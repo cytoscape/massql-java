@@ -1,0 +1,24 @@
+massql-java — dependency audit
+Generated 2026-07-31T01:02:00Z by scripts/dependency-audit.sh
+
+Answers SPIKE.md §11 Q3 and "did dependency complexity stay bounded?" at the review gate.
+
+================================================================
+SHIPPING CLOSURE  (compile+runtime = what massql-app embeds)
+================================================================
+  ARTIFACT                                            SIZE  SERVICES  VERSIONS  NATIVE
+  javolution-core-java-msftbx-6.11.8.jar            459292         0         0       0
+  antlr4-runtime-4.13.2.jar                         326307         0         0       0
+  TOTAL                                             785599
+
+  0.749 MB of ~1.5 MB budget (49.9%) — PASS
+  SERVICES / VERSIONS / NATIVE must all be 0 (constraints 1, 4, 3): 0 violation(s)
+
+  Test scope is excluded and must be: junit-platform-commons ships 10
+  META-INF/versions entries and junit-jupiter-engine 2 META-INF/services.
+
+See DEPENDENCY_POLICY.md for why MSDK, Guava, slf4j, JAXB and CDK are absent.
+
+================================================================
+FULL TREE
+================================================================

@@ -1,0 +1,71 @@
+# Builds a version-stamped massql-java-X.Y.Z.jar, attaches it to the GitHub release, and
+# deploys to the Cytoscape nexus (settled decision 4).
+#
+# Modelled on ../cy-ndex-2/.github/workflows/release.yml. Deliberate differences:
+#
+#   1. JDK 17, not 11 (constraint 7).
+#   2. No `xvfb-run` — nothing here touches AWT.
+#   3. Runs the FULL suite instead of `-DskipTests`. cy-ndex-2 skips tests on release;
+#      for an SDK whose whole value is bug-for-bug agreement with a pinned MassQL commit,
+#      publishing an unverified jar defeats the point. `verify` also packages, so this
+#      costs one build, not two.
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: MVN
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # Tag is the single source of truth for the version. Reject anything that is not
+      # plain semver so a typo cannot publish a bogus coordinate to the nexus.
+      - name: Extract and validate version from tag
+        id: version
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Error: '$VERSION' is not valid semver (expected X.Y.Z)"
+            exit 1
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Set version in pom.xml
+        run: mvn -B versions:set -DnewVersion=${{ steps.version.outputs.version }} -DgenerateBackupPoms=false
+
+      # Full suite: unit + integration + enforcer bans. Also produces the jar.
+      - name: Build and verify release JAR
+        run: mvn -B verify
+
+      - name: Dependency audit
+        run: bash scripts/dependency-audit.sh
+
+      - name: Upload JAR to release
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            "target/massql-java-${{ steps.version.outputs.version }}.jar" \
+            --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Requires REPO_USER / REPO_PWD in the MVN environment, and a <server> whose <id>
+      # matches distributionManagement's repository id (cytoscape_releases).
+      - name: Deploy to Cytoscape nexus
+        run: mvn -B deploy -DskipTests
+        env:
+          REPO_USER: ${{ secrets.REPO_USER }}
+          REPO_PWD: ${{ secrets.REPO_PWD }}

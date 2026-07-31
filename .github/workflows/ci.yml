@@ -1,0 +1,72 @@
+# Runs the full test suite on every push to master and every PR.
+#
+# Modelled on ../cy-ndex-2/.github/workflows/ci.yml, with three deliberate differences:
+#
+#   1. `mvn verify`, NOT `mvn test`. cy-ndex-2 runs `mvn test`, which invokes surefire
+#      only. All three of this spike's gates live in *IT.java files run by failsafe
+#      (reader parity, the differential, the CLI contract), so `mvn test` would report
+#      green while skipping every gate.
+#   2. JDK 17, not 11 — DEPENDENCY_POLICY.md constraint 7 (matches Cytoscape 3.10.4).
+#   3. No `xvfb-run`. cy-ndex-2 needs a virtual display because Cytoscape touches AWT;
+#      nothing in massql-java does (SPIKE.md §6d: "No display needed").
+name: Continuous Integration
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # Unit + integration tests, JaCoCo, and the enforcer dependency bans (which run at
+      # the validate phase, so a banned dependency fails the build rather than the bundle).
+      - name: Verify
+        run: mvn -B verify
+
+      # DEPENDENCY_POLICY.md as an executable check: exits non-zero if the shipping
+      # closure exceeds ~1.5 MB or if any artifact carries META-INF/services,
+      # META-INF/versions or a native library.
+      - name: Dependency audit
+        run: bash scripts/dependency-audit.sh
+
+      # Guards against a vacuous green run. Fixtures with unstated provenance are
+      # gitignored (the Ewing pair), so tests that need them skip by design — but a run
+      # where NOTHING executed must fail, not pass silently.
+      - name: Assert tests actually ran
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          total=0
+          for f in target/surefire-reports/*.txt target/failsafe-reports/*.txt; do
+            n=$(grep -ohE 'Tests run: [0-9]+' "$f" | head -1 | grep -oE '[0-9]+' || echo 0)
+            total=$((total + n))
+          done
+          echo "tests executed: $total"
+          if [ "$total" -lt 1 ]; then
+            echo "FAIL: no tests executed - a green run here would prove nothing" >&2
+            exit 1
+          fi
+
+      - name: Upload reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            target/surefire-reports/
+            target/failsafe-reports/
+          retention-days: 7
