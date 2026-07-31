@@ -1,5 +1,5 @@
 massql-java — dependency audit
-Generated 2026-07-31T01:02:00Z by scripts/dependency-audit.sh
+Regenerate with: make audit
 
 Answers SPIKE.md §11 Q3 and "did dependency complexity stay bounded?" at the review gate.
 

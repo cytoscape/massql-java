@@ -1,4 +1,30 @@
+# Build output. Covers everything Maven generates: generated-sources (the ANTLR parser),
+# classes, surefire-reports, failsafe-reports, jacoco.exec and the site report.
 target/
+
+# IDE
 .idea/
 *.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# Editor / OS noise
 .DS_Store
+*.swp
+*~
+
+# ---------------------------------------------------------------------------------------
+# DO NOT ignore src/test/resources/reference_parses/*.json
+#
+# Those 46 files look like temp output because of their hash-suffixed names
+# (QUERY_scaninfo_MS1DATA__WHERE_MS1MZ_425.2898TOLERA___106d511f8de4ae41364fbece4838e2c8.json)
+# but that is MassQL's own test-corpus naming and they are REQUIRED fixtures.
+# ParseConformanceTest reads every one and asserts the count is exactly 46, so ignoring them
+# turns the parser conformance suite into a vacuous pass and then a hard failure.
+#
+# Same for reference_parses/corpus-manifest.tsv and dependency-audit.txt: both are
+# checked-in review artifacts, not generated noise. The audit file is content-deterministic
+# (no timestamp) precisely so it only shows a diff when the closure actually changes.
+# ---------------------------------------------------------------------------------------

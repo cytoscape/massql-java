@@ -1,0 +1,101 @@
+package edu.ucsd.idekerlab.massql;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import edu.ucsd.idekerlab.massql.lang.ast.MassqlQuery;
+
+import java.lang.reflect.*;
+import java.util.*;
+
+import org.junit.jupiter.api.Test;
+
+/**
+ * No third-party type may appear on the public surface.
+ *
+ * <p>This is what keeps the parser swappable — for a hand-written one, or the remote
+ * {@code /parse} escape hatch — without touching the engine or any caller. It is cheap to
+ * assert and easy to violate by accident, e.g. by returning an ANTLR {@code ParserRuleContext}
+ * or accepting a {@code Token} in a helper that later becomes public.
+ *
+ * <p>It also guards {@code DEPENDENCY_POLICY.md} constraint 9 in spirit: the same check will
+ * catch an MSDK or vendored reader type leaking out in Tech_Step6/7.
+ */
+class AstEncapsulationTest {
+
+    /** Package prefixes that must never appear in a public signature. */
+    private static final List<String> FORBIDDEN = List.of(
+            "org.antlr.",                                 // the parser must stay swappable
+            "io.github.msdk.",                            // vendoring source, never a dependency
+            "edu.ucsd.idekerlab.massql.io.vendor.",        // vendored parser internals
+            "com.google.common.",                         // Guava is deliberately absent
+            "org.slf4j.",                                 // the SDK logs nothing
+            "org.cytoscape."                              // the compile-time firewall
+    );
+
+    private static final List<Class<?>> PUBLIC_API = List.of(
+            Massql.class, MassqlOptions.class, MassqlException.class,
+            MassqlParseException.class, MassqlQuery.class);
+
+    @Test
+    void noForbiddenTypeAppearsInAnyPublicSignature() {
+        List<String> violations = new ArrayList<>();
+        for (Class<?> c : PUBLIC_API) {
+            for (Method m : c.getMethods()) {
+                if (m.getDeclaringClass() == Object.class) continue;
+                check(violations, c + "#" + m.getName() + " return", m.getGenericReturnType());
+                for (Type p : m.getGenericParameterTypes()) {
+                    check(violations, c + "#" + m.getName() + " param", p);
+                }
+            }
+            for (Constructor<?> k : c.getConstructors()) {
+                for (Type p : k.getGenericParameterTypes()) {
+                    check(violations, c + " ctor param", p);
+                }
+            }
+            for (Field f : c.getFields()) {
+                check(violations, c + "#" + f.getName(), f.getGenericType());
+            }
+        }
+        assertTrue(violations.isEmpty(),
+                () -> "third-party types leaked onto the public API:\n  " + String.join("\n  ", violations));
+    }
+
+    private static void check(List<String> out, String where, Type t) {
+        String n = t.getTypeName();
+        for (String bad : FORBIDDEN) {
+            if (n.contains(bad)) out.add(where + " -> " + n);
+        }
+    }
+
+    @Test
+    void theAstPackageItselfIsFreeOfThirdPartyTypes() {
+        // Walk the AST reachable from MassqlQuery: its own records must be clean too, not
+        // just the entry points.
+        Deque<Class<?>> todo = new ArrayDeque<>(List.of(MassqlQuery.class));
+        Set<Class<?>> seen = new HashSet<>();
+        List<String> violations = new ArrayList<>();
+        while (!todo.isEmpty()) {
+            Class<?> c = todo.pop();
+            if (!seen.add(c) || !c.getName().startsWith("edu.ucsd.idekerlab.massql")) continue;
+            for (Method m : c.getMethods()) {
+                if (m.getDeclaringClass() == Object.class) continue;
+                check(violations, c.getSimpleName() + "#" + m.getName(), m.getGenericReturnType());
+                if (m.getReturnType().getName().startsWith("edu.ucsd.idekerlab.massql")) {
+                    todo.push(m.getReturnType());
+                }
+            }
+            for (Class<?> nested : c.getPermittedSubclasses() == null ? new Class<?>[0] : c.getPermittedSubclasses()) {
+                todo.push(nested);
+            }
+        }
+        assertTrue(violations.isEmpty(),
+                () -> "third-party types reachable from the AST:\n  " + String.join("\n  ", violations));
+    }
+
+    @Test
+    void massqlParseExceptionIsCatchableAsMassqlException() {
+        // The app catches one type; a parse failure must not require a separate catch block.
+        assertTrue(MassqlException.class.isAssignableFrom(MassqlParseException.class));
+        assertTrue(RuntimeException.class.isAssignableFrom(MassqlException.class));
+    }
+}

@@ -14,7 +14,11 @@ jarfor() {
 TOTAL=0; VIOLATIONS=0
 {
 echo "massql-java — dependency audit"
-echo "Generated $(date -u +%Y-%m-%dT%H:%M:%SZ) by scripts/dependency-audit.sh"
+# Deliberately NO timestamp. This file is checked in (Tech_Step13), and `make verify` runs
+# this script, so a timestamp would dirty the working copy on every single build and train
+# everyone to ignore its diffs. Content-deterministic means it changes ONLY when the
+# dependency closure actually changes -- which is the one time you want to see a diff.
+echo "Regenerate with: make audit"
 echo
 echo "Answers SPIKE.md §11 Q3 and \"did dependency complexity stay bounded?\" at the review gate."
 echo
