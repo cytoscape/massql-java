@@ -88,7 +88,35 @@ them; that would defeat the gate.
 ### 2. What to assert, per fixture
 
 Parameterize over every fixture with a dump: `small.mzML`, `small.mzXML`, `PlusRise.mgf`,
-`DP00570_F02.mzxml`, `DP00570_F02.mgf`, and the three micro-fixtures.
+`DP00570_F02.mzxml`, `DP00570_F02.mgf`, and the three original micro-fixtures.
+
+> ⚠ **Correction C28 — the dumps are authoritative per SCAN, never for ORDER.**
+> `dump_loader_parity.py` builds its `scans` list from `ms1_df` then `ms2_df`, so a dump holds **all MS1
+> entries followed by all MS2 entries** — 229 then 687 on the Ewing file, not document order. Anything
+> order-dependent must be re-derived from the file itself.
+>
+> Found the hard way in Step 7: `Ms1ScanDocumentOrderIT` originally derived its expected `ms1scan` chain
+> from the dump and failed against a *correct* reader, assigning the last MS1 (913) to all 687 MS2 scans.
+> It now walks the raw XML with a regex instead — which is better anyway, because that shares no code
+> with the streaming walk, so agreement is a real cross-check rather than one bug appearing twice.
+>
+> Use the dumps for `peak_count`, `i_sum_hex`, digests and first-8 values, **keyed by scan id**. Never
+> for "the Nth scan is…".
+
+> ⚠ **Step 7 added six micro variants, and four of them have NO dump.** `micro_p64.mzXML`,
+> `micro_zlib.mzXML`, `micro_p64_zlib.mzXML` and `micro_nested.mzXML` are decodable by MassQL, so dumps
+> *could* be generated — but were not, because Step 7 pinned them by cross-fixture equivalence instead
+> (zlib must decode bit-identically to uncompressed, nested row-for-row identically to flat), which is a
+> stronger statement than either against a golden. Either generate their dumps here or state in
+> `PARITY_REPORT.md` that they are covered by equivalence rather than by parity. **Do not silently drop
+> them from the coverage count.**
+
+> ⛔ **Two fixtures MUST be excluded from this sweep — MassQL cannot load them at all**
+> (Correction C27c). `micro_nopolarity.mzXML` raises `KeyError: 'polarity'` and
+> `micro_noprecursor.mzXML` raises `KeyError: 'precursorMz'`, both verified by execution. **No golden or
+> dump can exist for either**, so a parity harness that globs `fixtures/micro/*.mzXML` will fail trying
+> to load a dump that was never generated. Exclude them by name, with a comment saying why — they pin
+> *our* contract in `MzxmlPolarityTest` / `MzxmlEdgeCaseTest`, and parity is not available.
 
 > ⚠ **Correction C22 changes the shape of this test, and simplifies it.** There is no whole-file
 > table to compare against any more — iterate the `SpectraStream` cursor and compare **scan by scan**
@@ -143,17 +171,40 @@ computed from our loaded table using [Step 5](Tech_Step5.md)'s reductions:
 | `basePeakIntensity` | `max(i)` for that scan |
 | `totIonCurrent` | `sum(i)` for that scan |
 
-Expect **minor float drift on `totIonCurrent`** — the instrument's own value was computed by the vendor's
-software in unknown precision and order — so compare it with a relative tolerance (1e-6 is generous and still
-diagnostic). `basePeakMz` and `basePeakIntensity` are selected values, not accumulations, and should match much
-more tightly; hold them to 1e-9 relative.
+> ⛔ **Correction C30 — the tolerances this section prescribed are too tight on all three columns, and
+> the reasoning behind them was wrong.** It asked for 1e-9 relative on `basePeakMz` and
+> `basePeakIntensity` because they are "selected values, not accumulations", and called 1e-6 "generous"
+> for `totIonCurrent`. **Measured across all 916 Ewing scans in Step 7:**
+>
+> | Attribute | Worst relative delta | At scan |
+> |---|---|---|
+> | `totIonCurrent` | **4.724e-06** | 654 |
+> | `basePeakIntensity` | **4.895e-06** | 502 |
+> | `basePeakMz` | **4.850e-06** | 344 |
+>
+> Every one of those exceeds the prescribed tolerance, so the check as specified fails on a correct
+> reader. The premise was the mistake: the drift does **not** come from our accumulation order, it comes
+> from the attributes themselves — the vendor wrote them as decimal text derived from `float32` values,
+> so a *selected* value is no more exact than a summed one. That is why all three land at the same ~5e-6
+> magnitude.
+>
+> **Use 1e-5 relative on all three** — just above the measurement, so a real regression cannot hide
+> inside it. Already implemented in `InstrumentAttributeCrossCheckIT` (Step 7), which reproduces the
+> table above to three digits against an independent Python measurement.
 
-**A systematic mismatch is a bug, not drift.** If every scan is off by a consistent factor or offset, that is a
-decoder or reduction error. Report the distribution of deltas in `PARITY_REPORT.md`, not just pass/fail — a
-uniform tiny scatter around zero is healthy; a bias is not.
+**A systematic mismatch is a bug, not drift**, and a small worst-case delta does not by itself prove the
+absence of one. Assert the *shape*: differences must fall on both sides of zero roughly evenly. A
+one-sided distribution means we are consistently dropping or double-counting, which a max-delta check
+cannot see. Step 7's implementation does this by counting how many scans come out high versus low and
+requiring both sides to be non-trivial. Report the distribution in `PARITY_REPORT.md`, not just pass/fail.
 
-Some Ewing scans carry `peaksCount="3"` (noted in Step 2's `CONVERSION_NOTES.md`). Assert those by hand-written
-literal values, so at least a few assertions in the suite are readable without tooling.
+Also assert that the check is **sharp**: within each scan the runner-up peak's m/z must be far enough
+from the base peak's that a wrong `argmax` could not hide inside the tolerance. Otherwise `basePeakMz`
+agreement is weaker evidence than it appears.
+
+**11** Ewing scans carry `peaksCount="3"` — measured, and more than Step 2's `CONVERSION_NOTES.md`
+implies. Assert those by hand-written literal values, so at least a few assertions in the suite are
+readable without tooling.
 
 ### 4. The parity report
 

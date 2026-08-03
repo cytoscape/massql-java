@@ -211,7 +211,7 @@ referenceable param groups unless a fixture forces them.
 | **`scan`** | ⚠ **was missing from this spec entirely.** `int(spectrum["id"].replace("scanId=","").split("scan=")[-1])` (`msql_fileloading.py:575`) — strip any `scanId=` prefix, split on `scan=`, take the **LAST** segment. This is the field that determines every row's identity. An id with no `scan=` makes MassQL raise `ValueError`; we throw `MassqlException` naming the id — a documented deviation, a clean error either way |
 | `mslevel` | `MzMLCV.cvMSLevel` = `MS:1000511`. Route to the MS1 or MS2 side. Levels > 2 are out of scope: skip and report via `diagnostics()` |
 | **`rt`** | `MzMLCV.MS_RT_SCAN_START` = `MS:1000016`, **with its declared unit**. Convert **only if** seconds (`:564-571`). `small.mzML` says `unitName="minute"` → pass through. Read `unitName` *or* `unitAccession`. Store at **double** precision |
-| `precmz` | `MzMLCV.cvPrecursorMz` = `MS:1000744`. Absent → `0` sentinel |
+| `precmz` | `MzMLCV.cvPrecursorMz` = `MS:1000744`. Absent → `0` sentinel. ⚠ **Read it from `selectedIon[0]` of `precursor[0]` ONLY** — MassQL hard-indexes both (`:603`), so when a scan declares several precursors (multiplexed/MSX acquisition) the **FIRST wins, not the last**. This step originally overwrote on every matching cvParam; no fixture was multi-precursor, so nothing caught it (Correction C31) |
 | `charge` | `MzMLCV.cvChargeState` = `MS:1000041`. Absent → `0` sentinel |
 | **`ms1scan`** | **Document order.** See §4 — do **not** read `spectrumRef` |
 | `polarity` | `cvPolarityPositive` `MS:1000130` → 1, `cvPolarityNegative` `MS:1000129` → 2, else 0 |

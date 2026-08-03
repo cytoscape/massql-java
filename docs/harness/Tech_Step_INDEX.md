@@ -35,7 +35,7 @@ owning step.
 | [4](Tech_Step4.md) | Grammar, typed AST, `Massql.parse()` | 3, 1 | 3 d | | ✅ **DONE 2026-07-30** |
 | [5](Tech_Step5.md) | Columnar store + per-scan reductions | 3 | 1.5 d | | ✅ **DONE 2026-07-30** |
 | [6](Tech_Step6.md) | `SpectraStream` cursor + MGF reader + mzML reader | 3, 5, 1, 2 | 1.5 d | | ✅ **DONE 2026-08-03 — 275 tests** |
-| [7](Tech_Step7.md) | **Hand-written** mzXML reader (C23) | 3, 5, 6, 2 | 1 d | | in progress |
+| [7](Tech_Step7.md) | **Hand-written** mzXML reader (C23) | 3, 5, 6, 2 | 1 d | | ✅ **DONE 2026-08-03 — 335 tests** |
 | [8](Tech_Step8.md) | Reader parity — bit-identical vs Python | 2, 6, 7 | 0.5 d | ⛔ **GATE** | not started |
 | [9](Tech_Step9.md) | Condition filters (9a required + 9b) | 4, 5, 8 | 2 d | | not started |
 | [10](Tech_Step10.md) | `scaninfo` collation, result model, JSON | 9, 5 | 1.5 d | | not started |
@@ -223,6 +223,68 @@ differential runs `--output <tmp>` and diffs the **file**; stream hygiene stays 
 **Not affected: the SDK.** The Cytoscape app calls `Massql.execute` and writes the JSON into the node
 table in-process. There is no stdout, no temp file and no process boundary anywhere in the app's data
 path — the layer the reader assumed was at issue was never involved.
+
+### Corrections found while executing Step 7
+
+**C28 — the loader-parity dumps are grouped by ms level, so they cannot express document order.**
+`oracle/dump_loader_parity.py` builds its `scans` list from `ms1_df` then `ms2_df`, so a dump holds all
+MS1 entries followed by all MS2 entries — 229 then 687 on the Ewing file. Deriving the `ms1scan` chain
+from a dump therefore assigns the **last** MS1 (913) to every MS2. Found by writing
+`Ms1ScanDocumentOrderIT` that way and having it fail against a correct reader.
+
+**Consequence for [Step 8](Tech_Step8.md):** the dumps are authoritative for *per-scan* facts — peak
+counts, hex sums, digests, keyed by scan id — and **not** for anything order-dependent. Any assertion
+about sequence must re-derive order from the file. `Ms1ScanDocumentOrderIT` now does exactly that with a
+regex over the raw XML, which has the side benefit of sharing no code with the streaming walk, so
+agreement is a genuine cross-check rather than one bug appearing twice.
+
+**C31 — an MS2 scan may declare MULTIPLE precursors, and both readers took the LAST instead of the
+first.** MassQL hard-indexes `[0]` at every level: `precursorList.precursor[0].selectedIonList
+.selectedIon[0]` for mzML (`msql_fileloading.py:603`) and `spectrum["precursorMz"][0]` for mzXML (`:450`).
+Both of our readers instead **overwrote** `precmz` and `charge` on every occurrence, so a multi-precursor
+scan reported the last declared precursor.
+
+**Why nothing caught it:** every fixture in the project is single-precursor — measured `max=1` on
+`small.mzML`, `small.mzXML` and the Ewing file — so first-wins and last-wins are indistinguishable across
+the whole suite. It was found by asking whether mzML *can* carry several precursors, not by a test.
+
+**This is not a pathological input.** Multiplexed (MSX) acquisition deliberately co-fragments several
+precursors into one MS2 scan, and DIA/SWATH uses wide isolation windows with no single selected ion.
+MassQL keeps the first and discards the rest, so `micro_multiprec.{mzML,mzXML}` are **parity** fixtures —
+unlike the C27(c) pair, which MassQL cannot load at all.
+
+The mzML fixture carries **both** a second `<selectedIon>` inside the first `<precursor>` **and** a whole
+second `<precursor>`, so it catches a reader that honours one nesting level but not the other. Worth
+noting how the fix failed first time: the guard flag was added but never latched on `</selectedIon>`, so
+the reader silently reverted to last-wins and the mzML half of the test still reported the decoy
+(`1000.875`). A guard that is never set reads exactly like a guard that works.
+
+**C30 — [Step 8](Tech_Step8.md) §3's instrument-attribute tolerances are too tight on all three columns,
+and its reasoning was wrong.** It prescribed **1e-9** relative on `basePeakMz` and `basePeakIntensity`
+because they are "selected values, not accumulations", and called **1e-6** generous for `totIonCurrent`.
+Measured across all 916 Ewing scans: **4.850e-06**, **4.895e-06** and **4.724e-06** respectively — every
+one exceeds its prescribed tolerance, so the gate would fail against a correct reader.
+
+The premise was the error. The drift is not ours: the vendor wrote those attributes as decimal text
+derived from **`float32`** values, so a *selected* value is no more exact than a *summed* one. That is
+exactly why all three land at the same ~5e-6 magnitude rather than splitting into "tight" and "loose"
+columns. **Resolution: 1e-5 on all three**, just above the measurement.
+
+Two strengthenings came with it, now in `InstrumentAttributeCrossCheckIT`: assert the differences fall on
+**both sides of zero** (a max-delta check cannot see a systematic one-sided bias), and assert the check is
+**sharp** — the runner-up peak's m/z must be far enough from the base peak's that a wrong `argmax` could
+not hide inside the tolerance.
+
+**C29 — `make_micro_fixtures.py` never wrote `precursorCharge`, leaving mzXML's charge path untested.**
+The MGF writer emits `CHARGE=2+` for scan 5, but the mzXML writer emitted no charge attribute at all, so
+every MS2 scan came back `0` — which is *also* the absent-attribute default. A reader that ignored the
+attribute entirely would have passed. Fixed by emitting `precursorCharge` when the scan table has one.
+Scan 5 is the only such scan and it is absent from `micro_mzxml_results.json`, so no golden changed.
+
+> **Process note.** Both of these are the same shape as C27(b): a rule with no test, or a test that could
+> only pass. Neither was found by reading — C28 surfaced because a correct implementation failed a wrong
+> assertion, and C29 because an assertion passed for the wrong reason and the expected value looked
+> suspicious. Fixtures need the same "would this fail if the code were wrong?" check that assertions do.
 
 ### Corrections found while reviewing Step 7 as its implementer
 

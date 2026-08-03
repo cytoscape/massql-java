@@ -238,7 +238,7 @@ The expected per-format outcome, from `SPIKE.md` §3. `RESULT_CONTRACT.md` must 
 | `precmz` | ✔ (from `PEPMASS=`) | ✔ |
 | `ms1scan` | **null** — no survey scans exist | ✔ by **document order** ([Step 6](Tech_Step6.md) §4) |
 | `rt` | **`0.0`, not null** | ✔ |
-| `charge` | ⚠ **never null** — `CHARGE=` if present, else **`1`** (Correction C6; `SPIKE.md` §3 wrongly says null) | ✔ if recorded, else null via the `0` sentinel |
+| `charge` | ⚠ **never null** — `CHARGE=` if present, else **`1`** (Correction C6; `SPIKE.md` §3 wrongly says null) | ✔ if recorded, else null via the `0` sentinel. ⚠ **mzXML's absent default is `0`, not MGF's `1`** (`msql_fileloading.py:451`), and `DP00570_F02.mzxml` carries **zero** `precursorCharge` attributes — so in practice *every* row from it is null. That makes `charge` a **predicted difference** in [Step 12](Tech_Step12.md)'s Pair B, not a shared column (Correction C29) |
 | `tic` | ✔ sum of MS2 fragment intensities | ✔ |
 | `mslevel` | `2` | `2` |
 | `base_peak_i` / `base_peak_mz` | ✔ | ✔ |

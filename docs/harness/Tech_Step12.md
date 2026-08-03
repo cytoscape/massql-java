@@ -102,8 +102,13 @@ documented, but the reference wrapper adds the five computed columns uncondition
 **null**: `scan, rt, mslevel, tic, base_peak_i, base_peak_mz, ms1_i, ms1_precmz, ms1_base_peak_i`.
 **Resolve the open decision in [Step 10](Tech_Step10.md) §5 before writing this assertion.**
 
-Gitignored fixtures (both Ewing files) **skip with a clear message** when absent; never fail, never vacuously pass.
-Assert that the committed fixtures actually ran.
+> ⚠ **Correction C26 reverses this too** — it read *"gitignored fixtures (both Ewing files) skip with a
+> clear message when absent; never fail"*. Skipping is what made the whole suite prove nothing.
+
+A missing fixture is a **hard failure** naming `scripts/fetch-fixtures.sh` (the two Ewing files stay
+gitignored for licence reasons only; CI fetches and caches them). CI asserts the skipped-test count is
+**0** plus a floor on the number executed, so "the committed fixtures actually ran" is enforced by the
+build rather than left to a reviewer.
 
 ### 2. Layer 3 — cross-format equivalence
 
@@ -124,14 +129,29 @@ This is the higher-value half. Per the population table ([Step 10](Tech_Step10.m
 
 | Column | mzXML | MGF |
 |---|---|---|
-| `scan`, `precmz`, `rt`, `tic`, `mslevel`, `base_peak_i`, `base_peak_mz` | populated | populated |
+| `precmz`, `rt`, `tic`, `mslevel`, `base_peak_i`, `base_peak_mz` | populated | populated |
+| `scan` | populated — but **disjoint ids**, see below | populated |
 | `ms1scan` | **populated, by document order** | **null** |
 | `ms1_i`, `ms1_precmz`, `ms1_base_peak_i` | **populated** | **null** |
+| **`charge`** | **null on EVERY row** | **`2` (583 scans) or `1` (42 scans)** — never null |
 
-Assert both halves: the shared columns agree, **and** the `ms1_*` columns differ exactly this way. That pins the
-format distinction *and* the document-order rule in one test — the mzXML has **zero `precursorScanNum`
-attributes**, so populated `ms1scan` values are only possible under the document-order rule
-([Step 7](Tech_Step7.md)).
+> ⚠ **`charge` was missing from this table and it does NOT agree across the pair** (Correction C29).
+> Measured with MassQL's own loader on the two files:
+>
+> - The **mzXML has zero `precursorCharge` attributes**, so every row's raw charge is `0`, which
+>   [Step 10](Tech_Step10.md) converts to **null**. All 110,547 rows.
+> - The **MGF carries real charge data** and, by Correction C6, an absent `CHARGE=` becomes **`1`** rather
+>   than 0 — so MGF charge is **never null**: 583 scans at 2, 42 at 1.
+>
+> So `charge` belongs with the *predicted differences*, not the shared columns. A test asserting "the
+> shared columns agree" over a list that includes `charge` fails for an entirely correct reason. This is
+> the same underlying trap as C6 — three formats, three charge defaults — surfacing at the cross-format
+> layer where it is easiest to mistake for a bug.
+
+Assert both halves: the shared columns agree, **and** the `ms1_*` / `charge` columns differ exactly this
+way. That pins the format distinction *and* the document-order rule in one test — the mzXML has **zero
+`precursorScanNum` attributes**, so populated `ms1scan` values are only possible under the document-order
+rule ([Step 7](Tech_Step7.md)), where all 687 links are now verified.
 
 ⚠ **This is NOT a row-identity join — the two files have DISJOINT scan ids** (Correction C13: mzXML matches `[2, 556, 871]`, MGF matches `[370, 598]`). The MGF has no `SCANS=`, so MassQL numbers it by block index, and charge filtering dropped 62 of 687 MS2 scans. Assert the **population pattern per file** instead: on the mzXML every row has `ms1scan` and all three `ms1_*` populated; on the MGF every row has them null with `rt` = `0.0`. Do not attempt a join, and do not weaken this to "some rows populated" — it is every row on one side and none on the other.
 

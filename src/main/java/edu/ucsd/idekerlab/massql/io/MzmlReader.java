@@ -162,6 +162,14 @@ final class MzmlReader implements SpectraStream {
         boolean inBinaryArray = false;
         Binary bin = null;
 
+        // Correction C31: MassQL hard-indexes
+        // precursorList.precursor[0].selectedIonList.selectedIon[0] (msql_fileloading.py:603), so only
+        // the FIRST selectedIon of the FIRST precursor counts. mzML legitimately carries more --
+        // multiplexed (MSX) acquisition co-fragments several precursors -- and this reader used to
+        // OVERWRITE precmz/charge on every MS:1000744 it saw, i.e. last-wins. Every fixture was
+        // single-precursor, so nothing could catch it.
+        boolean firstSelectedIonDone = false;
+
         while (xml.hasNext()) {
             int ev = xml.next();
             if (ev == XMLStreamConstants.START_ELEMENT) {
@@ -169,8 +177,9 @@ final class MzmlReader implements SpectraStream {
                 CharArray name = xml.getLocalName();
                 if (eq(name, "cvParam")) {
                     if (inBinaryArray && bin != null) binaryCvParam(bin);
-                    else if (inSelectedIon) selectedIonCvParam();
-                    else spectrumCvParam();
+                    else if (inSelectedIon && !firstSelectedIonDone) selectedIonCvParam();
+                    else if (!inSelectedIon) spectrumCvParam();
+                    // else: a cvParam in a later selectedIon -- ignored, per [0] above.
                 } else if (eq(name, "selectedIon")) {
                     inSelectedIon = true;
                 } else if (eq(name, "binaryDataArray")) {
@@ -185,7 +194,14 @@ final class MzmlReader implements SpectraStream {
                 }
             } else if (ev == XMLStreamConstants.END_ELEMENT) {
                 CharArray name = xml.getLocalName();
-                if (eq(name, "selectedIon")) inSelectedIon = false;
+                if (eq(name, "selectedIon")) {
+                    inSelectedIon = false;
+                    // C31: the first selectedIon has now closed, so every later one -- whether a
+                    // sibling in this precursor or the first of a subsequent <precursor> -- is
+                    // ignored. This latch is the whole fix; without it the flag above never trips
+                    // and the reader silently reverts to last-wins.
+                    firstSelectedIonDone = true;
+                }
                 if (eq(name, "binaryDataArray")) {
                     if (bin != null) scan.accept(bin);
                     inBinaryArray = false;

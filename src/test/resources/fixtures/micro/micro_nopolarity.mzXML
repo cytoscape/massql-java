@@ -16,7 +16,7 @@
       <peaks precision="32" byteOrder="network" pairOrder="m/z-int"></peaks>
     </scan>
     <scan num="5" msLevel="2" peaksCount="1" retentionTime="PT120.0S">
-      <precursorMz precursorIntensity="0.0">500.0</precursorMz>
+      <precursorMz precursorIntensity="0.0" precursorCharge="2">500.0</precursorMz>
       <peaks precision="32" byteOrder="network" pairOrder="m/z-int">Qvbp4EWAAAA=</peaks>
     </scan>
   </msRun>

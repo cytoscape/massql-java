@@ -181,7 +181,9 @@ re-specify them here. This step only *adds* to the existing `ci.yml`:
 
 Already in place from Step 3 and not to be duplicated: JDK 17, `mvn verify` (not `mvn test` — every gate lives
 in an `*IT.java`), the dependency audit as a gate, and the "assert tests actually ran" guard that stops a
-skip-everything run from passing green.
+skip-everything run from passing green — **strengthened by Correction C26** to also assert the skipped-test
+count is **0**, plus a floor on the number executed, and a `fetch-fixtures.sh` step with an `actions/cache`
+for the two gitignored Ewing files.
 
 **`docs/SPIKE_ANSWERS.md`** — answer all eight §11 questions plainly. Four are already settled and just need
 carrying forward:
@@ -224,7 +226,9 @@ exposure than `SPIKE.md` assumed.
   `spectrumRef` will conclude we have a bug. §2.
 - **A coverage-percentage gate.** Invites tests written for the number. Map rules to tests instead.
 - **A hand-maintained feature matrix** that drifts from `UnsupportedConstructs`. Generate it.
-- **`make verify` exiting 0 when fixtures were skipped.** A green empty table is worse than a red one.
+- **`make verify` exiting 0 when fixtures were skipped.** A green empty table is worse than a red one. Since
+  Correction C26 a skip is structurally impossible — `Fixtures.require` fails — so the guard is now "assert
+  **zero** skips", and a skip appearing at all means someone reintroduced an `assumeTrue` or `@Disabled`.
 - **Doing the OSGi canary because it's recommended.** It is a decision for the gate. §7.
 - **Starting Phase 2 "while the review is pending."** The gate exists to prevent exactly that.
 
@@ -234,18 +238,20 @@ exposure than `SPIKE.md` assumed.
 |---|---|---|
 | `FeatureMatrixTest` | unit | The matrix in `docs/FEATURE_MATRIX.md` matches `UnsupportedConstructs` — every rejected construct listed, no listed construct silently supported. Keeps the published matrix honest. |
 | `OsgiReadinessIT` | IT | Runs `check-osgi-readiness.sh` and asserts exit 0, so the constraints are enforced by the build. |
-| `MakeVerifyIT` | IT | `make verify` exits non-zero when a differential is deliberately broken, and non-zero when all fixtures skip. Guards the review artifact against a false green. |
+| `MakeVerifyIT` | IT | `make verify` exits non-zero when a differential is deliberately broken, and non-zero if **any** test skips or fewer than the expected number run (C26 — "all fixtures skip" is no longer reachable, so the guard is a zero-skip assertion). Guards the review artifact against a false green. |
 
 ## Done when
 
 - [ ] `make verify` prints the per-format per-column table and exits 0; it exits non-zero on a broken differential
-      and on an all-skip run.
+      and on **any** skipped test (C26).
 - [ ] README contains: the pinned SHA, the feature matrix link, both result shapes, the population rules, **all
       known deviations**, the EPL-1.0 election, CLI usage, and the honest-framing paragraph.
 - [ ] `dependency-audit.txt` committed; total recorded; none of the forbidden artifacts present.
 - [ ] `scripts/check-osgi-readiness.sh` passes all nine assertions and runs in CI.
 - [ ] JaCoCo report generates; the README maps each §3 rule to the test that pins it.
-- [ ] CI green on push/PR, with no network access and no vacuous all-skip pass.
+- [ ] CI green on push/PR, with **zero skipped tests** and a floor on the number executed (C26). Note CI
+      does make one network call — `fetch-fixtures.sh` for the two gitignored Ewing files — behind an
+      `actions/cache`, so the flaky upstream is contacted once rather than per run.
 - [ ] `docs/SPIKE_ANSWERS.md` answers all eight §11 questions, including a measured LOC figure with a verdict on
       the 1,200–1,800 estimate.
 - [ ] The OSGi canary is **presented as a decision** in the README, not performed.

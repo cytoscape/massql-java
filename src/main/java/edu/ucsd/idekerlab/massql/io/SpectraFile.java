@@ -36,8 +36,7 @@ public final class SpectraFile {
         return switch (format) {
             case MGF -> new MgfReader(path);
             case MZML -> new MzmlReader(path);
-            case MZXML -> throw new MassqlException(
-                    "mzXML is not yet implemented -- see Tech_Step7. File: " + path);
+            case MZXML -> new MzxmlReader(path);
         };
     }
 

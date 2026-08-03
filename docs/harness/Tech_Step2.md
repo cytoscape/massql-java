@@ -46,6 +46,7 @@ Governing sections: `SPIKE.md` §6c, §7 Step 0.
 | `scripts/fetch-fixtures.sh` | Downloads the Ewing pair to `data/`, with size assertions |
 | `data/.gitignore` | Excludes the Ewing files (unstated provenance — referenced by URL, not committed) |
 | `fixtures/micro/micro.{mgf,mzML,mzXML}` + `micro_rtseconds.mzML` | 5 scans, <7 KB each. **Generated** by `oracle/make_micro_fixtures.py` from one explicit data table rather than hand-typed three times — the three encodings must contain identical peak data for the cross-format tests to mean anything. The table is the hand-written part. |
+| **Six more mzXML variants** (added in Step 7) | `micro_p64`, `micro_zlib`, `micro_p64_zlib`, `micro_nested`, `micro_nopolarity`, `micro_noprecursor`. Same generator, **one variable changed each**. Added because Corrections C27/C29 found that the primary fixtures are *all* `precision="32"` / uncompressed / `network`, leaving the 64-bit and zlib decode branches untested, and that the writer emitted no `precursorCharge` at all — so the charge path passed for the wrong reason. The last two are **not parity fixtures**: MassQL raises `KeyError` on both, so they pin our contract only |
 | `fixtures/micro/EXPECTED.md` | Hand-computed expected values per micro-fixture, with the arithmetic shown |
 | `fixtures/edge/empty_msLevel_tag.mzXML` | From MSDK's `msdk-io-mzxml` test resources |
 | `output/*_results.json` | One golden per (fixture, query) pair — see the matrix below |
@@ -110,8 +111,15 @@ curl -fL -o data/DP00570_F02.mgf   https://www.ewinglab.org/omicsanalysistutoria
 ```
 
 Assert the sizes — **3,761,778 B** for the mzxml, **2,196,881 B** for the mgf — and fail loudly on mismatch, so
-a silently-changed upstream file becomes a visible error rather than a mysterious test failure. Tests that
-depend on these files must **skip with a clear message** when they are absent, never fail.
+a silently-changed upstream file becomes a visible error rather than a mysterious test failure.
+
+> ⚠ **Correction C26 reverses what this paragraph used to say next** — *"tests that depend on these files
+> must skip with a clear message when they are absent, never fail"*. That instruction is how the whole
+> verification story came to prove nothing: the fixtures lived outside the repo, CI never had them, and
+> every parity assertion **skipped silently** while the test counter stayed healthy (surefire counts skips
+> inside "Tests run"). A missing fixture is now a **hard failure** carrying the
+> `scripts/fetch-fixtures.sh` command; CI fetches and caches these two files and asserts the skipped-test
+> count is **0**. See `docs/FIXTURES.md`.
 
 Expected content, for assertion: **916 scans (229 MS1, 687 MS2)**, mzXML schema **2.0**, `precision="32"`,
 `byteOrder="network"`, no compression, and **zero `precursorScanNum` attributes**:

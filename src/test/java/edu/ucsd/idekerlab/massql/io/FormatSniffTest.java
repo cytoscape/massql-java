@@ -81,12 +81,32 @@ class FormatSniffTest {
     }
 
     @Test
-    void mzxmlIsSniffedButNotYetReadable(@TempDir Path dir) throws IOException {
-        // Step 7 supplies the reader; until then the failure must name the step, not be a
-        // ClassNotFound or a null.
+    void mzxmlIsSniffedAndReadable(@TempDir Path dir) throws IOException {
+        // Step 7 supplied the reader, so this no longer asserts a "not yet implemented" throw.
+        // A scanCount="0" msRun is valid and simply yields nothing.
         Path p = write(dir, "a.mzXML", "<mzXML><msRun scanCount=\"0\"></msRun></mzXML>");
-        MassqlException e = assertThrows(MassqlException.class, () -> SpectraFile.open(p));
-        assertTrue(e.getMessage().contains("Tech_Step7"), e.getMessage());
+        assertEquals(Format.MZXML, SpectraFile.sniff(p));
+        try (SpectraStream s = SpectraFile.open(p)) {
+            assertEquals(Format.MZXML, s.format());
+            assertFalse(s.next(), "an empty msRun yields no scans");
+        }
+    }
+
+    @Test
+    void allThreeFormatsOpen(@TempDir Path dir) {
+        // The wiring assertion: every Format now maps to a reader, so a future fourth enum constant
+        // fails here rather than at a user's first open().
+        for (Format f : Format.values()) {
+            Path p = switch (f) {
+                case MGF -> Fixtures.require("fixtures/micro/micro.mgf");
+                case MZML -> Fixtures.require("fixtures/micro/micro.mzML");
+                case MZXML -> Fixtures.require("fixtures/micro/micro.mzXML");
+            };
+            try (SpectraStream s = SpectraFile.open(p)) {
+                assertEquals(f, s.format());
+                assertTrue(s.next(), f + " reader yielded no scans");
+            }
+        }
     }
 
     @Test

@@ -158,7 +158,7 @@ Correction C27(c), §4.
 | Field | Rule |
 |---|---|
 | **`scan`** | `int(num)`. pyteomics hands back `spectrum["id"]` as a **`str`** (`'1'`) — the root cause of C12 |
-| `precmz` | text of the first `<precursorMz>` element; absent on an MS2 → 0 (non-parity) |
+| `precmz` | text of the **first** `<precursorMz>` element — MassQL indexes `precursorMz[0]` (`:450`), so with several declared the **FIRST wins, not the last** (Correction C31; multiplexed/MSX acquisition produces such files). Absent on an MS2 → 0 (non-parity) |
 | **`charge`** | `precursorCharge`, absent → **`0`** (`:451`) — ⚠ **unlike MGF, where absent is `1`** (C6) |
 
 **`ms1scan`:** document order, per [Step 6](Tech_Step6.md) §4. `precursorScanNum` is **never read** — not even
@@ -254,23 +254,38 @@ spec previously called it `SpectraFileCloseTest`) must now be re-run against an 
 | `MzxmlDecodeTest` | unit | Big-endian; **interleaved pairs** correctly de-interleaved; `precision="32"` widened via `(double)(float)`, asserted on **raw bits**; `precision="64"`; zlib-compressed and uncompressed; absent `compressionType` treated as uncompressed. ⚠ **`micro.mzXML` alone cannot satisfy this** — it, `small.mzXML` and the Ewing file are *all* `precision="32"` / uncompressed / `network`, so §3's claim that the two fixtures "cover every decode path" was false (Correction C27, §6). The 64-bit and zlib paths need the new `micro_p64.mzXML` / `micro_zlib.mzXML` variants; `empty_msLevel_tag.mzXML` happens to be 64-bit + zlib but only 2 of its 10 scans survive the `msLevel` filter, so it is a poor primary source. |
 | `MzxmlPolarityTest` | unit | **Two groups, kept separate** (C27c). *Parity:* `"+"` → 1, `"-"` → 2, present-but-other → 0 — these MassQL can produce. *Our contract, no golden:* absent attribute → 0, asserted with a comment saying MassQL raises `KeyError` here. A single test lumping them together would imply parity we do not have. |
 | `MzxmlEdgeCaseTest` | unit | `empty_msLevel_tag.mzXML`: `msLevel=""` scans are **dropped, zero rows** (C27a — 8 of 10 dropped, scans 4 and 8 survive); `peaksCount="0"` yields an empty scan and **must not update the `ms1scan` chain** (C27b); MS2 with no `<precursorMz>` → `precmz = 0`, non-parity; truncated file throws with **no partial table**. |
-| `MzxmlSchema20IT` | IT | `data/DP00570_F02.mzxml` (schema 2.0) parses: **916 scans, 229 MS1, 687 MS2**. |
+| `MzxmlSchema20IT` | IT | `data/DP00570_F02.mzxml` (schema 2.0) parses: **916 scans, 229 MS1, 687 MS2**; scan ids strictly increasing (the nested walk must not re-emit or reorder); `peaksCount` agrees with the decoded length on every scan; the file really is nested (depth 2) and really is schema 2.0, so the premise cannot rot; the **11** `peaksCount="3"` scans are read rather than treated as empty; and a clean file produces **no** diagnostics. |
+| `MzxmlReaderTest` | unit | The Step 6-style oracle cross-check for `small.mzXML`, plus the **flat-vs-nested row-for-row equivalence** on the micro pair, `precursorScanNum` ignored (with the 34 occurrences asserted present first), and mzXML `charge` absent → 0 contrasted against MGF's 1. |
+| `StreamingMemoryTest` (extended) | unit | Step 7 §5: the Ewing file streams inside a **48 MB heap** and retains ~87 KB. mzXML holds a mapped region plus one scan's base64, which is a different retention shape from MGF's reader, so it needs its own proof. |
 | `InstrumentAttributeCrossCheckIT` | IT | A free check with **no Python in the loop**: the Ewing file's own `basePeakMz`, `basePeakIntensity` and `totIonCurrent` scan attributes vs our computed values. Hand-check the `peaksCount="3"` scans noted in Step 2. Expect minor float drift on `tic`; a **systematic** mismatch is a bug. (Full form in [Step 8](Tech_Step8.md).) |
 | `VendoredProvenanceTest` | unit | Every file under `io/vendor/` contains the provenance header and the string `EPL-1.0` — makes the licence obligation a build-enforced fact rather than a convention. |
 
 ## Done when
 
-- [ ] `mvn verify` green; `mvn dependency:tree` still shows **no** dsiutils, fastutil, Guava or logback,
-      and `scripts/dependency-audit.sh` reports the unchanged **two-artifact 785,599 B** closure.
-- [ ] **Both scan layouts** covered: flat (`small.mzXML`) and nested (`DP00570_F02.mzxml`).
-- [ ] **Nothing new under `io/vendor/`** (C23). `docs/VENDORED.md` is unchanged by this step — Step 6
-      already records the 13 decode-layer files, their upstream SHA, their modifications and the EPL-1.0
-      election citing the **pom** as authority.
-- [ ] `VendoredProvenanceTest` still passes over the files Step 6 vendored (this step adds none).
-- [ ] **`Ms1ScanDocumentOrderIT` passes on the Ewing mzXML** — the assertion that proves the document-order rule.
-- [ ] All four RT forms convert correctly; `precision="32"` asserted on raw bits.
-- [ ] `SpectraFile.open` handles `.mzXML` and `.mzxml`; the Step 6 close/leak test passes on mzXML too.
-- [ ] `docs/READER_RULES.md` extended with the mzXML column and the `msLevel`-absent rule.
+- [x] `mvn verify` green — **326 unit + 9 IT, 0 skipped**. `scripts/dependency-audit.sh` reports the
+      unchanged **two-artifact 0.749 MB** closure; no dsiutils, fastutil, Guava or logback.
+- [x] **Both scan layouts** covered: flat (`small.mzXML`, `micro.mzXML`) and nested
+      (`DP00570_F02.mzxml`, `micro_nested.mzXML`). The flat/nested pair is asserted as a **row-for-row
+      equivalence**, which is stronger than either alone, and the walk never treats `</scan>` as a
+      spectrum boundary — it emits at `<peaks>`, so both layouts take one code path.
+- [x] **Nothing new under `io/vendor/`** (C23) — still **13** files. `docs/VENDORED.md` unchanged.
+- [x] `VendoredProvenanceTest` still passes over the files Step 6 vendored (this step adds none).
+- [x] **`Ms1ScanDocumentOrderIT` passes on the Ewing mzXML** — all **687** MS2 links match document
+      order re-derived from the raw XML, including the non-trivial scan 100 → **97**. Zero
+      `precursorScanNum` in the file is asserted first, so the test cannot go vacuous. It **fails**
+      rather than skips when the fixture is absent (C26).
+- [x] All RT forms convert correctly, including the three pyteomics quirks (`P1DT1H` → 60, `P1M` → 0,
+      a leading `-` refused); `PT1.38S` asserted **bit-exact**. `precision="32"` asserted on raw bits,
+      with a companion assertion that the 32- and 64-bit decodes genuinely differ.
+- [x] `SpectraFile.open` handles `.mzXML` and `.mzxml` by **content**; close/leak tests extended to
+      mzXML (200 open/close cycles), and the constrained-heap proof extended to the Ewing file —
+      **916 scans / 308,425 peaks in a 48 MB heap, 87 KB retained**.
+- [x] `docs/READER_RULES.md` extended: the mzXML rules now include `scan`, `precmz` and `charge`
+      (absent → **0**, unlike MGF's 1), the resolved `msLevel`-absent rule, and the two non-parity cases.
+- [x] **The instrument cross-check reconciles with no Python in the loop** — worst relative delta
+      4.72e-06 / 4.90e-06 / 4.85e-06 on `totIonCurrent` / `basePeakIntensity` / `basePeakMz` across all
+      916 scans, matching an independent Python measurement to three digits, with a bias check proving
+      the drift is noise rather than systematic.
 
 ## References
 

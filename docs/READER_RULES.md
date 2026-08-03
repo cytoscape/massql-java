@@ -69,6 +69,21 @@ MassQL reads neither mzML's `spectrumRef` nor mzXML's `precursorScanNum` — the
 recorded". Tech_Step10 converts 0 → null for those three only, and **never for `rt`** — `0.0` is a real
 retention time. Converting early would destroy the distinction between "absent" and "already converted".
 
+**Multiple precursors per MS2 scan → the FIRST one wins** (Correction C31). MassQL hard-indexes `[0]` at
+every level:
+
+| Format | What MassQL reads |
+|---|---|
+| mzML | `precursorList.precursor[0].selectedIonList.selectedIon[0]` (`:603`) |
+| mzXML | `spectrum["precursorMz"][0]` (`:450`) — `precursorCharge` comes from the same element |
+
+Not a pathological case: **multiplexed (MSX) acquisition co-fragments several precursors into one MS2
+scan**, and DIA/SWATH uses wide isolation windows with no single selected ion. A reader that overwrites on
+each occurrence takes the *last* and disagrees. Both of ours did, and no fixture could tell — all of
+`small.mzML`, `small.mzXML` and the Ewing file are single-precursor (`max=1`).
+`micro_multiprec.{mzML,mzXML}` now pin it; the mzML one carries a second `<selectedIon>` **and** a second
+`<precursor>`, so honouring only one nesting level still fails.
+
 **Levels > 2** are skipped and reported through `SpectraStream.diagnostics()`.
 
 **Malformed input throws `MassqlException` with no partial result.** A reader that returns 40 of 48 scans
@@ -204,6 +219,28 @@ is dropped and contributes zero rows; see the `msLevel` rule above.
 | per-scan peak counts | all match | — |
 | scan 3 `rt` | `0.011218333333333334` (bit-exact) | golden |
 | `ms1scan` for scans 3, 10, 17, 24, 37, 44 | 2, 9, 16, 23, 36, 43 | golden |
+
+`small.mzXML` against `goldens/loader-parity/small.mzXML.json.gz`: **48 / 14 / 34**, per-scan peak counts
+all match, and its 34 `precursorScanNum` attributes are ignored.
+
+`DP00570_F02.mzxml` (the Ewing file), read by `MzxmlReader`:
+
+| | reader | source of truth |
+|---|---|---|
+| scans / MS1 / MS2 | **916 / 229 / 687** | parity dump |
+| `<scan>` nesting depth | 2 (nested) — handled | the file itself |
+| `ms1scan`, all **687** MS2 scans | match | document order re-derived from the raw XML |
+| e.g. scan 100 → **97** (not 99) | ✓ | MassQL's own loader |
+| `totIonCurrent` / `basePeakIntensity` / `basePeakMz` | worst relative delta **4.72e-06 / 4.90e-06 / 4.85e-06** | the instrument's own scan attributes — **no Python in the loop** |
+| peaks streamed | 308,425 in a **48 MB heap**, 87 KB retained | — |
+
+That instrument cross-check is the strongest independent evidence the decode is right: the drift matches an
+independent Python measurement to three digits, and it depends on no golden, no pyteomics and no MassQL.
+
+> ⚠ **The loader-parity dumps are GROUPED BY LEVEL, not document order.** They are built from `ms1_df`
+> then `ms2_df`, so `scans` holds all MS1 entries followed by all MS2 entries. Reconstructing the
+> `ms1scan` chain from a dump therefore yields the *last* MS1 for every MS2 (913, on the Ewing file).
+> Derive document order from the file, not the dump — **[Step 8](harness/Tech_Step8.md) needs this too.**
 
 `PlusRise.mgf`: 34,513 scans, **758,544** real peaks, streamed inside a **48 MB heap** — the proof that
 retained memory is bounded by scan size, not file size (C22).

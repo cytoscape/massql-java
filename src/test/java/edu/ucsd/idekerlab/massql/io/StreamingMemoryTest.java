@@ -126,6 +126,62 @@ class StreamingMemoryTest {
         }
     }
 
+    /**
+     * The same constrained-heap proof for <b>mzXML</b> (Step 7 §5).
+     *
+     * <p>mzXML is the format where a whole-file design is most tempting, because the interleaved array
+     * decodes into two {@code double[]} at once. This asserts the streaming property holds there too:
+     * 916 scans and ~110k peak rows inside a <b>48 MB heap</b>, memory-mapped throughout.
+     *
+     * <p>Worth having separately from the MGF proof because the two readers retain different things —
+     * MGF holds a {@code BufferedReader}, mzXML holds a mapped region plus one scan's base64 text.
+     */
+    @Test
+    void mzxmlStreamsWithinAConstrainedHeap() throws Exception {
+        Path mzxml = Fixtures.require("data/DP00570_F02.mzxml");
+
+        String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        ProcessBuilder pb = new ProcessBuilder(
+                javaBin, "-Xmx48m", "-cp", System.getProperty("java.class.path"),
+                StreamHarness.class.getName(), mzxml.toString());
+        pb.redirectErrorStream(true);
+        Process proc = pb.start();
+        String output = new String(proc.getInputStream().readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8).trim();
+        int exit = proc.waitFor();
+
+        System.out.println("  48 MB heap subprocess (mzXML): exit=" + exit + " | " + output);
+        assertEquals(0, exit,
+                "streaming DP00570_F02.mzxml inside a 48 MB heap failed -- the mzXML reader is "
+                        + "accumulating scans rather than streaming. Output:\n" + output);
+        assertTrue(output.contains("916 scans"), "unexpected subprocess output: " + output);
+    }
+
+    @Test
+    void mzxmlRetainsNothingAcrossScans() {
+        // The retained-heap counterpart, for the mapped-file reader. Bounds are generous on purpose:
+        // what this tests is the SHAPE -- that nothing accumulates -- not an absolute byte figure.
+        Path mzxml = Fixtures.require("data/DP00570_F02.mzxml");
+
+        long baseline = settledHeap();
+        int scans = 0;
+        long peaks = 0;
+        try (SpectraStream s = SpectraFile.open(mzxml)) {
+            while (s.next()) {
+                peaks += s.current().materialize().rowCount();
+                scans++;
+            }
+        }
+        long retained = settledHeap() - baseline;
+
+        assertEquals(916, scans);
+        System.out.printf("  mzXML: streamed %d scans / %,d peaks | retained %,d KB%n",
+                scans, peaks, retained / 1024);
+        assertTrue(retained < 24L * 1024 * 1024,
+                "after streaming, " + (retained / 1024 / 1024) + " MB is still retained; the mzXML "
+                        + "reader appears to be accumulating scans");
+    }
+
     @Test
     void metadataOnlyIterationNeverDecodesPeaks() {
         // The payoff of deferred decoding: a query rejecting scans on RTMIN/SCANMIN/POLARITY/CHARGE

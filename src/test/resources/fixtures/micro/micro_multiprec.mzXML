@@ -3,6 +3,7 @@
   <msRun scanCount="5">
     <scan num="1" msLevel="2" peaksCount="2" polarity="+" retentionTime="PT0.0S">
       <precursorMz precursorIntensity="0.0">250.25</precursorMz>
+      <precursorMz precursorIntensity="0.0" precursorCharge="7">999.875</precursorMz>
       <peaks precision="32" byteOrder="network" pairOrder="m/z-int">QsgAAEN6AABDSIAARLuAAA==</peaks>
     </scan>
     <scan num="2" msLevel="1" peaksCount="3" polarity="+" retentionTime="PT30.0S">
@@ -10,6 +11,7 @@
     </scan>
     <scan num="3" msLevel="2" peaksCount="4" polarity="+" retentionTime="PT60.0S">
       <precursorMz precursorIntensity="0.0">500.0</precursorMz>
+      <precursorMz precursorIntensity="0.0" precursorCharge="7">999.875</precursorMz>
       <peaks precision="32" byteOrder="network" pairOrder="m/z-int">QsgAAEN6AABDSIAARLuAAENJAABCyAAAQ5YAAEQ7gAA=</peaks>
     </scan>
     <scan num="4" msLevel="1" peaksCount="0" polarity="+" retentionTime="PT90.0S">
@@ -17,6 +19,7 @@
     </scan>
     <scan num="5" msLevel="2" peaksCount="1" polarity="+" retentionTime="PT120.0S">
       <precursorMz precursorIntensity="0.0" precursorCharge="2">500.0</precursorMz>
+      <precursorMz precursorIntensity="0.0" precursorCharge="7">999.875</precursorMz>
       <peaks precision="32" byteOrder="network" pairOrder="m/z-int">Qvbp4EWAAAA=</peaks>
     </scan>
   </msRun>
