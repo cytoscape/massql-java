@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<mzXML xmlns="http://sashimi.sourceforge.net/schema_revision/mzXML_2.0">
+  <msRun scanCount="5">
+    <scan num="1" msLevel="2" peaksCount="2" retentionTime="PT0.0S">
+      <precursorMz precursorIntensity="0.0">250.25</precursorMz>
+      <peaks precision="32" byteOrder="network" pairOrder="m/z-int">QsgAAEN6AABDSIAARLuAAA==</peaks>
+    </scan>
+    <scan num="2" msLevel="1" peaksCount="3" retentionTime="PT30.0S">
+      <peaks precision="32" byteOrder="network" pairOrder="m/z-int">Q/n/gER6AABD+gEARZxAAEQWAABGDKAA</peaks>
+    </scan>
+    <scan num="3" msLevel="2" peaksCount="4" retentionTime="PT60.0S">
+      <precursorMz precursorIntensity="0.0">500.0</precursorMz>
+      <peaks precision="32" byteOrder="network" pairOrder="m/z-int">QsgAAEN6AABDSIAARLuAAENJAABCyAAAQ5YAAEQ7gAA=</peaks>
+    </scan>
+    <scan num="4" msLevel="1" peaksCount="0" retentionTime="PT90.0S">
+      <peaks precision="32" byteOrder="network" pairOrder="m/z-int"></peaks>
+    </scan>
+    <scan num="5" msLevel="2" peaksCount="1" retentionTime="PT120.0S">
+      <precursorMz precursorIntensity="0.0">500.0</precursorMz>
+      <peaks precision="32" byteOrder="network" pairOrder="m/z-int">Qvbp4EWAAAA=</peaks>
+    </scan>
+  </msRun>
+</mzXML>

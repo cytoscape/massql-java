@@ -90,6 +90,12 @@ them; that would defeat the gate.
 Parameterize over every fixture with a dump: `small.mzML`, `small.mzXML`, `PlusRise.mgf`,
 `DP00570_F02.mzxml`, `DP00570_F02.mgf`, and the three micro-fixtures.
 
+> ⚠ **Correction C22 changes the shape of this test, and simplifies it.** There is no whole-file
+> table to compare against any more — iterate the `SpectraStream` cursor and compare **scan by scan**
+> as you go, calling `ScanView.materialize()` for the peak-level assertions. That matches the dump's
+> own per-scan structure, and it means the parity suite itself never holds more than one scan, so it
+> can run against arbitrarily large files.
+
 | Assertion | Detail |
 |---|---|
 | MS1 scan count | Exact |
@@ -112,9 +118,16 @@ has nothing to do with decoding. The `massql_query.py` int coercion fixes the *g
 Known expected counts, for a fast sanity read: `small.mzML` and `small.mzXML` → **48 spectra (14 MS1, 34 MS2)**;
 `DP00570_F02.mzxml` → **916 scans (229 MS1, 687 MS2)**; `PlusRise.mgf` → **21,942 scans** loaded from 34,513 blocks, all MS2 (Correction C14 — MassQL drops ~12,571; assert the loaded count, not the block count).
 
-Fixtures that are gitignored (both Ewing files) must **skip with a clear message** when absent, never fail and
-never silently pass as a vacuous zero-assertion test. Assert that at least the committed fixtures ran, so a
-misconfigured CI that skips everything fails.
+> ⚠ **Correction C26 reverses what this paragraph used to say.** It required gitignored fixtures to
+> **skip with a clear message** when absent. That is exactly how this suite came to prove nothing: the
+> fixtures lived outside the repo, CI never had them, and *every* parity assertion skipped while the
+> test counter stayed healthy (surefire counts skips inside "Tests run").
+
+Fixtures are **committed to this repository** under `src/test/resources/`, and a missing fixture is a
+**hard failure** — `Fixtures.require` throws, there is no skip path, and `FixturesContractTest` asserts
+that. The two Ewing files remain gitignored for licence reasons only; `scripts/fetch-fixtures.sh`
+retrieves them, CI runs it and caches the result, and their absence still **fails** with that command in
+the message. CI additionally asserts the skipped-test count is **0**. See `docs/FIXTURES.md`.
 
 ### 3. The instrument-attribute cross-check
 
@@ -164,8 +177,10 @@ the README at [Step 13](Tech_Step13.md).
 - **Comparing sums but not individual values.** Sums can agree by cancellation while individual peaks are wrong,
   and can disagree by accumulation order while every peak is right. Compare the multiset (§1).
 - **Round-tripping the dumps through decimal.** Defeats bit-comparison. Parse the hex.
-- **A vacuous pass.** If the dumps fail to load, or every fixture skips, a green suite means nothing. Assert the
-  dump file loaded and that a minimum number of fixtures actually ran.
+- **A vacuous pass.** If the dumps fail to load, a green suite means nothing. Assert the dump file loaded and
+  that a minimum number of fixtures actually ran. Note that the *skip* half of this trap is now structurally
+  impossible — `Fixtures.require` fails rather than skipping, and CI asserts zero skips (Correction C26) —
+  but it is exactly the failure that went unnoticed for four steps, so do not reintroduce a conditional.
 - **Blaming the reader for a conversion artifact.** If `small.mzXML`'s scan ids differ from `small.mzML`'s, Step 2
   recorded that; check `CONVERSION_NOTES.md` before touching reader code.
 - **Comparing `rt` at float precision.** Requires `scanRt` as double ([Step 5](Tech_Step5.md) §1); a float
@@ -201,5 +216,5 @@ multiset comparator with a broken `equals`, produces a green gate that proves no
   mismatch here means the decoder is wrong, and this is the cheapest place to learn that."*), §7 Step 2 item 2,
   §11 Q1
 - [Step 2](Tech_Step2.md) §6 — the dump format
-- [Step 6](Tech_Step6.md) §3 and §5, [Step 7](Tech_Step7.md) §4 — the decode rules under test
+- [Step 6](Tech_Step6.md) §3 and §5, [Step 7](Tech_Step7.md) §3 — the decode rules under test
 - [Step 5](Tech_Step5.md) §1 — the `scanRt` double-precision requirement

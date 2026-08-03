@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<mzXML xmlns="http://sashimi.sourceforge.net/schema_revision/mzXML_2.0">
+  <msRun scanCount="5">
+    <scan num="1" msLevel="2" peaksCount="2" polarity="+" retentionTime="PT0.0S">
+      <precursorMz precursorIntensity="0.0">250.25</precursorMz>
+      <peaks precision="64" byteOrder="network" pairOrder="m/z-int" compressionType="zlib" compressedLen="24">eJxziGQAA4d8BwidKQChpxeAaQA8KAOJ</peaks>
+    </scan>
+    <scan num="2" msLevel="1" peaksCount="3" polarity="+" retentionTime="PT30.0S">
+      <peaks precision="64" byteOrder="network" pairOrder="m/z-int" compressionType="zlib" compressedLen="36">eJxzqLf/wAAEDv0ODGC63kEBTG/ugPCbDkDog1PANADnbwiv</peaks>
+    </scan>
+    <scan num="3" msLevel="2" peaksCount="4" polarity="+" retentionTime="PT60.0S">
+      <precursorMz precursorIntensity="0.0">500.0</precursorMz>
+      <peaks precision="64" byteOrder="network" pairOrder="m/z-int" compressionType="zlib" compressedLen="36">eJxziGQAA4d8BwidKQChpxdA+QoQGqau6ACEbofIAwDxPQeU</peaks>
+    </scan>
+    <scan num="4" msLevel="1" peaksCount="0" polarity="+" retentionTime="PT90.0S">
+      <peaks precision="64" byteOrder="network" pairOrder="m/z-int" compressionType="zlib" compressedLen="8">eJwDAAAAAAE=</peaks>
+    </scan>
+    <scan num="5" msLevel="2" peaksCount="1" polarity="+" retentionTime="PT120.0S">
+      <precursorMz precursorIntensity="0.0">500.0</precursorMz>
+      <peaks precision="64" byteOrder="network" pairOrder="m/z-int" compressionType="zlib" compressedLen="21">eJxziLtrw/7bJ9NhAwMYAAAxSgRf</peaks>
+    </scan>
+  </msRun>
+</mzXML>

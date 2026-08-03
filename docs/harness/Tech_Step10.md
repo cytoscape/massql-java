@@ -112,7 +112,15 @@ Mirrors `massql_query.py:163-167` (`ms2_df.groupby("scan")["i"].idxmax()`). Comp
 not by re-parsing the file, so scan ids line up exactly.
 
 **`ms1_i` / `ms1_precmz` / `ms1_base_peak_i`** — the precursor lookup, and the single most likely misreading of the
-entire contract:
+entire contract.
+
+> ⚠ **Correction C22: the MS1 scan comes from the STREAM's retained scan, not a whole-file MS1 table.**
+> By the document-order rule, `ms1scan` is always the most recent *preceding* MS1 scan — so the
+> executor holds exactly that one scan as a single-scan `SpectrumTable`, and this lookup runs against
+> it. Assert `retainedMs1.index().scanIdAt(0) == ms1scan`; if it ever disagrees, the document-order
+> rule has been broken upstream. The rule we treated as a fidelity burden is what makes streaming
+> possible at all.
+
 
 ```
 if ms1scan is present (non-zero) and the MS1 table has that scan:

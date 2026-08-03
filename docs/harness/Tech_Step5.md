@@ -76,6 +76,12 @@ public final class SpectrumTable {
 }
 ```
 
+> ⚠ **Correction C20: this list is incomplete.** It omits `precmz`, `ms1scan` and `charge`,
+> which [Step 10](Tech_Step10.md) needs. Verified against the loader: each has **exactly one
+> distinct value per scan**, so they are per-SCAN metadata (flattened per-peak only because
+> pandas is a flat frame) and they live on `ScanIndex` alongside the exact `rt`. They carry
+> MassQL's raw **0 sentinel**; the 0-to-null conversion stays in Step 10.
+
 `rt` is `float` and `polarity`/`msLevel` are `byte` per `SPIKE.md` §4. Note the consequence and record it in
 `STORE_DESIGN.md`: **`rt` is stored at float precision but the result contract reports it as a double.** The
 mzML golden carries `rt` = `0.011218333333333334`, which does not survive a float round-trip. Therefore:
@@ -86,6 +92,12 @@ Keep the `float[] rt` peak column for cheap row-level RT filtering, and addition
 `double[] scanRt` on the scan index (§3), which is what [Step 10](Tech_Step10.md) reports. Any RT value that
 reaches the result JSON comes from `scanRt`. This is a real, easily-missed divergence from a literal reading of
 `SPIKE.md` §4 — flag it in `STORE_DESIGN.md`.
+
+> ✅ **Correction C22 — lifetime, not layout.** Execution is streaming: a table normally holds **one
+> scan**, built per scan as the cursor advances, and the whole-file table is never materialised. **No
+> code change was needed here** and all 44 tests survive unchanged — every invariant holds for a
+> single-scan table. This makes the `OTHERSCAN` seam below *more* apt, not less: the seam is exactly
+> the ability to retain pre-filter MS1 data, which streaming already does for one scan.
 
 **Two tables per file, not one.** MS1 and MS2 peaks live in separate `SpectrumTable` instances, mirroring
 MassQL's `ms1_df` / `ms2_df` split (`msql_fileloading.load_data()` returns exactly that pair, and
@@ -259,12 +271,18 @@ can run before the readers exist.
 
 ## Done when
 
-- [ ] `mvn test` green; all tests above present and passing.
-- [ ] `STORE_DESIGN.md` documents: the layout, all five invariants, the **`rt` double-precision decision**, the
-      NaN-on-zero-max decision, the argmax tie rule, and the `OTHERSCAN` seam constraint.
-- [ ] No public method exposes a mutable internal array (grep for `double[] get`/`return mz`).
-- [ ] `StoreScaleTest` passes and its measured numbers are recorded in `STORE_DESIGN.md` as a baseline for
-      [Step 12](Tech_Step12.md)'s performance note.
+- [x] `mvn test` green — **44 store tests** (7 window, 8 reductions, 5 derived, 6 index, 7 builder, 7 mask,
+      4 scale), 227 in the suite overall.
+- [x] `docs/STORE_DESIGN.md` documents the layout, all five invariants, the **`rt` double-precision
+      decision**, the NaN-on-zero-max decision, the argmax tie rule, the no-epsilon/no-`Arrays.binarySearch`
+      window rules, and the `OTHERSCAN` seam stated as a constraint.
+- [x] No public method exposes a mutable internal array — `ScanIndex.scanIds()` returns a clone, asserted by
+      `ScanIndexTest.internalArraysDoNotEscape`.
+- [x] `StoreScaleTest` passes; measured baselines recorded in `STORE_DESIGN.md`. Window cost is **flat** as the
+      table grows 100x (10 ms over 30k scans vs 18 ms over 300), which is what a binary search looks like.
+
+**✅ STEP 5 COMPLETE — 2026-07-30.** See Correction **C20** in
+[`Tech_Step_INDEX.md`](Tech_Step_INDEX.md) and `docs/STORE_DESIGN.md`.
 
 ## References
 

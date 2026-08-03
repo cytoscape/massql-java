@@ -33,9 +33,9 @@ owning step.
 | [2](Tech_Step2.md) | Build the full fixture + golden set (3 formats) | 1 | 0.5 d | | ✅ **DONE 2026-07-30** |
 | [3](Tech_Step3.md) | Scaffold `massql-java`; fix the dependency policy; **CI + release workflows** | — | 0.5 d | | ✅ **DONE 2026-07-30** |
 | [4](Tech_Step4.md) | Grammar, typed AST, `Massql.parse()` | 3, 1 | 3 d | | ✅ **DONE 2026-07-30** |
-| [5](Tech_Step5.md) | Columnar store + per-scan reductions | 3 | 1.5 d | | not started |
-| [6](Tech_Step6.md) | `SpectraReader` iface + MGF reader + mzML reader | 3, 5, 1, 2 | 1.5 d | | not started |
-| [7](Tech_Step7.md) | Vendored mzXML reader | 3, 5, 6, 2 | 1 d | | not started |
+| [5](Tech_Step5.md) | Columnar store + per-scan reductions | 3 | 1.5 d | | ✅ **DONE 2026-07-30** |
+| [6](Tech_Step6.md) | `SpectraStream` cursor + MGF reader + mzML reader | 3, 5, 1, 2 | 1.5 d | | ✅ **DONE 2026-08-03 — 275 tests** |
+| [7](Tech_Step7.md) | **Hand-written** mzXML reader (C23) | 3, 5, 6, 2 | 1 d | | in progress |
 | [8](Tech_Step8.md) | Reader parity — bit-identical vs Python | 2, 6, 7 | 0.5 d | ⛔ **GATE** | not started |
 | [9](Tech_Step9.md) | Condition filters (9a required + 9b) | 4, 5, 8 | 2 d | | not started |
 | [10](Tech_Step10.md) | `scaninfo` collation, result model, JSON | 9, 5 | 1.5 d | | not started |
@@ -43,8 +43,9 @@ owning step.
 | [12](Tech_Step12.md) | Integration layers 2–4 + error paths | 11, 2, 8 | 1.5 d | ⛔ **GATE** | not started |
 | [13](Tech_Step13.md) | Harden, document, hand off | 12 | 2 d | ⛔ **REVIEW** | not started |
 
-**Total ≈ 16 days** (SPIKE.md §7 estimated ~12; the delta is the mzXML vendoring in Step 7 and the finer
-integration split, both of which were folded into Step 2 of the original estimate).
+**Total ≈ 16 days** (SPIKE.md §7 estimated ~12; the delta is the finer integration split, plus what was
+originally scoped as mzXML *vendoring* in Step 7 — now hand-written per **C23** — both of which were
+folded into Step 2 of the original estimate).
 
 ## Dependency graph
 
@@ -161,6 +162,256 @@ MGF ([Step 9](Tech_Step9.md)).
 
 **C9 — the reference-parse corpus is 46 files, not 47** (35 `scaninfo`, 11 non-`scaninfo`), and there are **2**
 unused mzML loaders, not 3. `msql.ebnf` is 165 lines and `msql_fileloading.py` is 892 lines, both as claimed.
+
+### Corrections found while implementing Step 6
+
+**C24 — four implementation findings, each now pinned by a test.**
+
+**(a) javolution logs to STDOUT.** `XMLStreamReaderImpl` calls `LogContext.info(...)` every time it
+grows its character buffer, and an mzML `<binary>` element triggers that on essentially every real
+file — 6 lines on `small.mzML`. **The governing rule is `DEPENDENCY_POLICY.md` constraint 2: the SDK
+logs nothing at all**, to *either* stream — this is an SDK-layer reader, so that is the whole argument,
+and it is why `StdoutCleanlinessTest` asserts stdout **and** stderr are silent. Secondarily, and at a
+different layer, it would also corrupt the **Java CLI**'s stdout payload ([Step 11](Tech_Step11.md); the
+Step 12 differential is such a consumer). Fixed by `JavolutionQuiet` raising `LogContext.LEVEL` above
+`INFO`. **Nothing else in the suite would have noticed.** (Leading this entry with the CLI contract
+instead of constraint 2 is the defect corrected by **C25(a)**.)
+
+**(b) The `12,571 dropped spectra` mystery in C14 is explained — nothing is dropped.**
+`PlusRise.mgf` has 34,513 blocks of which **12,571 contain no peak lines**, leaving exactly the 21,942
+MassQL reports. They are real spectra with zero peaks; MassQL's dataframe simply has no *rows* for them.
+Our reader yields all 34,513, which is correct. **[Step 8](Tech_Step8.md) must expect that asymmetry**,
+and must also exclude MassQL's synthetic 1-row all-zero MGF MS1 placeholder — the dump's 758,545 total
+is 758,544 real peaks plus that phantom row.
+
+**(c) `SpectrumTableBuilder`'s capacity was tuned for whole-file building.** Under streaming it runs once
+per *scan*, so its 1024-element initial arrays cost 16 KB for a 22-peak MGF spectrum — ~190 MB of
+garbage across PlusRise. Added a capacity-hint constructor (mzML passes `defaultArrayLength`, MGF its
+counted peaks) and reduced the defaults. **No Step 5 test changed**, so the redesign still has not leaked.
+
+**(d) Peak used-heap is not evidence of bounded memory.** The first `StreamingMemoryTest` asserted on it
+and failed at 119 MB — but with only ~10 KB *retained*, that is short-lived garbage the JVM had no reason
+to collect. Peak heap under no memory pressure measures GC laziness. Replaced with a subprocess that
+streams PlusRise inside **`-Xmx48m`**: it passes, which is an actual proof. Retained-after-settling is the
+other honest assertion.
+
+### Corrections found while reviewing the stdout / data-transfer design
+
+**C25 — the specs conflate three artifacts, and the Java CLI has no `--output` flag.**
+
+**(a) The terminology defect, and the harm it did.** C24(a) justified the `JavolutionQuiet` fix by
+saying javolution's logging "breaks [Step 11](Tech_Step11.md)'s contract that stdout carries only the
+JSON array" — without stating that Step 11 is the **CLI** layer. The bug is in `MzmlReader`, an **SDK**
+component, so the claim read as *"the SDK treats stdout as a data pipe"*. That is false, and it drew a
+justified challenge that the design was violating 12-factor. The rule that actually governs an SDK
+reader is `DEPENDENCY_POLICY.md` constraint 2: **a library writes to no stream at all** — which is why
+`StdoutCleanlinessTest` asserts stdout *and* stderr are silent. The CLI contract was the weaker
+argument and should never have been the leading one. See **Terminology** under *Spec conventions*; the
+three labels are now binding on every spec.
+
+**(b) There is no `--output FILE`.** stdout-as-data stays the **default** — it is the Unix filter
+convention, it is what the reference implementation deliberately does, and it keeps the Step 12
+differential a literal diff. But offering *only* stdout is a real gap for a batch tool, so
+[Step 11](Tech_Step11.md) gains `--output FILE`, written as `FILE.tmp` then `Files.move(…,
+ATOMIC_MOVE)` so a downstream consumer never observes a partial file.
+
+**(c) [Step 12](Tech_Step12.md)'s differential conflated two independent properties** — "is the JSON
+correct" and "are the streams clean" — by testing correctness *through a pipe*. Now split: the
+differential runs `--output <tmp>` and diffs the **file**; stream hygiene stays in Step 11's
+`MainStreamDisciplineTest` / `MainNoStackTraceOnStdoutTest`, cross-referenced not duplicated.
+
+**Not affected: the SDK.** The Cytoscape app calls `Massql.execute` and writes the JSON into the node
+table in-process. There is no stdout, no temp file and no process boundary anywhere in the app's data
+path — the layer the reader assumed was at issue was never involved.
+
+### Corrections found while reviewing Step 7 as its implementer
+
+**C26 — CI verifies almost nothing; the fixtures are invisible to it.** `Fixtures.require` resolves to
+`../massql` (deliberately outside this repo) and gates on `Assumptions.assumeTrue`, so a missing
+fixture makes the test **skip**. `ci.yml` checks out only `massql-java`, so `../massql` never exists
+there: [Step 6](Tech_Step6.md)'s oracle cross-check, [Step 8](Tech_Step8.md)'s parity assertions and
+**`Ms1ScanDocumentOrderIT` — the assertion Step 7 exists for — all skip silently.** Surefire counts
+skips inside `Tests run`, so the CI test-count guard cannot see it either. A green CI proved only that
+the code compiles and the pure-unit tests pass.
+
+**Resolution: commit the fixtures and goldens into the repo** (~29 MB + 7.8 MB), resolve `Fixtures`
+in-repo, and **fail instead of skip** on a missing fixture. CI additionally asserts the skipped-test
+count is **0**, so this regression cannot recur. Excluded: `oracle/.venv/` (contains an unrelated
+3.6 MB plotly JSON). One caveat carried from
+[`data/CONVERSION_NOTES.md`](../../../massql/data/CONVERSION_NOTES.md):13-14 — `DP00570_F02.mzxml` and
+`DP00570_F02.mgf` are recorded there as *"gitignored, unstated licence"*, so redistribution must be
+confirmed before those two are committed; `PlusRise.mgf` is already cleared under settled decision 5.
+
+**C27 — four reader rules were wrong or missing, and one is a live Step 6 defect.**
+
+**(a) The Step 7 §4 open item is answered — the scan is dropped.** pyteomics converts `msLevel=""` to
+**`None`**, and `msql_fileloading.py:434,450` test `mslevel == 1` / `== 2`, so it matches neither branch
+and the spectrum contributes **zero rows**. Not a default of 1, not a skip-with-diagnostic, not a
+failure. Verified on `fixtures/edge/empty_msLevel_tag.mzXML`: 8 of its 10 scans are `msLevel=""`.
+
+**(b) A zero-peak scan must NOT update the `ms1scan` chain — `MzmlReader` gets this wrong today.** Both
+loaders `continue` on `len(spectrum["intensity array"]) == 0` (`:421` mzXML, `:559` mzML) **before**
+`previous_ms1_scan` is ever assigned, so a zero-peak MS1 cannot become a link — a following MS2 links
+to the MS1 *before* it. [`READER_RULES.md`](../READER_RULES.md) states the document-order rule
+unconditionally and `MzmlReader` has no such guard. **Latent, not benign:** there are zero zero-peak
+scans in either mzXML fixture, so nothing in the suite can catch it. Readers still **yield** the scan
+(consistent with MGF, where all 34,513 blocks including the 12,571 empty ones are yielded per C24(b)) —
+only the linkage skips it. `peakCount` comes from `defaultArrayLength` / `peaksCount`, so the guard
+costs no decode.
+
+**Confirmed against MassQL's own loader, and no new fixture was needed** — `micro.mzML` has held the
+case since Step 2 (`SCANS[3]` is an MS1 with `peaks=[]`, followed by the MS2 at scan 5) and nothing was
+looking at it. The loader returns `scan 5 -> ms1scan 2`, skipping the empty MS1 at scan 4. Two further
+findings from that: the same is true through the **nested** mzXML path (`{1:0, 3:2, 5:2}`), and
+`make_micro_fixtures.py`'s own `expected()` carried the identical defect, so **`EXPECTED.md` had been
+publishing `ms1scan=4` for scan 5** — with all three `ms1_*` wrongly null, since the empty scan has no
+peaks to look up. Both fixed. `ZeroPeakMs1ChainTest` pins it and was verified to have teeth: with the
+guard removed it reports "Got 4 — expected 2".
+
+> **Why the golden could not catch this.** The micro `scaninfo` golden contains only scans 1 and 3 —
+> scan 5 does not match `test_micro.massql`. So the one fixture that encoded the case had no golden
+> coverage of it, and the one document stating the expectation (`EXPECTED.md`) was generated by the same
+> wrong logic. A rule needs a test, not a second copy of the assumption.
+
+**(c) Two rules pinned behaviour the oracle cannot produce.** `_determine_scan_polarity_mzXML`
+(`:517-523`) does `spec["polarity"]` **unguarded**, and `:450` does
+`spectrum["precursorMz"][0]["precursorMz"]` unguarded — both raise `KeyError`, so **no golden can
+exist** for the absent case. **Confirmed by execution, not inferred from reading:** running MassQL's own
+loader over the two new fixtures gives `KeyError: 'polarity'` and `KeyError: 'precursorMz'` respectively. What the `polarity = 0` initialiser actually covers is *present but
+neither `+` nor `-`*, which is the only parity claim available. Our choices, recorded as **non-parity**:
+absent `polarity` → `0`; absent `<precursorMz>` on an MS2 → `precmz = 0` (the existing "not recorded"
+sentinel, consistent with mzML's `MS:1000744` absent → 0 rule, rather than a throw that would make
+mzXML stricter than mzML for the same missing field). Both get explicit tests, and
+`MzxmlPolarityTest` must assert the parity case and the non-parity case **separately**.
+
+**(d) The mzXML rule table was missing three fields entirely** — no `scan`, `precmz` or `charge` row.
+`scan` = `int(num)`; pyteomics returns `spectrum["id"]` as a **`str`** (`'1'`), which is the root cause
+of C12. `precmz` = `precursorMz[0]`. **`charge` absent → `0`** (`:451`) — *unlike MGF, where absent is
+`1`* per C6. Three formats, three different charge defaults.
+
+**(e) Verified sound, so no change needed** — recorded to stop the next reader re-deriving them: the RT
+literals and their bit-exactness (pyteomics `xml.py:136-141` does `minutes += hours*60.; minutes +=
+seconds/60.`, reproducing 1.5 / 0.023 / 1.5 / 60 exactly, and accumulation order does not shift the
+bits); the nesting requirement (`DP00570` `<scan>` depth **2**, `small.mzXML` depth **1**); absent
+`compressionType` → uncompressed on all three real fixtures; and
+`InstrumentAttributeCrossCheckIT`'s premise (`basePeakMz` / `basePeakIntensity` / `totIonCurrent` on
+all 916 scans — and there are **11** `peaksCount="3"` scans, more than Step 7 §6 implies).
+
+### Corrections found while reviewing Step 7
+
+**C23 — the mzXML parser cannot be vendored either; hand-write it. Same defect as C21, one spec over.**
+[Step 7](Tech_Step7.md) §2 listed "four modifications and only these four" for vendoring
+`MzXMLFileParser`. Measured: it carries **13 msdk imports**, including 7 `datamodel` types
+(`SimpleMsScan`, `SimpleIsolationInfo`, `IsolationInfo`, `MsScanType`, `MsSpectrumType`,
+`PolarityType`, `RawDataFile`). And modification #2 — "replace the single Guava `Range` use" —
+misidentifies the source: Guava arrives through **`SimpleMsScan`, which imports `Preconditions` and
+`Range`**. Vendoring means writing our own scan holder, the surgery that killed Step 6 §3.
+
+**Resolution: hand-write mzXML, vendor nothing new.** Cheap now because C21 already commits us to
+hand-writing the mzML walk, and mzXML is the simpler format — zlib-or-none vs zlib + 6 Numpress
+variants, one `precision` attribute vs per-array cvParams, one interleaved array vs two. Step 7's own
+estimate (~250–350 LOC, "the simplest decode path in the contract") stands. `io/vendor/` stays at 13
+files; mzXML reuses only `ByteBufferInputStream` / `FileMemoryMapper`.
+
+**Hard requirement this makes ours:** `small.mzXML` is **flat** but the Ewing file **nests** MS2 inside
+its parent MS1, so the walk must not assume `</scan>` ends the current spectrum. A flat-only reader
+passes on `small.mzXML` and silently mis-associates every nested scan.
+
+> **Process note.** C21 and C23 are the same finding in two specs, and C23 was foreseeable the moment
+> C21 landed — both parsers sit on the same `datamodel`. When a correction invalidates an approach,
+> check every spec that shares the approach, not just the one in hand. Also: my C21a propagation
+> **truncated a sentence** in Step 7 §4 (left `"…not full-precision doubles. Use"` dangling). Scripted
+> spec edits need a read-back, not just a grep for the newly inserted string.
+
+### Corrections found while executing Step 6
+
+**C21 — the mzML parser cannot be vendored as specced; only the DECODE layer can.**
+[Step 6](Tech_Step6.md) §3 (itself already a C16 rewrite) said to vendor `MzMLParser` +
+`MzMLFileImportMethod` + "the minimal `data/` value classes", replacing the `datamodel` types with
+our own holders. Measured from source, that is not a local edit: `MzMLMsScan` (19.5 KB) carries **9**
+`datamodel` imports plus Guava `Range`, slf4j, `SpectrumTypeDetectionAlgorithm`, `MsSpectrumUtil` and
+`MzTolerance`; `MzMLFileImportMethod` **17**; `MzMLChromatogram` **11** (and `MzMLParser` imports
+`Chromatogram`). ~30 files, ~160–190 KB, and "replace the datamodel types" means rewriting the scan
+model. **Step 6 §3's own "stop and report if more than a local edit" clause fired.**
+
+**Resolution: vendor the decode layer, hand-write the XML walk.** The decode layer is genuinely
+clean — **13 files, 112 KB, and after transformation ZERO non-JDK imports** across the whole set
+except our own `MassqlException`:
+
+| Vendored | Modification |
+|---|---|
+| `MSNumpress.java` (44 KB) | **package declaration only** — byte-identical |
+| `ByteBufferInputStream`, `FileMemoryMapper`, `MzMLArrayType`, `MzMLBitLength`, `MzMLCompressionType`, `MzMLCV`, `MzMLTags`, `MzMLCVParam` | package declaration only |
+| `MzMLBinaryDataInfo` | dropped one `@Nonnull` (jsr305 banned) |
+| `MzMLPeaksDecoder` | 3 swaps: Guava `LittleEndianDataInputStream` → our `LittleEndianDataInput`, commons-io `IOUtils.toByteArray` → `readAllBytes()`, `MSDKException` → `MassqlException` |
+| `LittleEndianDataInput` | **not vendored — written for this project**, only the 4 methods the decoder calls |
+
+Upstream commit `da2927a15c178b8ba9492d1e62571018bc70eecc`. Provenance headers and the EPL-1.0
+election on every file; full list in `docs/VENDORED.md`.
+
+Three findings for whoever writes the XML walk:
+- **`MzMLCV` does NOT define the bit-length or compression accessions** — those live on the
+  `MzMLBitLength` / `MzMLCompressionType` **enums**. You will look in `MzMLCV` and not find them.
+- Accessor naming is inconsistent in the vendored code: `MzMLBitLength.getValue()` but
+  `MzMLArrayType.getAccession()`.
+- `MzMLCV` references `MzMLCVParam` with no import (same package). Vendored rather than deleting the
+  four unused `static final` fields it needs, so the constants table stays byte-identical.
+
+**✅ And the vendored decoder is provably bit-correct for our contract.** `decodeToDouble` at 32-bit
+does `data[i] = Float.intBitsToFloat(dis.readInt())` into a `double[]` — exactly `(double)(float)raw`,
+the pyteomics-matching rule. Verified on raw bits with a real `small.mzML` m/z, plus a companion test
+asserting the 32- and 64-bit decodes genuinely differ so the first cannot pass vacuously. **Do not
+"fix" this to read 8 bytes.** It also handles zlib and all six Numpress variants.
+
+**C21a — `BinaryDecoder` is dropped.** [Step 6](Tech_Step6.md) §5 specified a shared
+base64/zlib/widening helper for both readers. There is nothing left to share: mzML's decode is the
+vendored `MzMLPeaksDecoder`, and mzXML's differs in byte order (big-endian), array layout
+(interleaved pairs) and has no Numpress at all. The only common ground is base64 + inflate, which is
+a handful of JDK calls. Step 6 §5's own warning — *"a shared, pre-configured `ByteBuffer` is how a
+60×-style silent bug gets introduced across two readers at once"* — argues against the abstraction.
+→ [Step 7](Tech_Step7.md) decodes inline; `ByteBufferInputStream` is already vendored here so Step 7
+reuses it.
+
+**C22 — execution is STREAMING, not whole-file. The store is never materialised for a whole file.**
+Prompted by a direct question about 500 MB inputs. Calibrating from the fixtures (10.7–20.0 bytes of
+file per loaded peak) against the store's 41 bytes/peak, a **500 MB input projects to 1.0–1.9 GB of
+heap** — an OOM or GC-thrash lockup inside Cytoscape, not a graceful failure. **This is a gap in
+SPIKE.md itself**: §9's constraints are entirely about bundle size and OSGi resolution; there is no
+heap constraint and no target file size anywhere in the document.
+
+Streaming works because **every v1 condition is a per-scan computation** (`i_norm` is `i/max(scan)`,
+`tic` and `base_peak_*` are per-scan reductions, the m/z conditions are per-scan predicates, RT/scan/
+charge/polarity are metadata), and **the precursor lookup needs exactly one retained scan** — by the
+document-order rule, `ms1scan` is the most recent *preceding* MS1 scan. The rule we treated as a
+fidelity burden is what makes streaming possible.
+
+Retained state is **one MS1 scan + the current scan**. Measured: largest single scan across all
+fixtures is **33,335 peaks → 2.6 MB**; a pathological 1,000,000-peak scan would be 78 MB. The mapped
+region is **off-heap**, so the file costs address space, not heap.
+
+**Step 5 needs no code change.** At 2.6 MB retained the 41 B/peak layout is irrelevant, so no column
+trimming is required. `SpectrumTable`, `Reductions`, `RowMask`, `mzWindow` and their 44 tests survive
+**unchanged** — only their *lifetime* changes, from one table per file to one table per scan, and
+every invariant still holds for a single-scan table. Results stay correctly ordered for free:
+`PlusRise.mgf`'s 34,513 `SCANS=` values are strictly ascending, so document order is scan order.
+
+### Corrections found while executing Step 5
+
+**C20 — `precmz` / `ms1scan` / `charge` are per-SCAN metadata and live on `ScanIndex`.**
+[Step 5](Tech_Step5.md)'s layout list named only `mz`/`i`/`iNorm`/`iTicNorm`/`scan`/`rt`/
+`polarity`, omitting the three columns [Step 10](Tech_Step10.md) needs. Verified against the
+loader: MassQL's `ms2_df` carries them, and **each has exactly one distinct value per scan** —
+they are flattened per-peak only because pandas is a flat frame. In Java they belong on the
+scan index, which is semantically right and much smaller (a 20,000-peak MS1 scan would
+otherwise hold 20,000 copies of its retention time). They carry MassQL's raw **0 sentinel**;
+the 0-to-null conversion stays in [Step 10](Tech_Step10.md). Note `ms1_df` has no such columns
+at all, so they are 0 throughout on an MS1 table.
+
+Also confirmed while building: **`rt` really does need storing twice.** The per-peak column is
+`float` per SPIKE.md §4, but the golden `rt = 0.011218333333333334` does not survive a float
+round-trip, so `ScanIndex.rtOf` is an exact `double` and is the value that reaches the result
+JSON. `ScanIndexTest` asserts the bit-exactness *and* that the value genuinely fails a float
+round-trip, so the requirement is pinned rather than remembered.
 
 ### Corrections found while executing Step 4
 
@@ -333,6 +584,23 @@ and `OTHERSCAN` exist undocumented. Publish a feature matrix and call it a **`sc
 
 Every `Tech_StepX.md` has these sections, in this order: **Goal · Prerequisites · Context · Scope ·
 Deliverables · Specification · Known traps · Tests required · Done when · References.**
+
+### Terminology — always name the layer (Correction C25)
+
+Three distinct artifacts. **Never write "the CLI" when the SDK is meant, and never use "CLI" as
+shorthand for "reference implementation".** An unqualified claim about output or streams reads as an
+**SDK** claim, because that is the layer consumers code against.
+
+| Label | Artifact | Streams |
+|---|---|---|
+| **reference implementation** | `../massql/massql_query.py` — the Python oracle. Generates goldens; **never ships** | JSON → stdout, by its own deliberate choice (`contextlib.redirect_stdout(sys.stderr)` at `:141`). We inherit the diff contract, not the convention |
+| **Java CLI** | `cli.Main` ([Step 11](Tech_Step11.md)) — a thin wrapper that mirrors the reference's interface so [Step 12](Tech_Step12.md) can diff | JSON → stdout **or** `--output FILE`; diagnostics → stderr |
+| **SDK** | `Massql.parse/execute/run` — the programmatic API the Cytoscape app codes against | **Neither.** Returns objects; `DEPENDENCY_POLICY.md` constraint 2 says it logs nothing at all |
+
+Two conventions are in play and they govern different layers. The **Unix filter convention** (stdout =
+the program's data, stderr = diagnostics) governs the Java CLI — it is what makes `| jq` work.
+**12-factor factor XI** (logs → stdout) governs long-running services, whose real output leaves over
+HTTP; it does not govern a batch filter. When citing a step number, say which layer it governs.
 
 ### Where a discovery goes — the fallout protocol
 

@@ -137,19 +137,35 @@ attributes**, so populated `ms1scan` values are only possible under the document
 
 ### 3. Layer 4 — the CLI contract
 
-Drive `cli.Main` as a subprocess, so stream separation is genuinely tested rather than simulated.
+Drive `cli.Main` as a subprocess. **Two independent properties, deliberately tested separately**
+(Correction C25c) — the original version asserted both at once by reading data off the pipe, which made
+a stream-hygiene regression present as a data mismatch and vice versa.
+
+**(a) Functional correctness — read the result from `--output FILE`, not the pipe.** Point `--output` at
+a temp file and compare *that*. No interleaving is possible, and a failure leaves the artifact on disk
+to inspect.
 
 | Assertion | Detail |
 |---|---|
 | Exit code 0 on success | |
-| stdout is a valid JSON array | Parse it; assert nothing but JSON |
-| Diagnostics on **stderr only** | Assert stdout has no diagnostic text and no stack frame |
 | `--precursor-tol-ppm` honoured | Two directions, both against real goldens rather than ad-hoc checks: the **default 20 ppm** run must match `small_mzml_results.json` (4 rows with null `ms1_i`/`ms1_precmz` and **populated `ms1_base_peak_i`**), and `--precursor-tol-ppm 60` must match `small_mzml_tol60_results.json` (all 6 populated). Same file, same query, differing only in that flag — the CLI-level proof of [Step 10](Tech_Step10.md) §3.2. Additionally check a deliberately absurd tolerance (0.001 ppm) nulls **all** matches while every `ms1_base_peak_i` survives |
 | Default is 20.0 | Omitting the flag reproduces the golden |
-| Trailing newline | Matches `massql_query.py:195` |
 
 The tight-tolerance case is the one to write first — it is the only place the `ms1_base_peak_i`-survives-a-miss
 rule is observable from outside the SDK.
+
+**(b) Stream hygiene — the one thing only a subprocess can prove.** [Step 11](Tech_Step11.md)'s
+`MainStreamDisciplineTest` owns the payload-shape assertions in-process; keep here only what an
+in-process `System.setOut` test genuinely **cannot** establish, namely that a real forked process with
+real file descriptors keeps the two streams apart (see the trap in §*Known traps*).
+
+| Assertion | Detail |
+|---|---|
+| stdout is a valid JSON array | Default mode, no `--output`. Parse it; assert nothing but JSON |
+| Diagnostics on **stderr only** | Assert stdout has no diagnostic text and no stack frame |
+| Trailing newline | Matches `massql_query.py:195` |
+| `--output` leaves stdout empty | The complement: with `--output FILE`, stdout is **empty** and the file holds the array |
+| Both modes agree byte-for-byte | Same run twice, once piped and once to `--output`; the bytes must be identical. This is what makes (a)'s file-based comparison a valid proxy for the piped payload |
 
 ### 4. Error paths, per format
 
@@ -161,7 +177,7 @@ Each of these, for each of the three formats where applicable:
 | Unsupported query | `MassqlParseException` **naming the offending construct** — e.g. `QUERY scansum(MS2DATA)` names `scansum` |
 | `QUERY scaninfo WHERE …` | Parse error whose message explains the function-call form ([Step 4](Tech_Step4.md) §4) |
 | Query matching nothing | **Empty JSON array, exit 0** — not a crash, not exit 1 |
-| Missing / empty `msLevel` tag | Handled per [Step 7](Tech_Step7.md) §5, using `empty_msLevel_tag.mzXML` |
+| Missing / empty `msLevel` tag | Handled per [Step 7](Tech_Step7.md) §4, using `empty_msLevel_tag.mzXML` |
 | Missing file / directory / empty file | Clear error naming the path, exit 2 |
 | **Handle leak** | Open and close **200+** files across all three formats without exhausting descriptors. Phase 2's `shutDown()` depends on this |
 
@@ -194,9 +210,13 @@ Answer these `SPIKE.md` §11 questions here, one sentence each: **Q2** (same row
 - **Debugging Pair A before reading `CONVERSION_NOTES.md`.** The cause may be msconvert, recorded in Step 2.
 - **A vacuous Pair B pass** from a near-empty scan-id join. Report the intersection size.
 - **Testing stream separation in-process.** Use a subprocess; an in-process `System.setOut` test can pass while
-  the real CLI interleaves streams.
-- **Skipping everything.** Both Ewing fixtures are gitignored; a CI without them must still run the committed
-  fixtures and must fail if nothing ran.
+  the real CLI interleaves streams. This is why §3(b) survives as a subprocess test rather than being folded
+  into [Step 11](Tech_Step11.md)'s in-process one.
+- **Reading the payload off the pipe to check data correctness.** That is §3(a)'s job and it uses
+  `--output FILE`; mixing the two makes a hygiene regression look like a data mismatch (Correction C25c).
+- **Skipping everything.** Fixtures and goldens are **committed to this repo** (Correction C26) and
+  `Fixtures` now **fails** rather than skipping when one is missing — a green run with zero assertions is
+  the failure mode this replaced. CI asserts the skipped-test count is **0**.
 - **Exit 1 for a no-match query.** It is exit 0 with `[]`.
 - **Comparing `rt` with a tolerance.** It is bit-identical, which is why `scanRt` is a double.
 
@@ -207,7 +227,7 @@ Answer these `SPIKE.md` §11 questions here, one sentence each: **Q2** (same row
 | `DifferentialIT` | IT | §1 for every fixture/golden pair, per-column policy, row count and order first. Includes the MS1DATA 4-key shape. |
 | `ResultComparatorTest` | unit | The comparator itself: a single-bit intensity difference **fails**; a 1e-10 relative m/z difference **passes** and 1e-8 fails; null-vs-0.0 **fails**; a row-count mismatch reports counts. **Test the test** — a comparator that always passes yields a meaningless gate. |
 | `CrossFormatEquivalenceIT` | IT | Pair A identical rows (or documented degradation, stated in the failure message); Pair B shared columns equal **and** `ms1_*` differing exactly per the table, with the intersection size reported. |
-| `CliContractIT` | IT | §3 via subprocess, including the tight-tolerance case proving `ms1_base_peak_i` survives. |
+| `CliContractIT` | IT | §3(a) via subprocess reading `--output FILE` — including the tight-tolerance case proving `ms1_base_peak_i` survives — **and** §3(b)'s stream-separation assertions, which include the piped-vs-`--output` byte-equality check that justifies (a)'s file-based comparison. |
 | `ErrorPathIT` | IT | Every §4 row, per format. |
 | `ResourceLeakIT` | IT | 200+ open/close cycles across all three formats. |
 | `PerformanceIT` | IT | Records wall-clock and peak heap per fixture; asserts only a generous ceiling so it reports rather than flakes. |

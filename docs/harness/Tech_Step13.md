@@ -67,8 +67,23 @@ The reviewer's entry point. Required content:
   Point at `docs/RESULT_CONTRACT.md`.
 - **The three per-format population rules** ([Step 10](Tech_Step10.md) §6 table).
 - **Known deviations** — see §2. Do not bury these.
-- **The EPL-1.0 election** and the vendored-code provenance ([Step 7](Tech_Step7.md) §3).
-- **CLI usage** and how to run `make verify`.
+- **The EPL-1.0 election** and the vendored-code provenance ([Step 6](Tech_Step6.md) §3 — Step 6 owns all vendoring; Step 7 vendors nothing per C23).
+- **CLI usage** and how to run `make verify`. Show **both output modes** and say when each fits — stdout
+  for composing with other tools, `--output FILE` for a durable artifact a downstream consumer can pick up
+  (Correction C25b):
+
+  ```bash
+  # default: JSON on stdout, diagnostics on stderr -- composable
+  java -cp massql-java.jar edu.ucsd.idekerlab.massql.cli.Main spectra.mzML query.massql | jq '.[0]'
+
+  # --output: JSON to a file, written atomically; stdout stays empty
+  java -cp massql-java.jar edu.ucsd.idekerlab.massql.cli.Main spectra.mzML query.massql --output out.json
+  ```
+
+  While documenting this, keep the three layers distinct (Correction C25a, *Terminology* in
+  [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md)): the stream rules above govern the **Java CLI**. The **SDK**
+  writes to no stream at all and returns `List<ScanInfoResult>` — which is what Phase 2 consumes, so a
+  reviewer must not read the CLI's stdout contract as an SDK behaviour.
 - **Honest framing**, per `SPIKE.md` §8: "full MassQL parity" means bug-for-bug agreement with *one commit* of a
   tool whose own docs advertise functions that don't exist (`scanmaxmz`, `scanrun`) while `scanmz` and `OTHERSCAN`
   exist undocumented. **Call it a `scaninfo` subset.** Overclaiming here is the one documentation failure that

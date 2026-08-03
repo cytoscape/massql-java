@@ -16,6 +16,24 @@ target/
 *~
 
 # ---------------------------------------------------------------------------------------
+# The two Ewing-lab fixtures are the ONLY test data not committed (Correction C26).
+#
+# data/CONVERSION_NOTES.md records them as "unstated licence": they are downloaded from
+# ewinglab.org, which publishes no redistribution terms, so we do not republish them.
+# Everything else under src/test/resources/ IS committed, deliberately -- see C26 (CI could not
+# see the fixtures at all, so every parity assertion silently skipped and CI proved nothing).
+#
+# Their GOLDENS are committed, and that is not an inconsistency: loader-parity dumps hold
+# per-scan counts, hex sums and SHA-256 digests; query-result goldens hold matched-scan metadata.
+# Neither contains a peak array, so no spectra are redistributed.
+#
+# `scripts/fetch-fixtures.sh` downloads both into this directory, and CI runs it and caches the
+# result. Fixtures.require() FAILS with that instruction when they are missing -- it must never
+# skip, which is the regression C26 exists to prevent.
+src/test/resources/data/DP00570_F02.mzxml
+src/test/resources/data/DP00570_F02.mgf
+
+# ---------------------------------------------------------------------------------------
 # DO NOT ignore src/test/resources/reference_parses/*.json
 #
 # Those 46 files look like temp output because of their hash-suffixed names

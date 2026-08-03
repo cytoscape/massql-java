@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<indexedmzML xmlns="http://psi.hupo.org/ms/mzml">
+<mzML version="1.1.0">
+<cvList count="1"><cv id="MS" fullName="PSI-MS" URI="http://purl.obolibrary.org/obo/ms.obo"/></cvList>
+<run id="micro" defaultInstrumentConfigurationRef="IC0">
+<spectrumList count="5" defaultDataProcessingRef="DP0">
+<spectrum index="0" id="controllerType=0 controllerNumber=1 scan=1" defaultArrayLength="2">
+<cvParam cvRef="MS" accession="MS:1000511" name="ms level" value="2"/>
+<cvParam cvRef="MS" accession="MS:1000130" name="positive scan" value=""/>
+<scanList count="1"><scan>
+<cvParam cvRef="MS" accession="MS:1000016" name="scan start time" value="0.0" unitCvRef="UO" unitAccession="UO:0000010" unitName="second"/>
+</scan></scanList>
+<precursorList count="1"><precursor>
+<selectedIonList count="1"><selectedIon>
+<cvParam cvRef="MS" accession="MS:1000744" name="selected ion m/z" value="250.25"/>
+</selectedIon></selectedIonList>
+</precursor></precursorList>
+<binaryDataArrayList count="2">
+<binaryDataArray encodedLength="0">
+<cvParam cvRef="MS" accession="MS:1000523" name="64-bit float" value=""/>
+<cvParam cvRef="MS" accession="MS:1000576" name="no compression" value=""/>
+<cvParam cvRef="MS" accession="MS:1000514" name="m/z array" value=""/>
+<binary>AAAAAAAAWUAAAAAAABBpQA==</binary>
+</binaryDataArray>
+<binaryDataArray encodedLength="0">
+<cvParam cvRef="MS" accession="MS:1000521" name="32-bit float" value=""/>
+<cvParam cvRef="MS" accession="MS:1000576" name="no compression" value=""/>
+<cvParam cvRef="MS" accession="MS:1000515" name="intensity array" value=""/>
+<binary>AAB6QwCAu0Q=</binary>
+</binaryDataArray>
+</binaryDataArrayList>
+</spectrum>
+<spectrum index="1" id="controllerType=0 controllerNumber=1 scan=2" defaultArrayLength="3">
+<cvParam cvRef="MS" accession="MS:1000511" name="ms level" value="1"/>
+<cvParam cvRef="MS" accession="MS:1000130" name="positive scan" value=""/>
+<scanList count="1"><scan>
+<cvParam cvRef="MS" accession="MS:1000016" name="scan start time" value="30.0" unitCvRef="UO" unitAccession="UO:0000010" unitName="second"/>
+</scan></scanList>
+<binaryDataArrayList count="2">
+<binaryDataArray encodedLength="0">
+<cvParam cvRef="MS" accession="MS:1000523" name="64-bit float" value=""/>
+<cvParam cvRef="MS" accession="MS:1000576" name="no compression" value=""/>
+<cvParam cvRef="MS" accession="MS:1000514" name="m/z array" value=""/>
+<binary>AAAAAPA/f0AAAAAAIEB/QAAAAAAAwIJA</binary>
+</binaryDataArray>
+<binaryDataArray encodedLength="0">
+<cvParam cvRef="MS" accession="MS:1000521" name="32-bit float" value=""/>
+<cvParam cvRef="MS" accession="MS:1000576" name="no compression" value=""/>
+<cvParam cvRef="MS" accession="MS:1000515" name="intensity array" value=""/>
+<binary>AAB6RABAnEUAoAxG</binary>
+</binaryDataArray>
+</binaryDataArrayList>
+</spectrum>
+<spectrum index="2" id="controllerType=0 controllerNumber=1 scan=3" defaultArrayLength="4">
+<cvParam cvRef="MS" accession="MS:1000511" name="ms level" value="2"/>
+<cvParam cvRef="MS" accession="MS:1000130" name="positive scan" value=""/>
+<scanList count="1"><scan>
+<cvParam cvRef="MS" accession="MS:1000016" name="scan start time" value="60.0" unitCvRef="UO" unitAccession="UO:0000010" unitName="second"/>
+</scan></scanList>
+<precursorList count="1"><precursor>
+<selectedIonList count="1"><selectedIon>
+<cvParam cvRef="MS" accession="MS:1000744" name="selected ion m/z" value="500.0"/>
+</selectedIon></selectedIonList>
+</precursor></precursorList>
+<binaryDataArrayList count="2">
+<binaryDataArray encodedLength="0">
+<cvParam cvRef="MS" accession="MS:1000523" name="64-bit float" value=""/>
+<cvParam cvRef="MS" accession="MS:1000576" name="no compression" value=""/>
+<cvParam cvRef="MS" accession="MS:1000514" name="m/z array" value=""/>
+<binary>AAAAAAAAWUAAAAAAABBpQAAAAAAAIGlAAAAAAADAckA=</binary>
+</binaryDataArray>
+<binaryDataArray encodedLength="0">
+<cvParam cvRef="MS" accession="MS:1000521" name="32-bit float" value=""/>
+<cvParam cvRef="MS" accession="MS:1000576" name="no compression" value=""/>
+<cvParam cvRef="MS" accession="MS:1000515" name="intensity array" value=""/>
+<binary>AAB6QwCAu0QAAMhCAIA7RA==</binary>
+</binaryDataArray>
+</binaryDataArrayList>
+</spectrum>
+<spectrum index="3" id="controllerType=0 controllerNumber=1 scan=4" defaultArrayLength="0">
+<cvParam cvRef="MS" accession="MS:1000511" name="ms level" value="1"/>
+<cvParam cvRef="MS" accession="MS:1000130" name="positive scan" value=""/>
+<scanList count="1"><scan>
+<cvParam cvRef="MS" accession="MS:1000016" name="scan start time" value="90.0" unitCvRef="UO" unitAccession="UO:0000010" unitName="second"/>
+</scan></scanList>
+<binaryDataArrayList count="2">
+<binaryDataArray encodedLength="0">
+<cvParam cvRef="MS" accession="MS:1000523" name="64-bit float" value=""/>
+<cvParam cvRef="MS" accession="MS:1000576" name="no compression" value=""/>
+<cvParam cvRef="MS" accession="MS:1000514" name="m/z array" value=""/>
+<binary></binary>
+</binaryDataArray>
+<binaryDataArray encodedLength="0">
+<cvParam cvRef="MS" accession="MS:1000521" name="32-bit float" value=""/>
+<cvParam cvRef="MS" accession="MS:1000576" name="no compression" value=""/>
+<cvParam cvRef="MS" accession="MS:1000515" name="intensity array" value=""/>
+<binary></binary>
+</binaryDataArray>
+</binaryDataArrayList>
+</spectrum>
+<spectrum index="4" id="controllerType=0 controllerNumber=1 scan=5" defaultArrayLength="1">
+<cvParam cvRef="MS" accession="MS:1000511" name="ms level" value="2"/>
+<cvParam cvRef="MS" accession="MS:1000130" name="positive scan" value=""/>
+<scanList count="1"><scan>
+<cvParam cvRef="MS" accession="MS:1000016" name="scan start time" value="120.0" unitCvRef="UO" unitAccession="UO:0000010" unitName="second"/>
+</scan></scanList>
+<precursorList count="1"><precursor>
+<selectedIonList count="1"><selectedIon>
+<cvParam cvRef="MS" accession="MS:1000744" name="selected ion m/z" value="500.0"/>
+<cvParam cvRef="MS" accession="MS:1000041" name="charge state" value="2"/>
+</selectedIon></selectedIonList>
+</precursor></precursorList>
+<binaryDataArrayList count="2">
+<binaryDataArray encodedLength="0">
+<cvParam cvRef="MS" accession="MS:1000523" name="64-bit float" value=""/>
+<cvParam cvRef="MS" accession="MS:1000576" name="no compression" value=""/>
+<cvParam cvRef="MS" accession="MS:1000514" name="m/z array" value=""/>
+<binary>aUz7BzzdXkA=</binary>
+</binaryDataArray>
+<binaryDataArray encodedLength="0">
+<cvParam cvRef="MS" accession="MS:1000521" name="32-bit float" value=""/>
+<cvParam cvRef="MS" accession="MS:1000576" name="no compression" value=""/>
+<cvParam cvRef="MS" accession="MS:1000515" name="intensity array" value=""/>
+<binary>AACARQ==</binary>
+</binaryDataArray>
+</binaryDataArrayList>
+</spectrum>
+</spectrumList>
+</run>
+</mzML>
+</indexedmzML>

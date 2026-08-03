@@ -1,0 +1,44 @@
+[
+  {
+    "scan": 2,
+    "precmz": 1163.282471,
+    "ms1scan": 1,
+    "rt": 0.023,
+    "charge": null,
+    "tic": 10917.0,
+    "mslevel": 2,
+    "base_peak_i": 6262.0,
+    "base_peak_mz": 533.4998779296875,
+    "ms1_i": 3107784.0,
+    "ms1_precmz": 1163.282470703125,
+    "ms1_base_peak_i": 3107784.0
+  },
+  {
+    "scan": 556,
+    "precmz": 1162.745605,
+    "ms1scan": 553,
+    "rt": 12.059833333333334,
+    "charge": null,
+    "tic": 21276268.0,
+    "mslevel": 2,
+    "base_peak_i": 2126843.0,
+    "base_peak_mz": 1031.64990234375,
+    "ms1_i": 14659148.0,
+    "ms1_precmz": 1162.74560546875,
+    "ms1_base_peak_i": 187998848.0
+  },
+  {
+    "scan": 871,
+    "precmz": 1163.486084,
+    "ms1scan": 869,
+    "rt": 18.923000000000002,
+    "charge": null,
+    "tic": 142321.0,
+    "mslevel": 2,
+    "base_peak_i": 21187.0,
+    "base_peak_mz": 1112.3251953125,
+    "ms1_i": 8152654.0,
+    "ms1_precmz": 1163.486083984375,
+    "ms1_base_peak_i": 9074370.0
+  }
+]

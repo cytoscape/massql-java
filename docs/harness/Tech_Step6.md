@@ -48,12 +48,13 @@ Governing sections: `SPIKE.md` §3 (population by format), §5 (reader dependenc
 
 | Path | Content |
 |---|---|
-| `src/main/java/…/massql/io/SpectraReader.java` | The interface |
-| `src/main/java/…/massql/io/SpectraFile.java` | `AutoCloseable` handle + `open()` sniffing |
+| `src/main/java/…/massql/io/SpectraStream.java`, `ScanView.java` | The cursor (C22) |
+| `src/main/java/…/massql/io/SpectraFile.java` | `open()` + format sniffing |
 | `src/main/java/…/massql/io/Format.java` | `MGF`, `MZML`, `MZXML` |
 | `src/main/java/…/massql/io/MgfReader.java` | ~150–200 LOC |
-| `src/main/java/…/massql/io/MzmlReader.java` | MSDK-backed |
-| `src/main/java/…/massql/io/BinaryDecoder.java` | Shared base64/zlib/float-widening helpers — **not** shared byte order (see §5) |
+| `src/main/java/…/massql/io/MzmlReader.java` | Hand-written XML walk over the vendored decode layer (C21) |
+| `src/main/java/…/massql/io/vendor/*` | 13 vendored decode-layer files (C21) |
+| ~~`BinaryDecoder.java`~~ | **Dropped — Correction C21a.** Nothing left to share: mzML decode is the vendored `MzMLPeaksDecoder`; mzXML differs in byte order, layout, and has no Numpress |
 | `src/test/java/…/io/*Test.java` | The test set below |
 | `docs/READER_RULES.md` | The per-format rule table, as the single reference for Steps 6 and 7 |
 
@@ -61,28 +62,55 @@ Governing sections: `SPIKE.md` §3 (population by format), §5 (reader dependenc
 
 ### 1. The interface
 
+> ⚠ **REPLACED by Correction C22 — this is a streaming cursor, not two whole-file tables.** The
+> original API below returned `SpectrumTable ms1()` / `ms2()` for the entire file. That projects a
+> **500 MB input to 1.0–1.9 GB of heap**, which OOMs inside Cytoscape. See C22 for the measurements
+> and why streaming is possible at all.
+
 ```java
-public interface SpectraReader {
-    /** Streams the file once and returns both tables. */
-    LoadedSpectra read(Path path) throws MassqlException;
-    boolean supports(Format f);
+public interface SpectraStream extends AutoCloseable {
+    /** Advance to the next spectrum in DOCUMENT ORDER. False at EOF. */
+    boolean next();
+    /** Valid ONLY until the next next() call -- copy via materialize() to retain it. */
+    ScanView current();
+    Format format();
+    List<String> diagnostics();
+    @Override void close();
 }
 
-public record LoadedSpectra(SpectrumTable ms1, SpectrumTable ms2) { }
+public interface ScanView {
+    int scanId();  int msLevel();  double rt();  int polarity();
+    double precmz();  int ms1scan();  int charge();     // raw 0 sentinels; Step 10 converts
+    int peakCount();
+    /** Copy into a single-scan SpectrumTable. THIS is what makes Step 5 reusable verbatim. */
+    SpectrumTable materialize();
+}
 
-public final class SpectraFile implements AutoCloseable {
-    public static SpectraFile open(Path path) throws MassqlException;   // sniffs format
-    public Format format();
-    public SpectrumTable ms1();      // never null; may be empty (MGF)
-    public SpectrumTable ms2();
-    @Override public void close();
+public final class SpectraFile {
+    public static SpectraStream open(Path path) throws MassqlException;   // format sniffed
 }
 ```
 
-**`AutoCloseable` is mandatory, not stylistic.** MSDK memory-maps files, so an unclosed `SpectraFile` holds a
-mapped region and a file descriptor; Phase 2's `shutDown()` depends on release, and
-[Step 12](Tech_Step12.md) tests opening and closing many files without leaking. Close every MSDK resource in
-`close()`, and make `close()` idempotent.
+`materialize()` returning a **single-scan** `SpectrumTable` is the hinge of the design: every Step 5
+primitive — `Reductions.sum(t, 0, I)`, `t.mzWindow(0, lo, hi)`, `argmax`, the derived columns — works
+unchanged on a one-scan table, so **Step 5 needs no code change and its 44 tests stay green**.
+
+Executor shape for Steps 9/10:
+
+```
+SpectrumTable retainedMs1 = null;                 // the ONE retained scan
+while (stream.next()) {
+    ScanView s = stream.current();
+    if (s.msLevel() == 1) retainedMs1 = s.materialize();
+    if (s.msLevel() == wanted && conditionsHold(s)) emitRow(s, retainedMs1);
+}
+```
+
+**`AutoCloseable` is mandatory, and now genuinely load-bearing.** `open()` maps the file and parses
+forward on demand, so the cursor holds a mapped region and a descriptor for its whole lifetime.
+Phase 2's `shutDown()` depends on release and [Step 12](Tech_Step12.md) tests 200 open/close cycles.
+`close()` must be idempotent. The mapped region is **off-heap**, so a 500 MB file costs address
+space, not heap.
 
 **Format sniffing** — by content, with the extension only as a tiebreak, because the fixtures disagree on case
 (`small.mzXML` from msconvert vs `DP00570_F02.mzxml` from Ewing) and `SPIKE.md` uses both spellings:
@@ -154,70 +182,50 @@ with `# TODO` comments).
 Parsing rules: tolerate blank lines and comment lines (`#`, `;`); tolerate CRLF; peak lines may be
 whitespace- or tab-separated; a malformed peak line is an error, not a skip (see §6).
 
-### 3. mzML reader — ⚠ VENDORED, not a dependency (Correction C16)
+### 3. mzML reader — vendored DECODE layer + hand-written XML walk (Correction C21)
 
-**This spec originally said "use `io.github.msdk.io.mzml.MzMLFileImportMethod`" as a Maven dependency. That is
-no longer possible.** `msdk-datamodel` cannot link without Guava (`MsScan` declares
-`Range<Double> getScanningRange()` in the interface; `SimpleMsScan` holds a `Range` field and calls
-`Preconditions`), and Guava brings 2.85 MB plus three OSGi resolution hazards — Cytoscape exports Guava **9.0.0**
-against MSDK's **27.1**, Guava 27.1 is itself a bundle exporting `com.google.common.*` so bnd emits an
-`Import-Package` Felix cannot satisfy, and `jsr305` exports `javax.annotation`. See `DEPENDENCY_POLICY.md`.
+> ⚠ This section previously said to vendor `MzMLParser` + `MzMLFileImportMethod` and replace the
+> `datamodel` types. **That is not achievable** — `MzMLMsScan`/`MzMLFileImportMethod`/
+> `MzMLChromatogram` carry 9/17/11 `msdk-datamodel` imports plus Guava `Range`, slf4j and
+> `msdk-spectra`; ~30 files, and replacing the datamodel types means rewriting the scan model. The
+> "stop and report if more than a local edit" clause fired. See C21.
 
-**So vendor the mzML parser, the same way [Step 7](Tech_Step7.md) vendors the mzXML one.** Follow Step 7 §1–§3
-for the mechanics (vendor the minimum, record every modification, provenance header + EPL-1.0 election in
-`docs/VENDORED.md`). Specifics for mzML:
+**Already vendored to `io/vendor/` — 13 files, 112 KB, zero non-JDK imports.** `MSNumpress` (44 KB)
+is byte-identical to upstream; only `MzMLPeaksDecoder` (3 swaps) and `MzMLBinaryDataInfo` (one
+annotation) were modified. Full list and provenance in `docs/VENDORED.md`.
 
-**Vendor from** `msdk-io-mzml/src/main/java/io/github/msdk/io/mzml/`:
-`data/MzMLParser.java`, `MzMLFileImportMethod.java`, `util/MSNumpress.java`,
-`util/ByteBufferInputStream.java`, `util/FileMemoryMapper.java`, `util/TagTracker.java`, plus the minimal
-`data/` value classes the parser populates.
+**The decoder already implements the 32-bit widening rule** — `Float.intBitsToFloat(readInt())` into
+a `double[]`, i.e. `(double)(float)raw`. Verified on raw bits. **Do not re-implement it and do not
+"fix" it to read 8 bytes.**
 
-**Modifications required, and record each:**
+**Write the XML walk** over `javolution.xml.internal.stream.XMLStreamReaderImpl`, **instantiated
+directly** (the JDK's `XMLInputFactory` uses `ServiceLoader`, banned by constraint 1; naming its impl
+needs `Class.forName`, also banned). Capture each `binaryDataArray`'s offset and length into an
+`MzMLBinaryDataInfo` and decode **on demand** per scan — that is what makes the streaming design work.
 
-| # | Change | Why |
-|---|---|---|
-| 1 | Replace `io.github.msdk.datamodel` types (`MsScan`, `SimpleMsScan`, `RawDataFile`, `IsolationInfo`, …) with our own minimal holders, or write straight into `SpectrumTableBuilder` | **This is what removes Guava.** Those interfaces expose `Range<Double>` |
-| 2 | Replace `org.apache.commons.io.IOUtils` with plain Java | Removes `commons-io` (208,700 B) |
-| 3 | Remove the slf4j `Logger` in `MzMLFileImportMethod` | Constraint 2: the SDK logs nothing |
-| 4 | Replace any Guava `Range`/`Preconditions` use with a plain pair / explicit checks | Constraint: no Guava |
-
-**`MSNumpress` is the reason this is vendoring rather than hand-writing.** It is self-contained, has no Guava,
-and hand-writing Numpress decompression would be the single largest avoidable risk in the spike. Take it
-verbatim.
-
-**Keep instantiating `javolution.xml.internal.stream.XMLStreamReaderImpl` DIRECTLY**, exactly as upstream does.
-That is the whole reason javolution is a dependency: the JDK's `javax.xml.stream.XMLInputFactory` discovers
-implementations via `ServiceLoader`, banned by constraint 1, and naming the JDK's internal impl would need
-`Class.forName`, also banned.
-
-If a modification needs more than a local edit, **stop and report** rather than rewriting the parser — at that
-point hand-writing mzML becomes a spec change, not an implementation choice.
+Only the slice `scaninfo` needs. **Not** chromatograms, the export path, products, scan windows, or
+referenceable param groups unless a fixture forces them.
 
 | Field | Rule |
 |---|---|
-| `mslevel` | From the spectrum's MS level; route peaks to the MS1 or MS2 table. Levels > 2 are out of scope — skip them and count how many were skipped, reporting it as a diagnostic. |
-| **`rt`** | Read `scan start time` **and its declared unit**. Convert **only if** the unit is seconds: `if unit == second: rt /= 60` (`msql_fileloading.py:564-571`). `data/small.mzML` declares `unitName="minute"` → **pass through unconverted**. Read `unitName` *or* `unitAccession` — either may carry it. Store at **double** precision into `scanRt`. |
-| `precmz` | The selected-ion m/z from `<precursor>`. Absent → `0` sentinel. |
-| `charge` | Charge state if recorded; absent → `0` sentinel. |
-| **`ms1scan`** | **Document order.** See §4 — do **not** read `spectrumRef`. |
-| `polarity` | Positive → 1, negative → 2, unknown → 0. |
+| **`scan`** | ⚠ **was missing from this spec entirely.** `int(spectrum["id"].replace("scanId=","").split("scan=")[-1])` (`msql_fileloading.py:575`) — strip any `scanId=` prefix, split on `scan=`, take the **LAST** segment. This is the field that determines every row's identity. An id with no `scan=` makes MassQL raise `ValueError`; we throw `MassqlException` naming the id — a documented deviation, a clean error either way |
+| `mslevel` | `MzMLCV.cvMSLevel` = `MS:1000511`. Route to the MS1 or MS2 side. Levels > 2 are out of scope: skip and report via `diagnostics()` |
+| **`rt`** | `MzMLCV.MS_RT_SCAN_START` = `MS:1000016`, **with its declared unit**. Convert **only if** seconds (`:564-571`). `small.mzML` says `unitName="minute"` → pass through. Read `unitName` *or* `unitAccession`. Store at **double** precision |
+| `precmz` | `MzMLCV.cvPrecursorMz` = `MS:1000744`. Absent → `0` sentinel |
+| `charge` | `MzMLCV.cvChargeState` = `MS:1000041`. Absent → `0` sentinel |
+| **`ms1scan`** | **Document order.** See §4 — do **not** read `spectrumRef` |
+| `polarity` | `cvPolarityPositive` `MS:1000130` → 1, `cvPolarityNegative` `MS:1000129` → 2, else 0 |
+| binary arrays | `MzMLArrayType.MZ`/`INTENSITY` (`MS:1000514`/`MS:1000515`); bit length and compression come from **`MzMLBitLength` / `MzMLCompressionType`** |
 
-**Binary arrays: little-endian.** mzML's binary data arrays are little-endian; `ByteBuffer` defaults to
-big-endian, so set the order explicitly. **Do not share a configured buffer with the mzXML reader**, which needs
-big-endian ([Step 7](Tech_Step7.md) §4).
+> **Three gotchas in the vendored code**, found while vendoring:
+> `MzMLCV` does **not** define the bit-length or compression accessions — those are on the enums, and
+> you will look in `MzMLCV` first. Accessor naming is inconsistent: `MzMLBitLength.getValue()` but
+> `MzMLArrayType.getAccession()`. And `MzMLBinaryDataInfo.setBitLength(String)` /
+> `setCompressionType(String)` accept raw accession strings, which is the convenient path from a
+> cvParam.
 
-**32-bit precision — the bit-identity trap.** For a `32-bit float` binary data array, pyteomics decodes to
-`float32` and Python widens to double downstream. So the golden value is `(double)(float)raw`, **not** a
-full-precision double. In Java: `readFloat()` then widen.
-
-```java
-double v = (double) buf.getFloat();     // correct
-double v = buf.getDouble();             // WRONG for a 32-bit array — different bits
-```
-
-Reading 8 bytes, or decoding to double directly, produces values that are *nearly* right, and
-[Step 8](Tech_Step8.md) fails with a confusing near-miss. Put this in `BinaryDecoder` once so both readers share
-one implementation of the widening rule (but not of byte order).
+**Binary arrays are little-endian** — the vendored `LittleEndianDataInput` handles it. mzXML is
+big-endian; never share a configured buffer between the readers.
 
 ### 4. `ms1scan` — document order, not the file's own linkage
 
@@ -232,9 +240,25 @@ streaming in **document order**, initialized to `0`.
 ```
 previous_ms1_scan = 0
 for each spectrum in document order:
-    if mslevel == 1: previous_ms1_scan = this scan id
-    else:            ms1scan = previous_ms1_scan
+    if peak_count == 0: continue                       # <-- Correction C27(b). NOT optional.
+    if mslevel == 1:    previous_ms1_scan = this scan id
+    else:               ms1scan = previous_ms1_scan
 ```
+
+> ⚠ **Correction C27(b) — this step shipped without the `peak_count == 0` guard, and no test caught
+> it.** Both loaders open with `if len(spectrum["intensity array"]) == 0: continue`
+> (`msql_fileloading.py:559` mzML, `:421` mzXML), and that `continue` runs **before**
+> `previous_ms1_scan` is assigned — so a zero-peak MS1 is invisible to the chain and the next MS2 links
+> to the MS1 *before* it. Confirmed against MassQL's own loader on `micro.mzML`: scan 5 → `ms1scan`
+> **2**, not the empty MS1 at scan 4.
+>
+> It went unnoticed because no real mzXML fixture has a zero-peak scan and the micro golden covers only
+> scans 1 and 3 — scan 5 does not match `test_micro.massql`. The fixture had the case all along and
+> nothing was looking. `ZeroPeakMs1ChainTest` now pins it; with the guard removed it reports "Got 4 —
+> expected 2".
+>
+> **The scan is still yielded** — only the linkage skips it, matching the MGF split below. Take
+> `peak_count` from `defaultArrayLength`, so the guard costs no decode.
 
 Three consequences:
 - An MS2 scan appearing **before any MS1 scan** gets `ms1scan = 0` → null downstream. **That is where the 0
@@ -252,16 +276,20 @@ linkage as a **named known deviation** in the README ([Step 13](Tech_Step13.md))
 [Step 7](Tech_Step7.md) on a fixture with no declared linkage at all. Do not conclude from a green `small.mzML`
 test that this rule is verified — add a comment saying so at the assertion site.
 
-### 5. What `BinaryDecoder` shares — and what it must not
+### 5. Decoding is NOT shared between readers (Correction C21a)
 
-| Share | Do **not** share |
-|---|---|
-| Base64 decode (`java.util.Base64`) | **Byte order** — mzML little-endian, mzXML big-endian |
-| zlib inflate (`java.util.zip.InflaterInputStream`) | **Array layout** — mzML has separate m/z and intensity arrays; mzXML interleaves pairs |
-| The `readFloat()`-then-widen rule for 32-bit precision | Numpress — mzML only |
+`BinaryDecoder` is **dropped**. There is nothing left to share:
 
-Take byte order as an explicit parameter. A shared, pre-configured `ByteBuffer` is how a 60×-style silent bug
-gets introduced across two readers at once.
+| | mzML | mzXML ([Step 7](Tech_Step7.md)) |
+|---|---|---|
+| Decoder | vendored `MzMLPeaksDecoder` | its own, inline |
+| Byte order | **little**-endian | **big**-endian (`"network"`) |
+| Layout | separate m/z and intensity arrays | **interleaved pairs** |
+| Numpress | yes, 6 variants | **none** |
+
+The only common ground is base64 + inflate — a handful of JDK calls. Forcing an abstraction over two
+decoders that agree on nothing else is how the 60×-class silent bug this spec warns about gets
+introduced. Step 7 reuses the already-vendored `ByteBufferInputStream` and decodes inline.
 
 ### 6. Error handling
 
@@ -269,7 +297,7 @@ gets introduced across two readers at once.
   `SpectrumTableBuilder` and only `build()` on success; never hand back a half-populated table. A partially-read
   file that silently returns 40 of 48 scans is worse than an exception.
 - Missing/empty `msLevel`: mzML normally always has it; if absent, treat the spectrum as unreadable and throw
-  with the spectrum id named. (mzXML's more permissive handling is [Step 7](Tech_Step7.md) §5.)
+  with the spectrum id named. (mzXML's more permissive handling is [Step 7](Tech_Step7.md) §4.)
 - Unreadable path / not a file / empty file → `MassqlException` naming the path.
 - Wrap MSDK's `MSDKException` in `MassqlException`, preserving the cause. Do not let MSDK types escape into
   public signatures — that is what keeps the reader swappable if the vendoring fallback is ever needed.
@@ -309,21 +337,35 @@ Unit (`*Test.java`), on the [Step 2](Tech_Step2.md) micro-fixtures — no large 
 | `MzmlReaderTest` | Scan/peak counts on `micro.mzML`; MS1/MS2 routing; `precmz`, `charge`, polarity 1/2/0; `scanRt` exact at **double** precision. |
 | `MzmlRtUnitTest` | `micro.mzML` declaring `unitName="second"` **is** converted; a copy declaring `"minute"` is **not**. Both directions, one fixture each — this is the test that catches a 60× error. |
 | `Ms1ScanDocumentOrderTest` | An MS2 scan **before any MS1** → `ms1scan == 0`; subsequent MS2 scans → the most recent preceding MS1 id. Include a comment stating that the decisive `spectrumRef`-vs-document-order assertion is in [Step 7](Tech_Step7.md), because this fixture cannot distinguish them. |
-| `Float32WideningTest` | A 32-bit array whose float32 and float64 decodes differ visibly decodes to `(double)(float)raw`. Assert on **raw bits** (`Double.doubleToLongBits`), not `assertEquals` with a delta. |
+| `ZeroPeakMs1ChainTest` | **Added by Correction C27(b), after this step was marked done.** A zero-peak MS1 must **not** become the `ms1scan` link: on `micro.mzML`, scan 5 → **2**, not the empty MS1 at scan 4. Also asserts the empty scan is still *yielded* (peak count 0, `materialize()` gives an empty table), so a reader that dropped it outright cannot pass. Verified to have teeth — with the guard removed it reports "Got 4 — expected 2". |
+| `MzMLPeaksDecoderTest` | ✅ **Done.** Proves the vendored decode layer standalone, before any XML walking rests on it: 64-bit bit-exact; 32-bit decodes to `(double)(float)raw` asserted on raw bits; a companion test that the two decodes genuinely differ (so the first cannot pass vacuously); zlib == uncompressed; empty array; accession→enum mapping; and our `LittleEndianDataInput` against `ByteBuffer`. |
 | `ReaderErrorPathTest` | Truncated mzML → throws, **no partial table**; empty file; missing path; directory instead of file. |
-| `SpectraFileCloseTest` | `close()` idempotent; open/close 200 files in a loop without exhausting descriptors. |
+| `SpectraStreamCloseTest` | `close()` idempotent; 200 open/close cycles without exhausting descriptors. Meaningful now precisely because the cursor holds the mapping (C22). |
+| `StreamingMemoryTest` | **Prove the C22 claim, do not assert it**: stream `PlusRise.mgf` (758,545 peaks) sampling used heap, asserting peak retained heap is bounded by *scan* size, not file size. |
 
 ## Done when
 
-- [ ] `mvn test` green.
-- [ ] `SpectraFile.open` correctly sniffs all three formats (mzXML routes to the Step 7 reader once it exists;
-      until then it throws a clear "not yet implemented" naming Step 7).
-- [ ] All three MGF rules verified: `ms1scan` always 0, `rt` ÷60 with `0.0` default, `charge` 0 sentinel.
-- [ ] Both mzML RT directions verified with separate fixtures.
-- [ ] `Float32WideningTest` asserts on raw bits and passes.
-- [ ] `docs/READER_RULES.md` contains the per-format rule table, including the MGF scan-numbering rule you
-      derived from source.
-- [ ] `dependency-audit.txt` updated with the final verified exclusion set and measured total.
+- [x] `mvn test` green — **282 tests** (275 at completion, plus C26's `FixturesContractTest` and C27's
+      `ZeroPeakMs1ChainTest`), including all 44 Step 5 store tests **unchanged**.
+- [x] **C27(b) fixed after the fact:** the zero-peak `ms1scan` guard, which this step shipped without.
+- [x] `SpectraFile.open` sniffs all three by **content**, not extension (the fixtures disagree on case).
+      mzXML throws a clear "not yet implemented" naming Tech_Step7.
+- [x] All three MGF rules verified: `ms1scan` always 0, `rt` ÷60 with `0.0` default, **`charge` absent → `1`**
+      (Correction C6 — this line previously said "0 sentinel", contradicting the field table above it).
+- [x] Both mzML RT directions verified with separate fixtures (`micro.mzML` minute → unchanged,
+      `micro_rtseconds.mzML` second → ÷60), plus a third test asserting they agree after conversion.
+- [x] The 32-bit widening is asserted **on raw bits** — already done by `MzMLPeaksDecoderTest` against the vendored decoder (8 tests green), including a companion assertion that the 32- and 64-bit decodes genuinely differ so it cannot pass vacuously. (This spec previously asked for "a 32-bit array whose float32 and float64 decodes differ visibly", which is incoherent — 4 bytes have no float64 decode.)
+- [x] `docs/READER_RULES.md` written: the three-format table, the shared `ms1scan` document-order rule, the
+      MGF scan-numbering rule, all three RT rules side by side, and the vendored-API gotchas.
+- [x] Closure unchanged: **two artifacts, 785,599 B**.
+- [x] **Oracle cross-check inside this step**, not deferred: `small.mzML` matches the parity dump on scan
+      counts (48 / 14 / 34), every per-scan peak count, 305,214 total peaks, bit-exact `rt`, and the
+      golden's six `ms1scan` links.
+- [x] **C22 proven, not asserted**: 34,513 scans / 758,544 peaks streamed inside a **48 MB heap**, ~0 KB
+      retained after settling.
+
+**✅ STEP 6 COMPLETE — 2026-07-31.** See Correction **C24** in
+[`Tech_Step_INDEX.md`](Tech_Step_INDEX.md) and `docs/READER_RULES.md`.
 
 ## References
 

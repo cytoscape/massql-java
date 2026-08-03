@@ -20,23 +20,28 @@ This is not obvious from the file paths, so read this before following a path in
 specs. Nothing outside it ships.
 
 **The oracle working directory (`../massql`, relative to this repo's root)** holds the
-pinned Python MassQL install, the fixtures, the goldens, and `massql_query.py`. It is
-**never shipped** and is not a git repo. It exists to define the behavioural contract and to
-generate the goldens the Java test suite diffs against.
+pinned Python MassQL install, `massql_query.py`, and the scripts that *generate* the fixtures
+and goldens. It is **never shipped** and is not a git repo. It exists to define the
+behavioural contract and to produce the goldens the Java test suite diffs against.
+
+> ⚠ **Correction C26 — the test suite no longer reads from the oracle directory at all.**
+> Fixtures and goldens are **committed to this repo** under `src/test/resources/`, because CI
+> checks out only `massql-java` and the old arrangement made every fixture-dependent test skip
+> silently. `mvn verify` now needs nothing outside this repo. See [`../FIXTURES.md`](../FIXTURES.md).
 
 Paths in the specs resolve like this:
 
 | Path form in a spec | Where it actually lives |
 |---|---|
 | `src/main/java/…`, `docs/…`, `pom.xml` | **this repo** |
+| `data/…`, `fixtures/…`, `goldens/…`, `reference_parses/…` | **this repo**, under `src/test/resources/` (C26) |
 | `oracle/…` (e.g. `oracle/PINNED.md`, `oracle/msql.ebnf`) | the oracle directory |
-| `data/…` (e.g. `data/small.mzML`, `data/CONVERSION_NOTES.md`) | the oracle directory |
-| `fixtures/…` (e.g. `fixtures/micro/EXPECTED.md`) | the oracle directory |
-| `output/…` (the goldens) | the oracle directory |
+| `output/…` (where goldens are *generated*) | the oracle directory; the committed copies are `src/test/resources/goldens/query-results/` |
+| `data/CONVERSION_NOTES.md` | the oracle directory — per-fixture provenance and generation notes |
 
-Artifacts copied *into* this repo for the test suite — the reference-parse corpus and the
-loader-parity dumps — live under `src/test/resources/` and are the committed copies the
-tests actually read.
+The one exception is the two Ewing-lab fixtures (`data/DP00570_F02.*`), gitignored because
+ewinglab.org states no redistribution terms. `scripts/fetch-fixtures.sh` retrieves them and CI
+caches the result; their absence **fails** a test rather than skipping it.
 
 ## Where a finding goes
 

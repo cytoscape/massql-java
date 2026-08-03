@@ -60,6 +60,28 @@ Governing sections: `SPIKE.md` §3 (exact rules), §6a (tolerance / comparator /
 
 ### 1. Execution model
 
+> ⚠ **Correction C22: evaluation is PER SCAN, over a stream.** This section was written against a
+> whole-file table with masks spanning it. There is no such table — the executor advances a
+> `SpectraStream` cursor and evaluates each scan as it arrives, retaining only the most recent MS1
+> scan for [Step 10](Tech_Step10.md)'s precursor lookup. The insight below is **unchanged and still
+> the crux**, and it gets *easier* to express per-scan: two conditions may be satisfied by different
+> peaks in the same scan, so a condition means "this scan contains a peak matching X". `RowMask` is
+> still useful *within* a scan; what disappears is the cross-scan intersection, which becomes a
+> simple per-scan boolean AND.
+>
+> Skeleton:
+> ```
+> SpectrumTable retainedMs1 = null;
+> while (stream.next()) {
+>     ScanView v = stream.current();
+>     if (v.msLevel() == 1) retainedMs1 = v.materialize();
+>     if (v.msLevel() != wantedLevel) continue;
+>     SpectrumTable scan = v.materialize();          // single-scan table
+>     if (allConditionsHold(scan, v, retainedMs1)) emit(v, scan, retainedMs1);
+> }
+> ```
+
+
 A MassQL condition is fundamentally *"this scan contains at least one peak satisfying P"*, not *"this row
 satisfies P"*. So:
 

@@ -1,0 +1,30 @@
+[
+  {
+    "scan": 1,
+    "precmz": 250.25,
+    "ms1scan": null,
+    "rt": 0.0,
+    "charge": null,
+    "tic": 1750.0,
+    "mslevel": 2,
+    "base_peak_i": 1500.0,
+    "base_peak_mz": 200.5,
+    "ms1_i": null,
+    "ms1_precmz": null,
+    "ms1_base_peak_i": null
+  },
+  {
+    "scan": 3,
+    "precmz": 500.0,
+    "ms1scan": 2,
+    "rt": 1.0,
+    "charge": null,
+    "tic": 2600.0,
+    "mslevel": 2,
+    "base_peak_i": 1500.0,
+    "base_peak_mz": 200.5,
+    "ms1_i": 1000.0,
+    "ms1_precmz": 499.99609375,
+    "ms1_base_peak_i": 9000.0
+  }
+]
