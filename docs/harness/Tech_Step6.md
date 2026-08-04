@@ -125,10 +125,21 @@ Extension matching must be case-insensitive everywhere.
 keeps [Step 10](Tech_Step10.md) free of null checks.
 
 > ⚠ Correction C14: the original rationale here was wrong. MassQL's MGF `ms1_df` is **not** empty — it is a
-> synthetic 1-row all-zero placeholder (`i=0, mz=0, scan=1, rt=0, polarity=1`), so
-> `massql_query.py:170`'s `len(ms1_df) == 0` branch **never fires for MGF**. The precursor lookup runs anyway
-> and yields nulls because `ms1scan` is 0 and no MS1 scan 0 exists. An empty Java table produces identical
-> results, so the conclusion stands — but do not expect that branch to be the mechanism.
+> fabricated 1-row table, so `massql_query.py:170`'s `len(ms1_df) == 0` branch **never fires for MGF**. The
+> precursor lookup runs anyway and yields nulls because `ms1scan` is 0 and no MS1 scan 0 exists. An empty
+> Java table produces identical results, so the conclusion stands — but do not expect that branch to be the
+> mechanism.
+>
+> ⚠ **Correction C33b refines this further: the fabricated row takes TWO forms, not one.** The all-zero
+> shape (`i=0, mz=0, scan=1, rt=0, polarity=1`) is the pyteomics loader's `except` branch, reached only when
+> its peak loop never ran — `PlusRise.mgf`'s case. On the normal path `peak_dict` **leaks from the loop**, so
+> the row is a byte-for-byte **duplicate of the last MS2 peak**, carrying that scan's id (`micro.mgf` → 3,
+> `DP00570_F02.mgf` → 625). See `docs/READER_RULES.md` for the table.
+>
+> 📌 **The `polarity=1` in the all-zero shape above was the clue that C8 was wrong** — the loader defaults
+> polarity to 1, and it is written right here. C33 found it three steps later via the Step 8 gate instead.
+> A value recorded incidentally inside an example is easy to read past; when a rule and an example disagree,
+> the example is data.
 
 ### 2. MGF reader
 
@@ -143,7 +154,7 @@ Structure: `BEGIN IONS` … `END IONS` blocks, each with `TITLE=`, `PEPMASS=`, `
 | **All peaks are MS2** | MGF is an MS2-only peak-list format. `mslevel` = 2, and the MS1 table is empty. |
 | `precmz` | First token of `PEPMASS=` (a second token, if present, is precursor intensity — ignore it). |
 | **`charge`** | From `CHARGE=`; strip a trailing `+`/`-`. **Absent → `1`, NOT 0 and not null.** ⚠ See Correction C6 — `SPIKE.md` §3 is wrong here. The live loader is `_load_data_mgf_pyteomics`, whose charge handling is `params.get('charge', [1])` with `except: charge = 1` (`msql_fileloading.py:192-203`). Since only `0` is null-converted ([Step 10](Tech_Step10.md) §4), **MGF `charge` is never null** — a genuine 1+ and an absent `CHARGE=` are indistinguishable. Confirmed against the golden: `plusrise_results.json` charge counts are `{1: 653, 2: 10, 3: 1}`, zero nulls. |
-| **`polarity`** | **Not read at all** on the live path (Correction C8). Verify the value MassQL actually emits against `ms1_df`/`ms2_df` rather than assuming; a `POLARITY` condition cannot meaningfully filter an MGF. |
+| **`polarity`** | **Hardcoded `1`** (positive). ⚠ **Correction C33 fixes C8**, which said "not read at all → 0". Not read from any *header* is true; but both loaders write `"polarity": 1  # Default` into every peak dict (`msql_fileloading.py:67`, `:86`), so MassQL emits **1** for every MGF row — measured `{1: all}` across 866k rows. A `POLARITY` condition still cannot meaningfully filter an MGF, since the value is a constant rather than data. **This row already said "verify the value MassQL actually emits rather than assuming", and the implementation assumed anyway** — the note below records why that was easy to miss. |
 | **`rt`** | `float(RTINSECONDS)/60.0`. **Absent → `0.0`, not null** (`msql_fileloading.py:179-181, :327-328`). |
 | **`ms1scan`** | **Hardcoded `0`** for every scan (`msql_fileloading.py:394`). Not derived, not looked up. |
 | **`scan`** | **`SCANS=` when present, else the 1-based index of the block in the file** — `scan = params.get('scans', index + 1)` (`msql_fileloading.py:177`). Resolved in Correction C7; the golden's first record is `scan: 576`. Check whether `PlusRise.mgf` actually carries `SCANS=` so you know which branch the fixture exercises. |

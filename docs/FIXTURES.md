@@ -16,7 +16,7 @@ see it. CI was green for four steps while proving only that the code compiled.
 | `data/` | The four real spectra files, one per format plus the MGF/mzXML pair |
 | `fixtures/micro/` | Hand-written 5-scan files with hand-computable values, one variable each — see below |
 | `fixtures/edge/` | Pathological inputs — currently MSDK's `empty_msLevel_tag.mzXML` |
-| `goldens/loader-parity/` | Per-scan counts, hex sums and SHA-256 digests from MassQL's own loader |
+| `goldens/loader-parity/` | **14 dumps.** Per scan: counts, hex intensity sum, SHA-256 of the m/z **and** intensity arrays, the leading 8 values of each as hex, `rt_hex` and `polarity` — all from MassQL's own loaded tables. The input to the Step 8 parity gate |
 | `goldens/query-results/` | `scaninfo` output from the reference implementation, per fixture/query |
 | `goldens/queries/` | The `.massql` query files those goldens were produced from |
 | `reference_parses/` | MassQL's own 46-file parse corpus (+ manifest) — `ParseConformanceTest` |
@@ -38,6 +38,25 @@ every expected value follows from arithmetic you can check by hand (`fixtures/mi
 | `micro_nested.mzXML` | MS2 nested **inside** its parent MS1 (`<scan>` depth 2) |
 | `micro_nopolarity.mzXML` | `polarity` attribute **omitted** — non-parity, see below |
 | `micro_noprecursor.mzXML` | MS2 with **no** `<precursorMz>` — non-parity, see below |
+| `micro_multiprec.mzXML` | **Two** `<precursorMz>` elements; the second is a decoy. MassQL indexes `[0]`, so first wins (C31) |
+| `micro_multiprec.mzML` | Same idea, plus a second `<selectedIon>` **and** a second `<precursor>` — so honouring one nesting level but not the other still fails |
+
+## Parity coverage — which fixtures have a dump, and which cannot
+
+All 14 fixtures with a dump are compared **bit-identically** against MassQL by the Step 8 gate
+(`docs/PARITY_REPORT.md`). Three fixtures deliberately have none:
+
+| Fixture | Why no dump |
+|---|---|
+| `micro_nopolarity.mzXML` | MassQL raises `KeyError: 'polarity'` (C27c) — verified by execution. Parity is not available; `MzxmlPolarityTest` pins *our* contract |
+| `micro_noprecursor.mzXML` | MassQL raises `KeyError: 'precursorMz'` (C27c). `MzxmlEdgeCaseTest` pins ours |
+| `micro_multiprec.mzML` | Adds nothing over the mzXML twin for *peak* parity; C31 is pinned by `MultiPrecursorTest` |
+| `fixtures/edge/empty_msLevel_tag.mzXML` | 8 of its 10 scans are dropped on `msLevel` (C27a). Still our only 64-bit + zlib decode of a file we did not generate |
+
+The four decode variants (`micro_p64`, `micro_zlib`, `micro_p64_zlib`, `micro_nested`) were in that list until
+Correction C32: Step 7 had pinned them only by cross-fixture *equivalence*, which cannot catch an error common
+to both sides of a pair, so the 64-bit, zlib and nested branches had no bit-identity check at all. Dumps were
+generated in Step 8 and they now do.
 
 **Why the mzXML variants exist (Correction C27).** `micro.mzXML`, `small.mzXML` and the Ewing file are
 *all* `precision="32"` / uncompressed / `network`, so the 64-bit and zlib decode branches were exercised

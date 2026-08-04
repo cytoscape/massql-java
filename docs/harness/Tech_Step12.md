@@ -69,17 +69,38 @@ compare field by field.
 | `scan`, `ms1scan`, `charge`, `mslevel` | **Exact**, including null-vs-value |
 | `precmz`, `base_peak_mz` | **Relative 1e-9** (m/z) |
 | `ms1_precmz` | **Relative 1e-9** normally, but **1e-7 when the fixture is 32-bit mzXML**. It is a *measured* m/z read from the binary array, so mzXML's single `precision="32"` truncates it: measured deltas vs the mzML golden are 4.9e-9 and 2.9e-8, and `float32(mzML_value) == our_value` exactly (Correction C11). This is a format property, not a decoder bug |
-| `tic`, `base_peak_i`, `ms1_i`, `ms1_base_peak_i` | **Bit-identical** (intensities) |
+| **`tic`** | **Relative 1e-6** — ⛔ **NOT bit-identical**; see Correction C34 below |
+| `base_peak_i`, `ms1_i`, `ms1_base_peak_i` | **Bit-identical** (intensities) — verified achievable |
 | `rt` | **Bit-identical** — requires the double-precision `scanRt` from [Step 5](Tech_Step5.md) §1 |
 | every column | **Exact null-vs-value.** A null where the golden has a value, or vice versa, is a failure regardless of the numeric policy |
 
 Also compare **row count** and **row order** (ascending scan id) before comparing fields, so a mismatch reports
 "expected 664 rows, got 663" rather than a field-level diff on misaligned rows.
 
-`tic` is the one column where an accumulation-order caveat could apply, as in [Step 8](Tech_Step8.md) §1. Try
-bit-identical first; if it fails **only** on `tic` and **only** in the last bits, that is an accumulation-order
-artifact, not a bug — but record it explicitly in `DIFFERENTIAL_REPORT.md` with the exact tolerance adopted and
-why, and keep every other intensity column bit-exact.
+> ⛔ **Correction C34 — `tic` was grouped with the bit-identical intensities and CANNOT be.** This row used
+> to read *"`tic`, `base_peak_i`, `ms1_i`, `ms1_base_peak_i` | Bit-identical"*, with a caveat suggesting that
+> a `tic`-only failure "in the last bits" would be an **accumulation-order** artifact. The instinct was
+> right and both the cause and the magnitude were wrong.
+>
+> **The cause is dtype.** MassQL's intensity column is `float32`, and `tic` is
+> `ms2_df.groupby("scan").sum()["i"]` over it (`msql_engine.py:638,660`, renamed at
+> `massql_query.py:158`) — a **float32 accumulation**. Our float64 sum is *exact*; the golden's is not.
+>
+> **Measured on `output/small_mzml_results.json` — all six rows differ, worst 3.691e-08:**
+>
+> | scan | golden `tic` | ours (float64) | rel diff |
+> |---|---|---|---|
+> | 3 | 586278.875 | 586278.8533592224 | 3.691e-08 |
+> | 17 | 1102582.0 | 1102582.026266098 | 2.382e-08 |
+> | 44 | 925073.8125 | 925073.8236341476 | 1.204e-08 |
+>
+> 3.7e-08 is **not** "the last bits", and anyone chasing an ordering bug would not find it.
+>
+> **Only `tic` moves.** `base_peak_i` is a `max()` — a *selected* value with no accumulation — and is
+> **bit-identical on all six golden rows**, verified. `ms1_i` and `ms1_base_peak_i` are likewise lookups and
+> maxima. So this is a split, not a blanket loosening: **`tic` at relative 1e-6, every other intensity
+> column still bit-exact.** Record it in `DIFFERENTIAL_REPORT.md` noting the error is in the **reference**,
+> not in us — the same finding [Step 8](Tech_Step8.md) §1 records for `i_sum_hex` (C33c).
 
 Fixtures and expected counts:
 

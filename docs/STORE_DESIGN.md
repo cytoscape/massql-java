@@ -81,6 +81,15 @@ only when assertions happen to be enabled.
    nonconforming file would otherwise produce silently wrong window results.
    `sortedAnyScan()` reports whether any sorting was necessary; record it if a real fixture
    ever trips it.
+
+   > ⚠ **This sort became load-bearing for the Step 8 parity gate, in a non-obvious way.**
+   > `ReaderParityIT` compares **SHA-256 over each peak array**, which is order-sensitive — so
+   > our array order must equal MassQL's *file* order. If a fixture ever arrives with descending
+   > m/z, this sort silently reorders our array and the digest fails, looking exactly like a
+   > decode bug. Measured across all 14 parity fixtures: **zero scans descend**, so the sort never
+   > fires. `PeakOrderPreconditionTest` asserts that from both sides — ours *and* MassQL's own
+   > order via the dumps' `mz_hex_first8` — and fails with the right explanation if it ever
+   > changes. Checking only our side would be circular, since the builder sorts.
 4. **`iNorm` / `iTicNorm` are computed at freeze**, never lazily, so the engine reads them as
    plain columns.
 5. **The table is immutable after `build()`.** No setters, no exposed arrays; `scanIds()`

@@ -155,7 +155,7 @@ class MgfReaderTest {
     }
 
     @Test
-    void everyScanIsMs2WithMs1scanZeroAndUnknownPolarity(@TempDir Path dir) throws IOException {
+    void everyScanIsMs2WithMs1scanZeroAndPositivePolarity(@TempDir Path dir) throws IOException {
         Path p = write(dir, "a.mgf", """
                 BEGIN IONS
                 PEPMASS=500.5
@@ -165,7 +165,18 @@ class MgfReaderTest {
         Row r = readAll(p).get(0);
         assertEquals(2, r.msLevel(), "MGF is an MS2-only peak list");
         assertEquals(0, r.ms1scan(), "hardcoded 0 (msql_fileloading.py:394) -> null downstream");
-        assertEquals(0, r.polarity(), "C8: polarity is not read on the live path");
+
+        // ⚠ Correction C33 -- this assertion used to require 0, citing C8 ("polarity is not read on the
+        // live path"). C8's premise is right (no MGF header carries polarity) but its conclusion was
+        // wrong: both MGF loaders write `"polarity": 1  # Default` into every peak dict
+        // (msql_fileloading.py:67 and :86), so MassQL reports POSITIVE for every MGF row. Measured across
+        // all three MGF fixtures -- 7 + 107,178 + 758,544 rows -- the distribution is {1: all}, not one 0.
+        //
+        // Caught by ReaderParityIT, the Step 8 gate. Returning 0 would have failed the Step 12
+        // differential on the polarity column for EVERY MGF row, where it would have looked like a
+        // collation bug rather than a reader default.
+        assertEquals(1, r.polarity(),
+                "MGF polarity is a hardcoded 1 (positive), not 0 -- C33 corrects C8");
     }
 
     @Test

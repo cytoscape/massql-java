@@ -36,7 +36,7 @@ owning step.
 | [5](Tech_Step5.md) | Columnar store + per-scan reductions | 3 | 1.5 d | | ✅ **DONE 2026-07-30** |
 | [6](Tech_Step6.md) | `SpectraStream` cursor + MGF reader + mzML reader | 3, 5, 1, 2 | 1.5 d | | ✅ **DONE 2026-08-03 — 275 tests** |
 | [7](Tech_Step7.md) | **Hand-written** mzXML reader (C23) | 3, 5, 6, 2 | 1 d | | ✅ **DONE 2026-08-03 — 335 tests** |
-| [8](Tech_Step8.md) | Reader parity — bit-identical vs Python | 2, 6, 7 | 0.5 d | ⛔ **GATE** | not started |
+| [8](Tech_Step8.md) | Reader parity — bit-identical vs Python | 2, 6, 7 | 0.5 d | ⛔ **GATE** | ✅ **GATE GREEN 2026-08-03 — 392 tests** |
 | [9](Tech_Step9.md) | Condition filters (9a required + 9b) | 4, 5, 8 | 2 d | | not started |
 | [10](Tech_Step10.md) | `scaninfo` collation, result model, JSON | 9, 5 | 1.5 d | | not started |
 | [11](Tech_Step11.md) | Public API surface + CLI | 10 | 0.5 d | | not started |
@@ -223,6 +223,169 @@ differential runs `--output <tmp>` and diffs the **file**; stream hygiene stays 
 **Not affected: the SDK.** The Cytoscape app calls `Massql.execute` and writes the JSON into the node
 table in-process. There is no stdout, no temp file and no process boundary anywhere in the app's data
 path — the layer the reader assumed was at issue was never involved.
+
+### Corrections propagated FROM Step 8 into later steps
+
+**C34 — `tic` cannot be bit-identical, and two later specs require it to be. Found by following C33(c)
+forward instead of waiting for Step 12 to fail.**
+
+C33(c) established that MassQL accumulates intensities in **`float32`**. `tic` is the same
+computation: `msql_engine.py:638,660` produce it as `ms2_df.groupby("scan").sum()["i"]` over that float32
+column, then `massql_query.py:158` renames `i` → `tic`. So the golden's `tic` carries float32 accumulation
+error while our float64 sum is exact.
+
+**Measured against `output/small_mzml_results.json` — all six rows differ:**
+
+| scan | golden `tic` (float32 sum) | float64 sum (ours) | rel diff |
+|---|---|---|---|
+| 3 | 586278.875 | 586278.8533592224 | 3.691e-08 |
+| 10 | 848427.375 | 848427.357460022 | 2.067e-08 |
+| 17 | 1102582.0 | 1102582.026266098 | 2.382e-08 |
+| 24 | 990298.625 | 990298.6140146255 | 1.109e-08 |
+| 37 | 1041573.6875 | 1041573.6759586334 | 1.108e-08 |
+| 44 | 925073.8125 | 925073.8236341476 | 1.204e-08 |
+
+**Only `tic`.** `base_peak_i` is a `max()` — a *selected* value, no accumulation — and is
+**bit-identical on all six rows**, verified. Same for `ms1_i` and `ms1_base_peak_i`, which are lookups and
+maxima. So the fix is a split, not a blanket loosening:
+
+| Column | Policy |
+|---|---|
+| **`tic`** | relative **1e-6** — float32 accumulation in the *reference* |
+| `base_peak_i`, `ms1_i`, `ms1_base_peak_i` | **bit-identical**, unchanged |
+
+**(a) [Step 12](Tech_Step12.md) §1 grouped all four as "Bit-identical (intensities)".** Its caveat had the
+right instinct — "`tic` is the one column where an accumulation-order caveat could apply… if it fails only
+on `tic` and only in the last bits" — but the wrong **cause** (dtype, not order) and the wrong
+**magnitude**: 3.7e-08 is not "the last bits", and a reader chasing an ordering bug would not find it.
+
+**(b) [Step 10](Tech_Step10.md)'s `CollationAnchorTest` hardcodes `tic 586278.875`** and asserts the golden
+record "field by field". As written it **fails** — our value is `586278.8533592224`. It must assert `tic`
+within 1e-6 while keeping every other field exact.
+
+> **Why this matters more than the tolerance itself.** Step 12 is a gate. Arriving there to find `tic`
+> failing on every row of every fixture, with a spec that says the cause is accumulation *order*, is a day
+> lost to chasing the wrong thing — and the tempting fix ("just loosen it") would have been adopted without
+> knowing that the error lives in the reference rather than in us. It does: our sum is the accurate one.
+
+**C34(b) — `POLARITY` cannot filter an MGF, and now matches everything rather than nothing.** Following
+C33(a): MGF polarity is a constant **1**, so `POLARITY=Positive` matches **every** MGF scan and
+`POLARITY=Negative` matches **none**. Under the old (wrong) value of 0 both matched nothing.
+[Step 9](Tech_Step9.md) §5 says "`0` (unknown) matches neither", which is still true of mzML/mzXML but no
+longer describes MGF at all. The condition is not a filter on data there — it is a filter on a constant.
+
+### Corrections found while executing Step 8 — the gate found a real reader bug
+
+**C33 — MGF `polarity` is a hardcoded `1`, not `0`. Correction C8 was wrong, and this is the first genuine
+reader bug the parity gate caught.**
+
+`MgfReader.polarity()` returned `0`, citing C8: *"polarity is not read on the live path"*. C8's premise is
+right — no MGF header carries polarity — but its **conclusion was wrong**. Both MGF loaders write
+`"polarity": 1  # Default` into every peak dict (`msql_fileloading.py:67` and `:86`), so MassQL reports
+**positive** for every MGF row. Measured across all three MGF fixtures — `micro.mgf` 7 rows,
+`DP00570_F02.mgf` 107,178, `PlusRise.mgf` 758,544 — the distribution is `{1: all}`. Not one `0`.
+
+**This is exactly what Step 8 exists for.** Returning `0` would have failed the
+[Step 12](Tech_Step12.md) differential on the polarity column for **every MGF row**, where it would have
+presented as a collation bug three steps away from its cause. Found before any query logic was written,
+fixed in one line. `MgfReaderTest` previously *asserted* the wrong value, so the unit suite was actively
+defending the bug — the golden was the only thing that could have known.
+
+> **Process note.** C8 was derived by reading which fields the loader *parses*, and the loader does not
+> parse polarity. The defaulting happened somewhere else in the function. Reading a rule off the parse
+> path is not the same as reading it off the output — when they can disagree, only the output settles it.
+
+**C33(b) — the MGF fake MS1 row is not always an all-zero placeholder.** `READER_RULES.md` and C14/C24b
+said MassQL "synthesises a 1-row all-zero MS1 placeholder for MGF (mz=0, i=0, scan=1)". True for one of the
+two MGF loaders only. The pyteomics loader ends with:
+
+```python
+# This is kind of a hack for compatibility
+try:
+    ms1_df = pd.DataFrame([peak_dict])     # peak_dict LEAKS from the MS2 peak loop
+except Exception:
+    peak_dict = { "i": 0, "mz": 0, "scan": 1, ... }   # the all-zero form
+    ms1_df = pd.DataFrame([peak_dict])
+```
+
+`peak_dict` is the loop variable, so the fake MS1 row is a **byte-for-byte duplicate of the last MS2
+peak** — verified identical on `micro.mgf` (scan 3, m/z 123.456789012345, i 4096.0) and
+`DP00570_F02.mgf` (scan 625, m/z 897.5525, i 2449.0). The all-zero `except` branch is reached only when the
+loop never ran, which is `PlusRise.mgf`'s case via the manual-loader fallback (pyteomics cannot index it).
+
+Consequences: the dump's `ms1_peak_rows: 1` **double-counts a real peak** on the pyteomics path rather than
+adding a synthetic zero, and its scan id is the *last* MS2 scan's — which is why it collides (C32a). Our
+readers omit it either way, correctly, since MGF has no survey scans.
+
+**C33(c) — the `i_sum` tolerance was blamed on the wrong cause.** [Step 8](Tech_Step8.md) §1 attributed the
+sum exception to numpy's pairwise accumulation and set **1e-15**. Measured, that fails on correct code: the
+real cause is **dtype**. MassQL's intensity column is `float32`, and `dump_loader_parity.py:81` records
+`g["i"].sum()` — a **float32 accumulation**. On `small.mzML` MS1 scan 1 the dump holds `69381840.0` where
+the true sum is `69381842.11895752`: relative error **3.05e-08**.
+
+Our Java sum is the *more accurate* one — accumulating the same values in float64 reproduces it **exactly**
+(measured difference `0.000e+00`). Tolerance set to **1e-6**, absorbing the dump's float32 epsilon
+(~1.2e-7) and nothing of ours. It costs the gate nothing because the **digests** establish bit-identity with
+no tolerance at all.
+
+### Corrections found while reviewing Step 8 as its implementer
+
+**C32 — [Step 8](Tech_Step8.md)'s parity harness, as specified, would compare the wrong rows and assert
+things that are false on a correct reader.** Five defects, four of them created by Steps 6/7 changing
+reality underneath the spec. None is a code defect — the readers appear correct.
+
+**(a) Keying by scan id alone is unsafe: the MGF phantom MS1's id COLLIDES with a real MS2 id.** MassQL
+synthesises an all-zero MS1 placeholder for MGF (C14/C24b) and **it is present in the dumps**. Measured:
+
+| dump | phantom MS1 scan id | collides with a real MS2 id? |
+|---|---|---|
+| `micro.mgf` | **3** | **yes** |
+| `DP00570_F02.mgf` | **625** | **yes** |
+| `PlusRise.mgf` | 1 | no |
+
+§2 said "keyed by scan id", which would silently compare a real MS2 scan against the synthetic zero row —
+2 of 3 MGF fixtures. **Key by `(mslevel, scan)`.**
+
+**(b) "MS1 scan count — Exact" is wrong for every MGF fixture.** Each MGF dump reports
+`ms1_scan_count: 1` (that phantom); our reader correctly yields **0** MS1 scans for MGF. Skip
+`mslevel == 1` entries on MGF fixtures, and assert our MGF MS1 count is 0.
+
+**(c) The zero-peak reconciliation was unspecified, and the deltas are large.** The dumps omit every
+zero-peak scan; our readers deliberately yield them. **PlusRise: 34,513 reader scans vs 21,942 dump
+entries.** `micro.mzML`: 5 vs 4. The rule is now stated, and the count of reader-only scans is
+**asserted** per fixture rather than tolerated — otherwise a reader that dropped real scans passes.
+
+**(d) §1's preferred "multiset of individual intensities" is not implementable, and contradicts itself.**
+The dumps store **SHA-256 digests** plus first-8 values; individual peaks are not there (Step 2 measured
+the all-values form at 86 MB and rejected it). Digests are also **order-sensitive**, which contradicts
+`ReaderParityHarnessTest`'s required "reordering compares equal". Resolved as **digest-based** —
+strictly stronger than a multiset, because it pins order too.
+
+Digest comparison is only valid because our array order matches MassQL's file order, and
+`SpectrumTableBuilder` **sorts by m/z when a scan is unsorted** (`:174-176`). Verified: **zero fixtures
+have descending m/z within a scan**, so the sort never fires. `PeakOrderPreconditionTest` now asserts that
+precondition, so a future unsorted fixture fails with the right diagnosis instead of looking like a decode
+bug.
+
+**(e) "Scan ids, in order, as a list — Exact" contradicts the spec's own C28 note** that the dumps are
+level-grouped rather than document order. Replaced with a keyed comparison.
+
+**Four stale references, all from C26/C30 fallout:**
+- The ⚠ claiming the dumps hold `scan`/`ms1scan` as **strings** is **false**.
+  `dump_loader_parity.py:78` coerces (`int(scan) if str(scan).lstrip("-").isdigit() else str(scan)`), and
+  every dump reads back `int`. Harmless advice that sends the implementer hunting for a non-problem.
+- Deliverable path `src/test/resources/loader-parity/` → `src/test/resources/goldens/loader-parity/`.
+- Prerequisite said `oracle/loader-parity/*.json` → they are `.json.gz` and committed in-repo.
+- `InstrumentAttributeCrossCheckIT` was listed as a Step 8 deliverable but **was built in Step 7** and
+  passes with C30's corrected 1e-5 tolerances. Step 8 cross-references it rather than rebuilding it.
+  `ParityCoverageTest`'s stated purpose is now covered by C26's zero-skip CI gate plus
+  `FixturesContractTest`; its residual value folds into `ReaderParityIT`.
+
+**Also resolved here: four decode branches had no parity check at all.** `micro_p64`, `micro_zlib`,
+`micro_p64_zlib` and `micro_nested` were pinned only by cross-fixture *equivalence* (Step 7), which cannot
+catch an error common to both sides of a pair. Dumps generated for those four plus `micro_multiprec.mzXML`
+and `micro_rtseconds.mzML` — the latter gaining its only parity check, since the seconds-side RT rule was
+unit-tested only.
 
 ### Corrections found while executing Step 7
 

@@ -103,7 +103,7 @@ Specification: `_load_data_mgf_pyteomics` (`msql_fileloading.py:155-244`).
 | **`rt`** | `RTINSECONDS`÷60. **Absent → `0.0`, not null** |
 | **`scan`** | `SCANS=` when present, else the **1-based block index** (Correction C7) |
 | `ms1scan` | Hardcoded **0** (`:394`) |
-| `polarity` | **Not read** on the live path (Correction C8) → 0 |
+| **`polarity`** | Not read from any header — but **hardcoded `1`** (positive), not 0. ⚠ **Correction C33 fixes C8**, which said "not read → 0": both loaders write `"polarity": 1  # Default` (`:67`, `:86`). Measured `{1: all}` across 866k MGF rows. Reading a rule off the *parse* path missed a default set elsewhere in the function |
 
 > **⚠ MGF `charge` is never null.** SPIKE.md §3 says "null if absent"; the live loader uses
 > `params.get('charge', [1])` with `except: charge = 1`. Since only `0` is null-converted, an absent
@@ -113,9 +113,23 @@ Specification: `_load_data_mgf_pyteomics` (`msql_fileloading.py:155-244`).
 peak lines. MassQL's dataframe simply has no *rows* for them, which is why it reports **21,942** unique
 scans — this explains the "12,571 dropped spectra" left unexplained in Correction C14. Nothing is dropped.
 
-**MassQL synthesises a 1-row all-zero MS1 placeholder for MGF** (mz=0, i=0, scan=1). It is not a peak, and
-our reader correctly omits it — so the parity dump's `758,545` total is `758,544` real peaks plus that
-phantom row. Step 8's comparison must exclude it.
+**MassQL fabricates a 1-row MS1 table for MGF, and it takes one of TWO forms** (Correction C33b — this
+paragraph previously claimed it was always all-zero at scan 1). The pyteomics loader ends with
+`ms1_df = pd.DataFrame([peak_dict])` where `peak_dict` **leaks from the MS2 peak loop**, so the row is a
+byte-for-byte **duplicate of the last MS2 peak**. The all-zero `except` branch (mz=0, i=0, scan=1) is
+reached only when that loop never ran.
+
+| Fixture | Loader | Fake MS1 row |
+|---|---|---|
+| `PlusRise.mgf` | manual (pyteomics cannot index it) | **all zeros**, scan 1 |
+| `micro.mgf` | pyteomics | duplicate of the last MS2 peak — scan **3**, m/z 123.456789012345, i 4096.0 |
+| `DP00570_F02.mgf` | pyteomics | duplicate — scan **625**, m/z 897.5525, i 2449.0 |
+
+Our readers omit it either way, correctly: MGF has no survey scans. Two consequences for Step 8: the dump's
+`ms1_peak_rows: 1` **double-counts a real peak** on the pyteomics path (so PlusRise's `758,545` = 758,544
+real + one synthetic zero, but micro/DP00570's totals include a duplicated real peak), and the fake row's
+scan id is the *last MS2 scan's*, which is why it **collides** with a real id (C32a) and why the parity
+harness keys on `(mslevel, scan)`.
 
 Parsing tolerances: blank lines, `#`/`;`/`!` comments, CRLF, space- or tab-separated peaks, and a
 file-level `COM=`/`CHARGE=` preamble before the first `BEGIN IONS` (both real fixtures have one).

@@ -13,7 +13,7 @@ loader — before any query logic is written.
 
 | Step | Why |
 |---|---|
-| [Step 2](Tech_Step2.md) | Provides `oracle/loader-parity/*.json` — the per-scan peak counts and intensity sums dumped from MassQL's own loaded tables, with floats as hex. This step's entire input. |
+| [Step 2](Tech_Step2.md) | Provides the loader-parity dumps — per-scan peak counts, intensity sums, SHA-256 digests and first-8 values from MassQL's own loaded tables, floats as hex. This step's entire input. ⚠ They are **`.json.gz`** and live at **`src/test/resources/goldens/loader-parity/`**, committed in-repo (C26) — *not* `oracle/loader-parity/*.json` as this row used to say. C32 extended them to 14 fixtures. |
 | [Step 6](Tech_Step6.md) | MGF and mzML readers. |
 | [Step 7](Tech_Step7.md) | mzXML reader. |
 
@@ -51,10 +51,18 @@ Governing sections: `SPIKE.md` §6b layer 1, §7 Step 2 item 2, §11 Q1.
 
 | Path | Content |
 |---|---|
+| `src/test/java/…/io/ParityDump.java` | Shared reader for the full per-scan dump record. Three tests need it, so it is a helper rather than copied a third time |
 | `src/test/java/…/io/ReaderParityIT.java` | The parameterized parity suite |
-| `src/test/java/…/io/InstrumentAttributeCrossCheckIT.java` | The no-Python check |
-| `src/test/resources/loader-parity/` | The dumps, copied from `oracle/loader-parity/` |
+| `src/test/java/…/io/ReaderParityHarnessTest.java` | Tests the harness itself |
+| `src/test/java/…/io/PeakOrderPreconditionTest.java` | The precondition that makes digest comparison valid (§1) |
 | `docs/PARITY_REPORT.md` | Per-format results table; the artifact the reviewer reads |
+
+> ⚠ **Two rows removed from this table (C32).**
+> `src/test/resources/loader-parity/` — the dumps already live at
+> **`src/test/resources/goldens/loader-parity/`**, committed by C26; there is nothing to copy.
+> `InstrumentAttributeCrossCheckIT` — **already built and passing in [Step 7](Tech_Step7.md)**, with C30's
+> corrected 1e-5 tolerances plus the no-bias and sharpness checks. §3 below documents it; this step does
+> not rebuild it.
 
 ## Specification
 
@@ -73,17 +81,42 @@ The Step 2 dumps are gzipped and store, per scan, `peak_count`, `i_sum_hex`, **S
 `Double.parseDouble` on the hex form (Java accepts `0x1.5c8f2ap+20`) — **never** via a decimal string, which can
 lose or fabricate low bits and turn a real bug into a passing test.
 
-**One deliberate exception.** A per-scan intensity **sum** is an accumulation, and floating-point addition is not
-associative: Python's `numpy.sum` may pairwise-accumulate while a naive Java loop accumulates left to right,
-giving different last bits from identical inputs. Two acceptable resolutions, in order of preference:
+> ⛔ **Correction C32(d) — this section used to prefer comparing "the multiset of individual
+> intensities". That is not implementable, and it contradicted the harness test.** The dumps store
+> **SHA-256 digests** plus the first 8 values; the individual peaks are not in them, because Step 2
+> measured the all-values form at **86 MB** and rejected it as no more rigorous. Digests are also
+> **order-sensitive**, which contradicted `ReaderParityHarnessTest`'s requirement that a reordering-only
+> difference compare *equal*.
 
-1. **Compare the multiset of individual intensities instead of the sum** — this is what actually establishes
-   bit-identity, and it sidesteps accumulation order entirely. Prefer this.
-2. If comparing sums, match the accumulation order to numpy's, or allow a relative tolerance of 1e-15 **on sums
-   only** and record the exception explicitly in `PARITY_REPORT.md`.
+**Compare the digests.** That is strictly stronger than a multiset comparison, because it pins the array
+**order** as well as every bit of every value. Repack our array and hash it:
+
+```java
+ByteBuffer b = ByteBuffer.allocate(8 * n).order(ByteOrder.BIG_ENDIAN);
+for (double v : values) b.putDouble(v);
+MessageDigest.getInstance("SHA-256").digest(b.array());   // hex-compare to i_sha256 / mz_sha256
+```
+
+**The precondition that makes this valid, and why it must be asserted.** Digest equality requires our
+array order to equal MassQL's *file* order — and `SpectrumTableBuilder` **sorts a scan by m/z when it is
+not already ascending** ([Step 5](Tech_Step5.md), `:174-176`). Measured: **zero fixtures have descending
+m/z within a scan**, so the sort never fires and file order is preserved. `PeakOrderPreconditionTest`
+asserts that, so a future unsorted fixture fails saying *"this fixture has unsorted peaks, digest
+comparison is no longer valid"* rather than presenting as a mystery decode bug.
+
+**One deliberate exception, for sums only.** A per-scan intensity **sum** is an accumulation, and
+floating-point addition is not associative: Python's `numpy.sum` may pairwise-accumulate while a naive Java
+loop goes left to right, giving different last bits from identical inputs. So `i_sum_hex` is a **secondary
+signal only**, at relative 1e-15, recorded explicitly in `PARITY_REPORT.md`. The digests are what establish
+bit-identity; the sum is a cheap cross-check that costs nothing.
 
 Individual `mz` and `i` values are compared bit-exactly with no exception. Do not extend the sum exception to
 them; that would defeat the gate.
+
+**Make a digest failure actionable.** A mismatched 64-character hash says nothing on its own. When digests
+differ, additionally compare `i_hex_first8` / `mz_hex_first8`: if those still match, the values are right at
+the head and the fault is **ordering**, not decoding. That is exactly what the first-8 fields are in the
+dump for — use them in the failure message rather than only for manual diagnosis.
 
 ### 2. What to assert, per fixture
 
@@ -100,16 +133,29 @@ Parameterize over every fixture with a dump: `small.mzML`, `small.mzXML`, `PlusR
 > It now walks the raw XML with a regex instead — which is better anyway, because that shares no code
 > with the streaming walk, so agreement is a real cross-check rather than one bug appearing twice.
 >
-> Use the dumps for `peak_count`, `i_sum_hex`, digests and first-8 values, **keyed by scan id**. Never
-> for "the Nth scan is…".
+> Use the dumps for `peak_count`, `i_sum_hex`, digests and first-8 values, **keyed by `(mslevel, scan)`**
+> (C32a — scan id alone collides with the MGF phantom). Never for "the Nth scan is…".
 
-> ⚠ **Step 7 added six micro variants, and four of them have NO dump.** `micro_p64.mzXML`,
-> `micro_zlib.mzXML`, `micro_p64_zlib.mzXML` and `micro_nested.mzXML` are decodable by MassQL, so dumps
-> *could* be generated — but were not, because Step 7 pinned them by cross-fixture equivalence instead
-> (zlib must decode bit-identically to uncompressed, nested row-for-row identically to flat), which is a
-> stronger statement than either against a golden. Either generate their dumps here or state in
-> `PARITY_REPORT.md` that they are covered by equivalence rather than by parity. **Do not silently drop
-> them from the coverage count.**
+> ✅ **Resolved by C32: the six missing dumps are now generated.** Step 7 left `micro_p64.mzXML`,
+> `micro_zlib.mzXML`, `micro_p64_zlib.mzXML` and `micro_nested.mzXML` pinned only by cross-fixture
+> *equivalence* — zlib decodes bit-identically to uncompressed, nested row-for-row to flat. That cannot
+> catch an error **common to both sides** of an equivalence pair, so the 64-bit, zlib and nested decode
+> branches had no bit-identity check against Python at all.
+>
+> `dump_loader_parity.py` takes fixtures as argv and writes with `mtime=0` (idempotent), so no script
+> change was needed:
+>
+> ```bash
+> oracle/.venv/bin/python oracle/dump_loader_parity.py oracle/loader-parity \
+>   fixtures/micro/micro_p64.mzXML fixtures/micro/micro_zlib.mzXML \
+>   fixtures/micro/micro_p64_zlib.mzXML fixtures/micro/micro_nested.mzXML \
+>   fixtures/micro/micro_multiprec.mzXML fixtures/micro/micro_rtseconds.mzML
+> ```
+>
+> `micro_rtseconds.mzML` gains its **only** parity check — the seconds-side mzML RT rule was unit-tested
+> only. `micro_multiprec.mzXML` gives C31's first-precursor rule a golden. `micro_multiprec.mzML` is
+> deliberately excluded: a second `<precursor>` adds nothing for *peak* parity over the mzXML one, and C31
+> is already pinned by `MultiPrecursorTest`.
 
 > ⛔ **Two fixtures MUST be excluded from this sweep — MassQL cannot load them at all**
 > (Correction C27c). `micro_nopolarity.mzXML` raises `KeyError: 'polarity'` and
@@ -124,24 +170,55 @@ Parameterize over every fixture with a dump: `small.mzML`, `small.mzXML`, `PlusR
 > own per-scan structure, and it means the parity suite itself never holds more than one scan, so it
 > can run against arbitrarily large files.
 
+> ⛔ **Correction C32(a) — key every comparison by `(mslevel, scan)`, NEVER by scan id alone.** MassQL
+> synthesises an all-zero MS1 placeholder for MGF (C14/C24b) and **it is in the dumps**. Its scan id
+> **collides with a real MS2 id** in 2 of the 3 MGF fixtures — `micro.mgf` phantom at **3**,
+> `DP00570_F02.mgf` phantom at **625**, both also real MS2 ids. Keying by scan id silently compares a real
+> MS2 scan against a synthetic row of zeros, and it passes or fails for reasons unrelated to decoding.
+
 | Assertion | Detail |
 |---|---|
-| MS1 scan count | Exact |
-| MS2 scan count | Exact |
-| Scan **ids**, in order | Exact, as a list. Catches renumbering — including any introduced by the msconvert conversion in Step 2 — and MGF scan-id derivation errors ([Step 6](Tech_Step6.md) §2) |
+| MS2 scan count | Exact, against `ms2_scan_count` |
+| MS1 scan count | Exact for mzML/mzXML. ⛔ **For MGF, assert our count is `0`** — C32(b): every MGF dump reports `ms1_scan_count: 1`, which is MassQL's phantom placeholder, and our reader correctly omits it. Skip `mslevel == 1` dump entries entirely on MGF fixtures |
+| Scan **ids** | Exact as a **set**, keyed by `(mslevel, scan)`. ⛔ **Not "in order, as a list"** — C32(e): that contradicted the C28 note below, since the dumps are level-grouped rather than document order. Still catches renumbering (including any msconvert artifact from Step 2) and MGF scan-id derivation errors ([Step 6](Tech_Step6.md) §2) |
 | Per-scan peak count | Exact |
-| Per-scan intensity multiset | **Bit-identical** (§1) |
-| Per-scan first `mz` | **Bit-identical** — cheap detector of an interleaving or byte-order error |
-| Per-scan `rt` | **Bit-identical** against the dumped value. This is the assertion that catches all three RT-unit rules at once, and it requires the double-precision `scanRt` from [Step 5](Tech_Step5.md) §1 |
+| Per-scan intensity + m/z arrays | **Bit-identical via `i_sha256` / `mz_sha256`** (§1) — the digest pins order as well as values |
+| Per-scan first 8 `mz` and `i` | **Bit-identical** via `i_hex_first8` / `mz_hex_first8`. Cheap detector of an interleaving or byte-order error, and the diagnostic that separates "wrong values" from "wrong order" when a digest fails |
+| Per-scan `rt` | **Bit-identical** against `rt_hex`. This is the assertion that catches all three RT-unit rules at once, and it requires the double-precision `scanRt` from [Step 5](Tech_Step5.md) §1 |
 | Per-scan polarity | Exact (1 / 2 / 0) |
+| Per-scan intensity sum | `i_sum_hex` at relative **1e-15**, secondary only (§1) |
 
-⚠ **The dumps record the loader's RAW types, which are not always the SDK's.** `dump_loader_parity.py` reads
-`ms2_df` directly rather than going through `massql_query.py`, so it captures MassQL's own dtypes — and for
-**mzXML** those include `scan` and `ms1scan` as **strings** (Correction C12), as does `scan` for
-`PlusRise.mgf` (Correction C14). Java produces ints in both cases, correctly. **Compare these fields
-numerically, not by type or string equality**, or every mzXML and PlusRise assertion fails for a reason that
-has nothing to do with decoding. The `massql_query.py` int coercion fixes the *goldens*
-([Step 12](Tech_Step12.md)), not these dumps.
+> ⛔ **Correction C32(c) — the dumps omit every zero-peak scan; our readers deliberately yield them.**
+> The deltas are not small: **PlusRise.mgf is 34,513 reader scans against 21,942 dump entries**, and
+> `micro.mzML` is 5 against 4 (its zero-peak MS1 at scan 4). MassQL's loaders `continue` on an empty
+> intensity array, so its dataframe simply has no rows for those scans (C24b), while our readers yield them
+> and let the engine filter (C27b). The reconciliation rule:
+>
+> ```
+> for each dump entry, keyed by (mslevel, scan), skipping MGF mslevel==1:
+>     a matching reader scan MUST exist, and every field above must match
+> for each reader scan with NO dump entry:
+>     peakCount MUST be 0
+> assert the NUMBER of such reader-only scans equals a per-fixture expected value
+>     PlusRise.mgf                                  = 12,571
+>     small.mzML / small.mzXML / DP00570_F02.*      = 0
+>     micro* (the zero-peak MS1 at scan 4)          = 1
+> ```
+>
+> **Assert that count, do not merely tolerate reader-only scans** — otherwise a reader that dropped real
+> spectra passes this gate silently, which is the exact failure mode the gate exists to catch.
+
+> ⚠ **Correction C32 — this paragraph used to warn that the dumps hold `scan`/`ms1scan` as **strings**
+> for mzXML and PlusRise (C12/C14). That is FALSE of the dumps.** `dump_loader_parity.py:78` already
+> coerces on the way out — `int(scan) if str(scan).lstrip("-").isdigit() else str(scan)` — and every dump
+> verified reads back a JSON **int**, including `small.mzXML`, `DP00570_F02.mzxml` and `PlusRise.mgf`.
+> The advice ("compare numerically") was harmless, but the premise sends an implementer hunting for a
+> problem that does not exist.
+>
+> The underlying C12/C14 string typing is real in MassQL's *dataframes* and is what
+> `massql_query.py`'s int coercion fixes for the **goldens** ([Step 12](Tech_Step12.md)). It does not reach
+> these dumps. Still parse defensively — `Integer.parseInt(String.valueOf(v))` — so a future generator
+> change cannot break the harness silently.
 
 Known expected counts, for a fast sanity read: `small.mzML` and `small.mzXML` → **48 spectra (14 MS1, 34 MS2)**;
 `DP00570_F02.mzxml` → **916 scans (229 MS1, 687 MS2)**; `PlusRise.mgf` → **21,942 scans** loaded from 34,513 blocks, all MS2 (Correction C14 — MassQL drops ~12,571; assert the loaded count, not the block count).
@@ -226,7 +303,14 @@ the README at [Step 13](Tech_Step13.md).
 - **Loosening the comparison to get to green.** The whole value of this gate is that it is exact. If it fails, the
   reader is wrong. A tolerance added here to unblock Step 9 converts a found bug into a permanent unknown.
 - **Comparing sums but not individual values.** Sums can agree by cancellation while individual peaks are wrong,
-  and can disagree by accumulation order while every peak is right. Compare the multiset (§1).
+  and can disagree by accumulation order while every peak is right. Compare the **digests** (§1); the sum is a
+  secondary signal only.
+- **Keying by scan id alone.** The MGF phantom MS1's id collides with a real MS2 id in `micro.mgf` (3) and
+  `DP00570_F02.mgf` (625), so the harness would compare a real spectrum against a row of zeros. Key by
+  `(mslevel, scan)` — C32(a).
+- **Treating reader-only scans as slack.** The dumps omit zero-peak scans and our readers yield them, so
+  extras are expected — but their **count must be asserted** (PlusRise 12,571). Tolerating an unbounded
+  number lets a reader that dropped real spectra pass the gate — C32(c).
 - **Round-tripping the dumps through decimal.** Defeats bit-comparison. Parse the hex.
 - **A vacuous pass.** If the dumps fail to load, a green suite means nothing. Assert the dump file loaded and
   that a minimum number of fixtures actually ran. Note that the *skip* half of this trap is now structurally
@@ -241,25 +325,43 @@ the README at [Step 13](Tech_Step13.md).
 
 | Test | Type | Pins |
 |---|---|---|
-| `ReaderParityIT` | IT | Every assertion in §2, `@ParameterizedTest` over all fixtures with dumps. Bit-exact on individual `mz`/`i`/`rt`. |
-| `ReaderParityHarnessTest` | unit | The comparison harness itself: hex parsing round-trips exactly; a deliberately-perturbed value in the last bit **fails**; the multiset comparator detects a reordering-only difference as equal and a value difference as unequal. Guards against a harness that always passes. |
-| `InstrumentAttributeCrossCheckIT` | IT | §3, including the hand-written `peaksCount="3"` literals. |
-| `ParityCoverageTest` | unit | At least the committed fixtures (`small.mzML`, `small.mzXML`, `PlusRise.mgf`, 3 micro) have dumps present and ran — so a skip-everything CI fails. |
+| `ReaderParityIT` | IT | Every assertion in §2, `@ParameterizedTest` over all fixtures with dumps, keyed by `(mslevel, scan)`. Bit-exact on `mz`/`i` digests and on `rt`. Also folds in the old `ParityCoverageTest`: **every expected dump is present and was consumed**, and the reader-only scan count matches its per-fixture figure. |
+| `ReaderParityHarnessTest` | unit | The comparison harness itself: hex parsing round-trips exactly; a value perturbed in its **last bit** must **fail**; a digest over a **reordered** array must **differ** (⚠ C32d — the inverse of the "multiset compares reordering equal" requirement this row used to state, which the digest format makes both impossible and undesirable); an unloadable dump must fail rather than silently pass. |
+| `PeakOrderPreconditionTest` | unit | §1's precondition: our materialised m/z is strictly ascending, **and** each dump's `mz_hex_first8` is ascending — so a future unsorted fixture fails with the right diagnosis rather than as a mystery digest mismatch. |
+| `InstrumentAttributeCrossCheckIT` | IT | §3. ✅ **Already built in [Step 7](Tech_Step7.md)** at C30's 1e-5 tolerances, with the no-bias and sharpness checks and the 11 `peaksCount="3"` scans. Not rebuilt here. |
 
 `ReaderParityHarnessTest` is not ceremony: a bit-comparison harness that silently coerces to `float`, or a
-multiset comparator with a broken `equals`, produces a green gate that proves nothing. Test the test.
+digest routine that hashes a decimal rendering instead of the raw bits, produces a green gate that proves
+nothing. Test the test — and prove it has teeth by breaking the input on purpose, as
+`ZeroPeakMs1ChainTest` was proven in Step 7.
+
+> ⚠ **`ParityCoverageTest` is dropped as a separate test (C32).** Its stated purpose — "so a
+> skip-everything CI fails" — is now covered twice over by C26: `Fixtures.require` fails rather than
+> skipping, `FixturesContractTest` asserts that, and CI asserts the skipped-test count is **0**. Its
+> residual value (every expected dump present and consumed) folds into `ReaderParityIT`, where the count
+> it guards actually lives.
 
 ## Done when
 
-- [ ] `mvn verify` green.
-- [ ] For **all three formats**: scan counts, scan ids, per-scan peak counts, polarity and `rt` all match the
-      Step 2 dumps exactly.
-- [ ] Individual `mz` and `i` values are **bit-identical** across every committed fixture — no tolerance.
-- [ ] Any sum-comparison exception is documented in `PARITY_REPORT.md` with its exact tolerance, or avoided
-      entirely by multiset comparison.
-- [ ] The Ewing cross-check runs, and its delta distributions are recorded and show no systematic bias.
-- [ ] `docs/PARITY_REPORT.md` exists with the per-format table and the one-sentence answer to §11 Q1.
-- [ ] `ReaderParityHarnessTest` demonstrates the harness detects a single-bit perturbation.
+- [x] `mvn verify` green — **369 unit + 23 IT, 0 skipped**.
+- [x] For **all three formats**: scan counts, scan ids (as a set keyed by `(mslevel, scan)`), per-scan peak
+      counts, polarity and `rt` all match the dumps exactly.
+- [x] `mz` and `i` are **bit-identical** via `i_sha256` / `mz_sha256` on all **14** fixtures with a dump — no
+      tolerance. The set now includes the four decode variants that previously had none.
+- [x] The reader-only scan count is **asserted** per fixture, not tolerated: PlusRise **12,571**, micro
+      **1** each, `small.*` and `DP00570_F02.*` **0**.
+- [x] MGF MS1 count asserted as **0** against dumps that report 1 (MassQL's fabricated row — C33b).
+- [x] The `i_sum_hex` exception documented in `PARITY_REPORT.md` at **1e-6**, with the corrected cause:
+      **float32 accumulation dtype**, not ordering (C33c). Our float64 sum is exact; the tolerance absorbs
+      the reference's error, not ours.
+- [x] `PeakOrderPreconditionTest` green — asserts the precondition from **both** sides (our arrays and
+      MassQL's own file order via `mz_hex_first8`), since checking only ours would be circular.
+- [x] The Ewing cross-check still green at 1e-5, with delta distributions recorded and no systematic bias.
+- [x] `docs/PARITY_REPORT.md` written, with the per-format table and the §11 Q1 answer.
+- [x] `ReaderParityHarnessTest` **demonstrated** to detect a single-ULP perturbation — proven by shifting one
+      intensity with `Math.nextUp` and confirming `ReaderParityIT` fails on exactly the three mzML fixtures
+      with an actionable message.
+- [x] **⛔ GATE GREEN.** One real reader bug found and fixed: MGF `polarity` was 0, MassQL emits 1 (C33).
 
 ## References
 

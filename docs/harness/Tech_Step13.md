@@ -91,7 +91,8 @@ The reviewer's entry point. Required content:
 
 ### 2. Known deviations — state them, don't bury them
 
-Three deliberate divergences a user could otherwise discover the hard way:
+**Five** deliberate divergences a user could otherwise discover the hard way (three were foreseen; two came out
+of Steps 7–8):
 
 1. **`ms1scan` is inferred by document order, not read from the file.** MassQL ignores `spectrumRef` (mzML) and
    `precursorScanNum` (mzXML); we reproduce that to match its answers. **Consequence:** on interleaved
@@ -103,6 +104,17 @@ Three deliberate divergences a user could otherwise discover the hard way:
    ([Step 9](Tech_Step9.md) §3.)
 3. **`i_norm` and `i_norm_ms1` are dropped** from the output as structurally constant.
    ([Step 10](Tech_Step10.md).)
+4. **`tic` is NOT bit-identical to MassQL's, and ours is the more accurate value** (Correction C34). MassQL's
+   intensity column is `float32` and `tic` is a pandas `groupby.sum()` over it; we accumulate in float64.
+   Measured divergence on `small.mzML`: up to **3.7e-08** relative, e.g. golden `586278.875` vs our
+   `586278.8533592224`. Compared at 1e-6. **State plainly that the error is in the reference, not in us** — a
+   reviewer seeing a tolerance will otherwise assume the opposite. Every *other* intensity column
+   (`base_peak_i`, `ms1_i`, `ms1_base_peak_i`) **is** bit-identical, because they are selections rather than
+   sums.
+5. **`POLARITY` on an MGF filters a constant, not the data** (Correction C34b). MassQL hardcodes MGF polarity to
+   **1** (C33 — our reader returned `0` until the Step 8 gate caught it), so `POLARITY=Positive` matches every
+   MGF scan and `POLARITY=Negative` matches none, whatever the spectra are. There is no way to tell from the
+   output, which is precisely why it belongs in this list.
 
 Plus any tolerance adopted in [Step 8](Tech_Step8.md) §1 or [Step 12](Tech_Step12.md) §1 — if a `tic`
 accumulation-order tolerance was accepted, it is a deviation and belongs here.

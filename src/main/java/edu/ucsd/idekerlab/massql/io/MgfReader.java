@@ -224,7 +224,22 @@ final class MgfReader implements SpectraStream {
         @Override public int scanId()    { return scanId; }
         @Override public int msLevel()   { return 2; }        // MGF is an MS2-only peak list
         @Override public double rt()     { return rt; }
-        @Override public int polarity()  { return 0; }        // C8: not read on the live path
+        /**
+         * MGF polarity is a hardcoded <b>1</b>, not 0 — Correction C33.
+         *
+         * <p>Correction C8 said MGF polarity "is not read on the live path" and inferred 0 from that. The
+         * first half is true: no MGF header supplies polarity. The inference was wrong. Both MGF loaders
+         * write {@code "polarity": 1  # Default} into every peak dict
+         * (`msql_fileloading.py:67` and `:86`), so MassQL reports **positive** for every MGF row.
+         *
+         * <p>Measured across all three MGF fixtures — {@code micro.mgf} 7 rows, {@code DP00570_F02.mgf}
+         * 107,178, {@code PlusRise.mgf} 758,544 — the polarity distribution is {@code {1: all}}. Not one 0.
+         *
+         * <p>Found by {@code ReaderParityIT}, the Step 8 gate, before any query logic existed. Returning 0
+         * here would have failed the Step 12 differential on the polarity column for **every MGF row**, and
+         * at that layer it would have looked like a collation bug.
+         */
+        @Override public int polarity()  { return 1; }
         @Override public double precmz() { return precmz; }
         @Override public int ms1scan()   { return 0; }        // hardcoded 0 (msql_fileloading.py:394)
         @Override public int charge()    { return charge; }

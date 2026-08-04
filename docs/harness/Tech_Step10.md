@@ -90,6 +90,16 @@ All the sentinel and NaN rules live **in the SDK**, not in the consuming app —
 
 ### 2. The two native computations
 
+> ⛔ **Correction C34 — our `tic` will NOT equal the golden's bit-for-bit, and that is correct.** MassQL's
+> intensity column is `float32` and `tic` is a pandas `groupby.sum()` over it, so the golden carries float32
+> accumulation error while our float64 sum is exact. Measured on `small.mzML`: golden `586278.875` vs our
+> `586278.8533592224`, relative **3.691e-08**; all six golden rows differ.
+>
+> **Compare `tic` at relative 1e-6.** Do **not** "fix" our sum to match by accumulating in float — the
+> reference is the less accurate side. And do not loosen the other intensity columns: `base_peak_i`,
+> `ms1_i` and `ms1_base_peak_i` are `max()`/lookup *selections* with no accumulation, and are
+> **bit-identical**, verified on all six rows.
+
 - **`tic`** = **sum** of all fragment intensities in the scan. This is MassQL's `i` renamed. Note it is a *sum*
   for `scaninfo` specifically; other MassQL functions put a different quantity in `i` (`scanmaxint` puts the base
   peak there), which is why `massql_query.py:154` guards the rename to `scaninfo` queries only. We only support
@@ -276,7 +286,7 @@ All unit (`*Test.java`), on the [Step 2](Tech_Step2.md) micro-fixtures and hand-
 | `ResultJsonShapeTest` | MS2DATA emits **exactly** the 12 keys in order; MS1DATA emits **exactly** 4 with precursor keys **absent** (assert `!json.has("precmz")`, not `json.get("precmz") == null`); null renders as JSON `null`; empty result → `[]`. |
 | `ResultJsonRoundTripTest` | Every emitted float parses back to the **identical bits** — guards against a formatter that rounds. |
 | `TicIsSumTest` | `tic` is the sum of fragment intensities, not the base peak — the distinction `massql_query.py:154` guards. |
-| `CollationAnchorTest` | Build a table reproducing `small.mzML`'s scan 3 and assert the full first golden record field by field. **At the default 20 ppm** (`output/small_mzml_results.json`): `scan` 3, `precmz` 810.79, `ms1scan` 2, `rt` 0.011218333333333334, `charge` null, `tic` 586278.875, `mslevel` 2, `base_peak_i` 161140.859375, `base_peak_mz` 736.6370849609375, **`ms1_i` null, `ms1_precmz` null**, `ms1_base_peak_i` **183838.71875**. That row is itself the tolerance-miss case — the nearest MS1 peak is 34.8 ppm away, so the match fails while `ms1_base_peak_i` survives. **At 60 ppm** (`output/small_mzml_tol60_results.json`) the same row has `ms1_i` 131528.0625 and `ms1_precmz` 810.8182000219822. Assert both; together they are the cleanest possible anchor for §3.2. |
+| `CollationAnchorTest` | Build a table reproducing `small.mzML`'s scan 3 and assert the full first golden record field by field. **At the default 20 ppm** (`output/small_mzml_results.json`): `scan` 3, `precmz` 810.79, `ms1scan` 2, `rt` 0.011218333333333334, `charge` null, **`tic` 586278.875 compared at relative 1e-6** (our float64 sum gives 586278.8533592224 -- the golden is a float32 accumulation, C34), `mslevel` 2, `base_peak_i` 161140.859375, `base_peak_mz` 736.6370849609375, **`ms1_i` null, `ms1_precmz` null**, `ms1_base_peak_i` **183838.71875**. That row is itself the tolerance-miss case — the nearest MS1 peak is 34.8 ppm away, so the match fails while `ms1_base_peak_i` survives. **At 60 ppm** (`output/small_mzml_tol60_results.json`) the same row has `ms1_i` 131528.0625 and `ms1_precmz` 810.8182000219822. Assert both; together they are the cleanest possible anchor for §3.2. |
 | `MgfPopulationTest` | With an empty MS1 table: `ms1scan` and all three `ms1_*` null, `rt` present as `0.0`, and **`charge` = `1` when absent — never null** (Correction C6). The `plusrise_results.json` row shape: charge counts across its 664 rows are `{1: 653, 2: 10, 3: 1}` with **zero nulls**. |
 | `OperationOrderTest` | Sentinel conversion happens **after** the lookup: a row with `ms1scan == 0` gets null `ms1scan` **and** null `ms1_*`, and does not throw. |
 

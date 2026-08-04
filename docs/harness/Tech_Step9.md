@@ -178,6 +178,18 @@ the pinned Python source disagree, **the source wins** — correct the spec and 
 
 **Polarity:** 1 = positive, 2 = negative. `0` (unknown) matches neither.
 
+> ⚠ **Correction C34(b) — `POLARITY` cannot filter an MGF, and it now matches EVERYTHING there rather than
+> nothing.** MGF polarity is a hardcoded constant **1** (C33a corrected C8's `0`), so on any MGF fixture
+> `POLARITY=Positive` matches **every** scan and `POLARITY=Negative` matches **none** — regardless of what the
+> spectra actually are. Under the old, wrong value of `0` both matched nothing, which at least *looked* like
+> "no polarity information". The sentence above still describes mzML and mzXML correctly, where `0` means
+> genuinely unrecorded.
+>
+> Test this deliberately rather than discovering it: a `POLARITY=Positive` query over `PlusRise.mgf` returning
+> all 21,942 loaded scans is **correct behaviour**, not a broken filter. Note it in the Step 13 README as a
+> known deviation — a user filtering an MGF by polarity is filtering on a constant, and has no way to tell
+> from the output.
+
 **`MASSDEFECT`:** fractional part of the mass. Derive the exact definition (which mass, and whether the bound is
 inclusive) from the pinned Python source and record it; do not infer it from the name.
 
