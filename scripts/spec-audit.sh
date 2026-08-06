@@ -491,6 +491,68 @@ fi
 echo
 
 # --------------------------------------------------------------------------------------------
+# Check 6 -- every non-empty result golden carries exactly the 12 keys, in the frozen order.
+#
+# Catches Correction C40's entire defect class. The result contract was specifiable in four places
+# (SPIKE.md, the oracle's RESULT_SCHEMA.md, Tech_Step10, and the goldens themselves) and drifted
+# into THREE different answers: 4 keys, 9 keys, and the actual 12. The 9-key
+# small_mzml_ms1_results.json was the only non-conforming golden and nothing was comparing it to
+# anything -- it had shipped that way since Step 2.
+#
+# The key list is read from docs/RESULT_SCHEMA.md, not hardcoded here, so this script and
+# ResultSchemaContractTest share the single definition rather than duplicating it. Hardcoding it
+# would recreate the exact problem C40 was about.
+#
+# Empty goldens ([] -- micro_mzml_edge, dp00570_mzxml_empty) are skipped: they carry no keys, and
+# both are DELIBERATE assertions that a query matches nothing, not missing data.
+# --------------------------------------------------------------------------------------------
+
+echo "6. every non-empty golden carries exactly the 12 keys, in the frozen order (the C40 check)"
+
+SCHEMA_DOC=docs/RESULT_SCHEMA.md
+GOLDEN_DIR=src/test/resources/goldens/query-results
+
+if [ ! -f "$SCHEMA_DOC" ]; then
+    fail "$SCHEMA_DOC is missing -- it is the single definition of the result contract (C40)"
+else
+    # The frozen order line: the fenced block after "in this order**:".
+    EXPECTED_KEYS=$(awk '
+        /in this order\*\*:/ { want = 1; next }
+        want && /^```$/      { infence = !infence; if (!infence) exit; next }
+        want && infence      { print }
+    ' "$SCHEMA_DOC" | tr -d ' \n')
+
+    if [ -z "$EXPECTED_KEYS" ]; then
+        fail "could not read the frozen key order from $SCHEMA_DOC (expected a fenced block after
+        'in this order**:'). That block is the contract; this check cannot run without it."
+    else
+        n_expected=$(printf '%s' "$EXPECTED_KEYS" | tr ',' '\n' | grep -c .)
+        checked_goldens=0
+        for g in "$GOLDEN_DIR"/*.json; do
+            [ -e "$g" ] || continue
+            actual=$(python3 -c "
+import json,sys
+d=json.load(open(sys.argv[1]))
+print('' if not d else ','.join(d[0].keys()))
+" "$g")
+            [ -z "$actual" ] && continue    # empty golden -- deliberate, no keys to check
+            checked_goldens=$((checked_goldens + 1))
+            if [ "$actual" != "$EXPECTED_KEYS" ]; then
+                fail "$(basename "$g") does not carry the frozen key set/order.
+        expected: $EXPECTED_KEYS
+        actual:   $actual
+        The contract is ONE uniform 12-key shape for both MS1DATA and MS2DATA, discriminated by
+        mslevel, with no key ever absent (C40, $SCHEMA_DOC). A golden with a different shape means
+        either the oracle wrapper regressed or the golden predates the contract."
+            fi
+        done
+        [ "$FAILURES" -eq 0 ] && pass \
+            "$checked_goldens non-empty golden(s) carry the $n_expected keys from $SCHEMA_DOC in order"
+    fi
+fi
+echo
+
+# --------------------------------------------------------------------------------------------
 
 if [ "$FAILURES" -ne 0 ]; then
     printf 'spec-audit: %d FAILURE(S).\n' "$FAILURES" >&2

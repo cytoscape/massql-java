@@ -444,6 +444,60 @@ authoritative while being guesswork is worse than one whose gap is recorded.
 silently fix a spec*), and it is not mechanizable — the build can check that a declared obligation was met, not
 that a discovery was declared.
 
+<a id="c40"></a>
+**C40 — the result contract has ONE uniform 12-key shape. Three documents and one golden said otherwise, and
+`scaninfo(MS1DATA)`'s `base_peak_i`/`base_peak_mz` nulls were a join artifact in our own wrapper.**
+
+**Fallout:** Tech_Step2.md, Tech_Step10.md, Tech_Step11.md, Tech_Step12.md, Tech_Step13.md
+
+Found while reviewing [Step 10](Tech_Step10.md) before implementation. `SPIKE.md` §3 cites
+[cytoscape/cytoscape#26](https://github.com/cytoscape/cytoscape/issues/26) as its source at `:64` and then
+**narrows it** at `:124-127`: *"`scaninfo(MS1DATA)` → a different, smaller shape … `precmz`/`ms1scan`/`charge`
+and all `ms1_*` columns are **absent, not null**."* The issue says the opposite — the schema is
+*"a union of all possible attributes from ms1 and ms2"* with **`mslevel`** as the discriminator. **No key is
+ever absent.** Four sources had drifted apart:
+
+| Source | Claimed | |
+|---|---|---|
+| **issue #26** | one 12-key union, `mslevel` discriminates | ✅ authoritative |
+| `SPIKE.md:124-127`, `:261` | MS1DATA is a smaller shape; keys **absent** | ❌ |
+| oracle `RESULT_SCHEMA.md:25-29` | *"a different, smaller schema"* | ❌ |
+| `small_mzml_ms1_results.json` | **9 keys**, 5 all-null | ❌ neither 4 nor 12 |
+| `Tech_Step12.md` | `:139` said **9**, `:290` said **4** | ❌ self-contradictory |
+
+**The two defects behind the 9-key golden, which are not the same defect.** Its five nulls split cleanly:
+
+- **`ms1_i` / `ms1_precmz` / `ms1_base_peak_i` are genuinely null and stay that way.** An MS1 survey scan has
+  no precursor, so they are undefined. The reference reaches this for the right reason — MassQL's `ms1_df`
+  carries no `ms1scan` column, so `massql_query.py`'s empty-MS1 branch fires. Issue #26 sanctions exactly these
+  as nullable. **Unchanged.**
+- **`base_peak_i` / `base_peak_mz` were a LEFT-JOIN ARTIFACT.** `massql_query.py:186` computed base peaks from
+  `ms2_df` and then `results_df.merge(base, how="left", on="scan")`. For an MS1DATA query `results_df` holds MS1
+  scan ids while `ms2_df` holds only MS2 ids — in `small.mzML` those sets are **disjoint** (`[1,2,8,9,…]` vs
+  `[3,4,5,…]`), so every row missed the join and became `NaN` → `null`.
+
+**Proof it was an artifact rather than a rule about MS1 spectra:** in `micro.mgf` the phantom MS1 id (`3`)
+**collides** with a real MS2 id (`3`), so the identical join attaches an unrelated MS2 scan's base peak to the
+MS1 row — a **wrong non-null**. The output depended on scan-id collision, not on any property of the spectrum.
+Independently, issue #26 marks `base_peak_i` *"Can be null? **No**"*, so the golden violated the published
+model. A survey scan plainly has a base peak.
+
+**Resolution.** The rule is *MS1 ids join only to MS1 data, MS2 ids only to MS2 data.* `massql_query.py` now
+selects the base-peak source frame by the query's level and emits the full union key set for MS1DATA;
+`small_mzml_ms1_results.json` was regenerated (12 keys, real base peaks, the three `ms1_*` still null) — the
+**only** golden affected, the other 14 were already 12-key.
+
+**`docs/RESULT_SCHEMA.md` is now the single definition** and every other document links to it instead of
+restating the key set. That is what stops a fourth variant appearing: the contract was specified in four places
+precisely because it was *specifiable* in four places. Enforced by `spec-audit` **check 6** (every non-empty
+golden carries exactly the 12 keys in order) and by **`ResultSchemaContractTest`**, which parses the key table
+out of that document and asserts `ResultJson` emits exactly those keys — making the doc executable rather than
+decorative.
+
+**[C15](#c15) is retired into this entry**, and this is the first Correction recorded under the C38+ ratchet —
+the `Fallout:` line above is mandatory, and `spec-audit` check 3 fails the build until all five named specs
+cite `C40`.
+
 ### Corrections found while reviewing Step 9 as its implementer
 
 **C35 — [Step 9](Tech_Step9.md) names a type that does not exist, and its §1 contradicts itself.** Five
@@ -1045,14 +1099,19 @@ index**), but revises C6: charge defaults to 1 only on the *pyteomics* path. Als
 `massql_query.py:170`'s `len(ms1_df) == 0` branch never fires for MGF (Step 6's conclusion still holds; its
 rationale did not).
 
-**C15 — the `scaninfo(MS1DATA)` output shape is 9 keys, not 4.** SPIKE.md §3 and
-[Step 10](Tech_Step10.md) §5 say `scan, rt, tic, mslevel` only. Measured from the reference wrapper:
-`scan, rt, mslevel, tic, base_peak_i, base_peak_mz, ms1_i, ms1_precmz, ms1_base_peak_i`. `precmz`/`ms1scan`/
-`charge` **are** absent as documented, but `massql_query.py:161-179` adds the five computed columns
-unconditionally, and they come back **null** for MS1DATA (base peaks are computed from `ms2_df`, which has no
-MS1 scan ids). **⚠ OPEN DECISION before Step 10:** does the SDK emit the reference's 9-key shape, or the
-4-key shape SPIKE.md specifies (and if 4, the mzML MS1DATA golden must be regenerated)? Arguably the SDK
-should compute `base_peak_i`/`base_peak_mz` from the MS1 scan itself, which is neither.
+<a id="c15"></a>
+**C15 — ⛔ RETIRED, superseded by [C40](#c40).** It recorded that the `scaninfo(MS1DATA)` output shape was
+**9 keys, not the 4** SPIKE.md §3 specified, and left an **open decision** for Step 10: emit the reference's 9,
+SPIKE.md's 4, or 9 with real base peaks.
+
+**The decision is made and the premise was wrong: the answer is 12, and there is only ever one shape.**
+[cytoscape/cytoscape#26](https://github.com/cytoscape/cytoscape/issues/26) — which SPIKE.md §3 cites as its own
+source — defines a **uniform 12-key union** discriminated by `mslevel`, so none of the three candidates was
+right. C15's measurement was accurate; what it measured was two separate defects in the wrapper. See
+[C40](#c40) for the resolution, and `docs/RESULT_SCHEMA.md` for the contract.
+
+Every existing citation of C15 still resolves by landing here and following the link; no inbound reference was
+rewritten (the [C35(a) → C18](#c18) precedent).
 
 **C10 — `output/small_mzml_results.json` was regenerated at the documented 20 ppm default.** The original had
 been produced at an unrecorded ~60 ppm tolerance and could not be reproduced from documented parameters; its

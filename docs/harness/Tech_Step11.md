@@ -99,8 +99,13 @@ Rules on this surface:
   in that order (`small_mzml_results.json` starts at scan 3 and `plusrise_results.json` at 576, both ascending);
   if MassQL's own ordering differs anywhere, match MassQL and record it in `docs/API.md`.
 
-Where the query is `scaninfo(MS1DATA)`, `execute` returns rows with `ms1DataShape = true` so
-`ResultJson` emits the 4-key form ([Step 10](Tech_Step10.md) §5).
+> ⚠ **Correction C40 deleted this paragraph's subject.** It read: *"Where the query is `scaninfo(MS1DATA)`,
+> `execute` returns rows with `ms1DataShape = true` so `ResultJson` emits the 4-key form."*
+>
+> **There is one shape.** MS1DATA and MS2DATA both emit the same 12 keys, discriminated by the `mslevel` value
+> rather than by a shape flag, so `ScanInfoResult` has **no `ms1DataShape` component** and `ResultJson` takes no
+> shape parameter. `execute` therefore needs no special case for MS1DATA at all — a simplification, not a
+> restriction. Contract: [`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md).
 
 ### 2. Diagnostics
 

@@ -136,10 +136,22 @@ Fixtures and expected counts:
 | `fixtures/micro/micro.mzML` | **`test_micro_edge.massql`** *(added Step 9)* | `output/micro_mzml_edge_results.json` | **0 rows.** ⚠ **An empty golden is a real assertion here, not a missing one** — do not treat `[]` as "nothing to check" or skip the pair. `MS2PROD=201.5:TOLERANCEMZ=0.5` puts the window bound exactly on scan 3's `201.0` peak, and MassQL excludes it; this file *is* the executed evidence for the strict half of Correction C37 (§1). A build that used inclusive bounds for conditions returns 1 row and fails here — the only golden that catches it |
 | `fixtures/micro/micro_ms1var.mzML` | **`test_micro_ms1var.massql`** *(added Step 9)* | `output/micro_ms1var_results.json` | **1 row**, scan `2`. Two conditions ANDed across different MS levels (`MS1MZ=400.0 AND MS2PROD=200.0`) against the only fixture whose two MS1 scans differ, so it is the only golden that can catch an `MS1MZ` condition resolved against the wrong linked MS1 scan. Every value is hand-computable: `tic` 2000.0, `base_peak_i` 1500.0, `base_peak_mz` 200.0, `ms1_base_peak_i` 2000.0, and `ms1_i`/`ms1_precmz` **null** — a [Step 10](Tech_Step10.md) §3.2 tolerance miss on a file small enough to check by hand |
 
-⚠ **The MS1DATA shape is 9 keys, not 4** (Correction C15). `precmz`/`ms1scan`/`charge` are absent as
-documented, but the reference wrapper adds the five computed columns unconditionally and they come back
-**null**: `scan, rt, mslevel, tic, base_peak_i, base_peak_mz, ms1_i, ms1_precmz, ms1_base_peak_i`.
-**Resolve the open decision in [Step 10](Tech_Step10.md) §5 before writing this assertion.**
+> ✅ **RESOLVED by Correction C40 — the MS1DATA shape is the SAME 12 keys as MS2DATA.** This paragraph read
+> *"The MS1DATA shape is 9 keys, not 4 (Correction C15) … Resolve the open decision in Step 10 §5 before writing
+> this assertion."* Both the open decision and C15 are closed:
+> [cytoscape/cytoscape#26](https://github.com/cytoscape/cytoscape/issues/26) defines **one union schema**
+> discriminated by `mslevel`, with no key ever absent.
+>
+> **This file also contradicted itself** — `:139` said 9 keys while the `DifferentialIT` row said 4. Both now
+> read one 12-key shape. The contract is [`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md); do not restate it here.
+>
+> For the MS1DATA pair specifically: `precmz`/`ms1scan`/`charge` and the three `ms1_*` columns are **present and
+> `null`**, while **`base_peak_i`/`base_peak_mz` carry real values**. `small_mzml_ms1_results.json` was
+> regenerated accordingly — it was the only non-conforming golden of the 15.
+>
+> ⚠ **`tic` needs C34's relative 1e-6 on MS1DATA rows too.** Measured on MS1 scan 1: golden `69381840.0` vs our
+> exact `69381842.11895752`, relative **3.05e-08** — the same `float32` accumulation, so the tolerance is not
+> MS2-only.
 
 > ⚠ **Correction C26 reverses this too** — it read *"gitignored fixtures (both Ewing files) skip with a
 > clear message when absent; never fail"*. Skipping is what made the whole suite prove nothing.
@@ -287,7 +299,7 @@ Answer these `SPIKE.md` §11 questions here, one sentence each: **Q2** (same row
 
 | Test | Type | Pins |
 |---|---|---|
-| `DifferentialIT` | IT | §1 for every fixture/golden pair, per-column policy, row count and order first. Includes the MS1DATA 4-key shape. |
+| `DifferentialIT` | IT | §1 for every fixture/golden pair, per-column policy, row count and order first. Includes the MS1DATA pair, which carries the **same 12 keys** as every other row (C40 — this row used to say "the MS1DATA 4-key shape", contradicting `:139`'s "9 keys" eight lines earlier). |
 | `ResultComparatorTest` | unit | The comparator itself: a single-bit intensity difference **fails**; a 1e-10 relative m/z difference **passes** and 1e-8 fails; null-vs-0.0 **fails**; a row-count mismatch reports counts. **Test the test** — a comparator that always passes yields a meaningless gate. |
 | `CrossFormatEquivalenceIT` | IT | Pair A identical rows (or documented degradation, stated in the failure message); Pair B shared columns equal **and** `ms1_*` differing exactly per the table, with the intersection size reported. |
 | `CliContractIT` | IT | §3(a) via subprocess reading `--output FILE` — including the tight-tolerance case proving `ms1_base_peak_i` survives — **and** §3(b)'s stream-separation assertions, which include the piped-vs-`--output` byte-equality check that justifies (a)'s file-based comparison. |
@@ -300,7 +312,8 @@ Answer these `SPIKE.md` §11 questions here, one sentence each: **Q2** (same row
 - [ ] `make verify` green.
 - [ ] The differential table reads **6/6 on `small.mzML`, 664/664 on `PlusRise.mgf`, and the full mzXML golden —
       per column**.
-- [ ] The MS1DATA differential passes with precursor keys **absent**.
+- [ ] The MS1DATA differential passes with the **same 12 keys** as every other row (C40): precursor keys
+      **present and `null`**, `base_peak_i`/`base_peak_mz` **non-null**. This box used to require them "absent".
 - [ ] Layer 3 Pair A: identical rows, or a degradation documented and traced to `CONVERSION_NOTES.md`.
 - [ ] Layer 3 Pair B: shared columns equal, `ms1_*` differing exactly as predicted, intersection size reported.
 - [ ] CLI: all of §3, including the tight-tolerance case.

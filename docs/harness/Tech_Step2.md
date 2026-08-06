@@ -192,7 +192,7 @@ golden in `oracle/generate-all.sh` and in `oracle/reproduce-goldens.sh`.
 | `data/small.mzXML` | `test_mzml.massql` | `output/small_mzxml_results.json` | new; ideally identical rows to the mzML golden |
 | `data/DP00570_F02.mzxml` | `test.massql` | `output/dp00570_mzxml_results.json` | new |
 | `data/DP00570_F02.mgf` | `test.massql` | `output/dp00570_mgf_results.json` | new; `ms1scan` + all `ms1_*` **null** |
-| `data/small.mzML` | `test_ms1.massql` *(new)* | `output/small_mzml_ms1_results.json` | new; the **4-key** MS1DATA shape |
+| `data/small.mzML` | `test_ms1.massql` *(new)* | `output/small_mzml_ms1_results.json` | **14 rows, the same 12 keys as every other golden** (Correction **C40**). This row said "the **4-key** MS1DATA shape" and the golden shipped as **9** keys — neither was the contract. **Regenerated under C40**: precursor keys present and `null`, `base_peak_i`/`base_peak_mz` real. The **only** golden of the 15 that was non-conforming |
 | each `fixtures/micro/*` | `test.massql` and `test_ms1.massql` | `output/micro_*_results.json` | new |
 | `fixtures/micro/micro.mzML` | **`test_micro_edge.massql`** *(added Step 9)* | *(defaults)* | `output/micro_mzml_edge_results.json` | **0 records — and an empty golden is a real assertion, not a missing one.** `MS2PROD=201.5:TOLERANCEMZ=0.5` puts the window bound exactly on scan 3's `201.0` peak; MassQL returns nothing, which is the executed proof of the **strict** half of Correction **C37**. A reader that used inclusive bounds for conditions would return a row here |
 | `fixtures/micro/micro_ms1var.mzML` | **`test_micro_ms1var.massql`** *(added Step 9)* | *(defaults)* | `output/micro_ms1var_results.json` | **1 record**, scan `2`. Two conditions ANDed across *different* levels (`MS1MZ=400.0` and `MS2PROD=200.0`), which only this fixture can discriminate. Note `ms1_i`/`ms1_precmz` are **null** while `ms1_base_peak_i` is `2000.0` — the [Step 10](Tech_Step10.md) §3.2 rule again, on a hand-computable file |
@@ -201,9 +201,14 @@ Both Step 9 queries live in `goldens/queries/` alongside the others, per §5's r
 query and flags it was produced with.
 
 Create `test_ms1.massql` containing a `scaninfo(MS1DATA)` query — e.g.
-`QUERY scaninfo(MS1DATA) WHERE MS1MZ=810.79:TOLERANCEMZ=1.0` — so the 4-key shape has a golden. Confirm from
-the output that `precmz`, `ms1scan`, `charge` and all three `ms1_*` keys are **absent**, not null; that shape
-is what [Step 10](Tech_Step10.md) must reproduce.
+`QUERY scaninfo(MS1DATA) WHERE MS1MZ=810.79:TOLERANCEMZ=1.0` — so the MS1DATA path has a golden.
+
+> ⚠ **Correction C40 inverts what to confirm here.** This paragraph said to *"confirm that `precmz`, `ms1scan`,
+> `charge` and all three `ms1_*` keys are **absent**, not null."* The opposite is required: they must be
+> **present with the value `null`**, because the contract is a single 12-key union discriminated by `mslevel`
+> ([`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md)). Additionally `base_peak_i`/`base_peak_mz` must be **non-null**
+> — a survey scan has a base peak, and their nulls in the original golden were a `ms2_df` left-join artifact in
+> `massql_query.py`, since fixed.
 
 **Compare the two `small.*` goldens against each other** and record the result. Same data, same query, so the
 rows should match. Any difference is a property of the *conversion*, not of Java, and knowing it now prevents
@@ -272,7 +277,8 @@ Scripts, verified by running them:
       `EXPECTED.md` showing the arithmetic and agreeing with the oracle.
 - [x] `fixtures/edge/empty_msLevel_tag.mzXML` present (118,392 B).
 - [x] All goldens exist; the two pre-existing ones still reproduce bit-identically; the MS1DATA
-      golden confirmed to have precursor keys **absent, not null**. **This read "All 13 goldens" and the count
+      golden confirmed to have precursor keys **present and `null`** — ⚠ this box read *"absent, not null"* and is
+      inverted by **C40**. **The count also read "All 13 goldens" and the count
       is now 15** — Step 9 added `micro_mzml_edge_results.json` and `micro_ms1var_results.json`. Counts that
       later steps grow are exactly what `make spec-audit` checks, rather than a number maintained by hand.
 - [x] `oracle/loader-parity/` has one gzipped file per fixture (4.7 MB total; digests, not full hex arrays), floats as hex, with per-scan peak counts and intensity

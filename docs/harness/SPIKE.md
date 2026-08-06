@@ -121,10 +121,28 @@ part of the contract:
 > unlinked mzXML fixture in §6c, which has no `precursorScanNum` at all and therefore *only* works under
 > the document-order rule.
 
-### `scaninfo(MS1DATA)` → a different, smaller shape
+### `scaninfo(MS1DATA)` → ⛔ the SAME 12 keys (Correction C40)
 
-`scan`, `rt`, `tic`, `mslevel: 1` only. No precursor exists, so `precmz`/`ms1scan`/`charge` and all
-`ms1_*` columns are **absent, not null**. Nearly free once the store exists — same collation path.
+> **This section was wrong, and is corrected in the ledger rather than quietly rewritten.** It read:
+>
+> > *"`scaninfo(MS1DATA)` → a different, smaller shape. `scan`, `rt`, `tic`, `mslevel: 1` only. No precursor
+> > exists, so `precmz`/`ms1scan`/`charge` and all `ms1_*` columns are **absent, not null**."*
+>
+> **There is no second shape.** [cytoscape/cytoscape#26](https://github.com/cytoscape/cytoscape/issues/26) —
+> which §3 cites as its own source four lines above — defines the schema as *"a union of all possible attributes
+> from ms1 and ms2"*, with **`mslevel`** as the discriminator. `MS1DATA` emits the **same 12 keys**;
+> inapplicable fields are present as **`null`**, never absent.
+>
+> `precmz`, `ms1scan`, `charge` and the three `ms1_*` columns *are* null for an MS1 row — a survey scan has no
+> precursor, and that part of the old text was right for the right reason. But **`base_peak_i` and
+> `base_peak_mz` are real values**: a survey scan plainly has a base peak, and issue #26 marks both
+> *"Can be null? **No**"*. Their nulls in the old golden were a left-join artifact in `massql_query.py`, proven
+> by the `micro.mgf` phantom-id collision producing a *wrong non-null*.
+>
+> **[`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) is the single definition.** Correction **C40** has the
+> analysis.
+
+Still true: nearly free once the store exists, since it is the same collation path.
 
 ### Exact rules — each is one line, and each is a silent wrong-answer bug if missed
 
@@ -258,7 +276,7 @@ real files in all three formats and diff against the Python goldens.
 | Store reductions | Per-scan sum / max / first / argmax; mask AND; mz-sorted binary-search window edges; empty-scan and single-peak cases |
 | Precursor lookup | Picks the **closest** peak to `precmz`, not the most intense — construct a window where those differ. **This is the test that catches the most likely misreading of the whole contract.** Also: `ms1_base_peak_i` populated even when the tolerance match fails |
 | Null / sentinel rules | `0`→null for `precmz`/`ms1scan`/`charge`; `rt=0.0` **preserved**; NaN/inf→null |
-| Result JSON | Exact 12-key shape and key names for MS2DATA; the 4-key MS1DATA shape with precursor keys **absent, not null**; null renders as JSON `null` |
+| Result JSON | ⛔ **Corrected by C40** — this read *"the 4-key MS1DATA shape with precursor keys absent, not null"*. There is **one** shape: the exact 12 keys in the frozen order for **both** MS1DATA and MS2DATA, `mslevel` discriminating, inapplicable fields present as `null`; null renders as JSON `null`. Definition: [`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) |
 | Scan/RT/charge filters | `RTMIN`/`RTMAX` strict; `SCANMIN`/`SCANMAX` inclusive; polarity 1=pos / 2=neg |
 | **RT units, per format** | mzXML `PT90S` → `1.5` minutes; mzML converts **only if** the declared unit is seconds (`small.mzML` says `minute` → unchanged); MGF `RTINSECONDS`÷60, absent → `0.0`. Three different rules — see the §6c table |
 | **`ms1scan` document order** | `ms1scan` = id of the most recent **preceding** MS1 spectrum, **not** the file's `spectrumRef`/`precursorScanNum`; `0` when no MS1 precedes it; MGF always `0`. Assert on a fixture with no declared linkage — see §3 |

@@ -63,8 +63,12 @@ The reviewer's entry point. Required content:
 - **The pinned MassQL SHA** — `dad2a28c01e6e5132240270fc6700fbae29f1652` (tag `2026.03.14`). State plainly that
   this SHA *is* the definition of "MassQL-compliant" here.
 - **The supported-feature matrix** — what parses, what executes, what rejects. Link `docs/FEATURE_MATRIX.md`.
-- **The 12-key result contract** and the 4-key MS1DATA shape, with the absent-vs-null distinction called out.
-  Point at `docs/RESULT_CONTRACT.md`.
+- **The 12-key result contract** — **one shape** for both MS1DATA and MS2DATA, discriminated by `mslevel`, with
+  no key ever absent. Point at **[`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md)**, the single definition; do not
+  restate the key set in the README. ⚠ This bullet read *"and the 4-key MS1DATA shape, with the absent-vs-null
+  distinction called out … point at `RESULT_CONTRACT.md`"* — both the second shape and that document are
+  gone under Correction **C40**. (Path deliberately written without its `docs/` prefix so `spec-audit` check 5
+  does not read a quoted, retired name as a live reference once this step completes.)
 - **The three per-format population rules** ([Step 10](Tech_Step10.md) §6 table).
 - **Known deviations** — see §2. Do not bury these.
 - **The EPL-1.0 election** and the vendored-code provenance ([Step 6](Tech_Step6.md) §3 — Step 6 owns all vendoring; Step 7 vendors nothing per C23).
@@ -302,7 +306,8 @@ exposure than `SPIKE.md` assumed.
 - `SPIKE.md` §7 Step 3 (this step), §8 (honest framing and the out-of-scope list), §9 (the constraints and the
   canary), §11 (the eight questions), §6d (build wiring and `make verify`), §10 (Phase-2 sketch — context only)
 - Inputs: `docs/PARITY_REPORT.md` ([Step 8](Tech_Step8.md)), `docs/DIFFERENTIAL_REPORT.md`
-  ([Step 12](Tech_Step12.md)), `docs/RESULT_CONTRACT.md` ([Step 10](Tech_Step10.md)),
+  ([Step 12](Tech_Step12.md)), **`docs/RESULT_SCHEMA.md`** ([Step 10](Tech_Step10.md) — renamed from the
+  never-written `RESULT_CONTRACT.md` by **C40**, which folded it into the one existing definition),
   `docs/SEMANTICS.md` ([Step 9](Tech_Step9.md)), `docs/VENDORED.md` ([Step 6](Tech_Step6.md), owned by
   [Step 7](Tech_Step7.md)), `docs/READER_RULES.md` (Steps [6](Tech_Step6.md), [7](Tech_Step7.md))
 

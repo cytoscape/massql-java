@@ -262,6 +262,8 @@ This step predates the Java test suite; its "tests" are scripts:
 - `SPIKE.md` §7 Step 0 (this step's origin), §12 (reference material)
 - `massql_query.py` — the reference implementation; `add_precursor_intensity` at lines 62–116 is the contract
   for [Step 10](Tech_Step10.md)
-- `RESULT_SCHEMA.md` — the 12-column result contract
+- **[`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) — the 12-key result contract, and the single definition of it.**
+  The oracle's own `RESULT_SCHEMA.md` is superseded in place and points here; its "smaller MS1DATA schema" note was
+  wrong (Correction **C40**)
 - `github.com/mwang87/MassQueryLanguage` @ `dad2a28c01e6e5132240270fc6700fbae29f1652`
 - Corrections C1–C5 and Established facts in [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md)
