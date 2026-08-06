@@ -145,18 +145,36 @@ through `ordinalOf`.
 ### 4. m/z window lookup — the performance-critical primitive
 
 ```java
-/** Row range within one scan whose mz lies in [lo, hi], both inclusive. */
+/** Row range within one scan whose mz lies in [lo, hi], both INCLUSIVE. */
 public IntRange mzWindow(int scanOrdinal, double lo, double hi);
+
+/** Row range whose mz lies in (lo, hi), both STRICT — added by Correction C37. */
+public IntRange mzWindowExclusive(int scanOrdinal, double lo, double hi);
 ```
 
-Implementation: two `Arrays.binarySearch` calls bounded to `[rowStart, rowEnd)` of that scan. Because
-`binarySearch`'s behaviour on duplicate keys is unspecified, do **not** use its return value directly for the
-bounds — use it to locate a position, then walk outward to the true first/last index. Duplicate m/z values do
-occur in real centroided data.
+> ⛔ **Correction C37 — there are TWO window methods, and the choice is load-bearing.** This section described
+> one inclusive method and attributed it to [Step 9](Tech_Step9.md): *"Step 9 is responsible for computing
+> `lo`/`hi` from a tolerance."* **That attribution is backwards.** MassQL genuinely differs by caller, and both
+> halves were verified by execution rather than inferred:
+>
+> | Caller | Bound | Method | Evidence |
+> |---|---|---|---|
+> | [Step 9](Tech_Step9.md) condition windows | **STRICT** | `mzWindowExclusive` | `msql_engine_filters.py:253` and three siblings use `>`/`<`. `micro.mzML` scan 3 has a peak at exactly `201.0`; `MS2PROD=201.5:TOLERANCEMZ=0.5` gives the window `[201.0, 202.0]` and MassQL returns **0 rows** |
+> | [Step 10](Tech_Step10.md) precursor lookup | **INCLUSIVE** | `mzWindow` | `massql_query.py:101-103` uses `>=`/`<=`. At `--precursor-tol-ppm 7.8125` an exactly-on-bound peak **does** populate `ms1_i` (`1000.0`) |
+>
+> **Do not unify them.** Collapsing to one rule would fix one divergence by creating another in
+> `ms1_i`/`ms1_precmz` — the columns [Step 12](Tech_Step12.md) compares at **1e-9**. `MzWindowTest` asserts both
+> in one class so the difference stays visible.
 
-**Both bounds are inclusive**, and edge behaviour is exact: a peak whose m/z equals `hi` to the bit **is** in
-the window. [Step 9](Tech_Step9.md) is responsible for computing `lo`/`hi` from a tolerance; this method must
-not apply any epsilon of its own. A helpful epsilon here would silently widen every tolerance in the system.
+Implementation: two binary searches bounded to `[rowStart, rowEnd)` of that scan. Because
+`Arrays.binarySearch`'s behaviour on duplicate keys is unspecified, hand-roll `lowerBound`/`upperBound` rather
+than using its return value — duplicate m/z values do occur in real centroided data. The exclusive variant is
+the same two searches with the roles swapped (`upperBound(lo)` skips every row equal to `lo`,
+`lowerBound(hi)` stops before every row equal to `hi`), which is exact and stays correct with duplicates.
+
+**Neither method applies an epsilon, ever.** The caller computes `lo`/`hi` from a tolerance; a helpful epsilon
+here would silently widen every tolerance in the system. Edge behaviour is exact in both: a peak whose m/z
+equals `hi` to the bit **is** in the inclusive window and **is not** in the exclusive one.
 
 `SPIKE.md` §7 Step 2's performance note applies to this method specifically: if the MGF fixture is slower than
 pandas, the likely cause is a linear scan where this binary search belongs.
@@ -248,7 +266,9 @@ doesn't "optimize" filtering into destructive pruning.
 - **Using a scan id as an array index.** Scan ids are neither dense nor guaranteed 1-based.
 - **Trusting `Arrays.binarySearch` on duplicate keys.** Its choice among equal elements is unspecified; walk
   outward from the hit.
-- **An epsilon inside `mzWindow`.** Widens every tolerance in the system invisibly. Bounds arrive exact.
+- **An epsilon inside either window method.** Widens every tolerance in the system invisibly. Bounds arrive exact.
+- **Unifying `mzWindow` and `mzWindowExclusive`** because two near-identical methods look redundant. They are
+  not (Correction C37): dropping either one silently breaks the other's caller. See §4.
 - **`argmax` ties resolving to the last index.** Disagrees with pandas `idxmax` and therefore with the goldens.
 - **Mutating a `RowMask` in place** while composing conditions.
 - **Substituting 0 for NaN** in `iNorm` on an all-zero scan. NaN is the correct "undefined"; Step 10 maps it to
@@ -263,11 +283,11 @@ can run before the readers exist.
 |---|---|
 | `SpectrumTableBuilderTest` | Invariant enforcement: array-length mismatch, non-monotonic `scan`, unsorted m/z within a scan (auto-sorted), immutability after `build()`. |
 | `ScanIndexTest` | `rowStart`/`rowEnd` ranges; `ordinalOf` for present and absent ids; sparse and non-1-based scan ids; exact double `rtOf`. |
-| `MzWindowTest` | Peak exactly at `lo` and exactly at `hi` included; a peak one ULP outside excluded; **duplicate m/z values** at a boundary; empty result; whole-scan window; single-peak scan. |
+| `MzWindowTest` | **Both methods, in one class, so the C37 difference stays visible.** Inclusive: peak exactly at `lo` and exactly at `hi` included; one ULP outside excluded; **duplicate m/z** at a boundary all included; empty result; whole-scan window; single-peak scan; window scoped to its own scan. Exclusive: a peak on **either** bound rejected; strictly-interior peaks kept; empty when only the bounds would match; **duplicate m/z on a bound** — every copy dropped, which is the case a `binarySearch` return value would get wrong. |
 | `ReductionsTest` | sum/max/min/first/count/argmax on multi-peak, single-peak and **empty** scans; **argmax tie → lowest row index**; `argmax` used to read a different column; masked variants. |
 | `DerivedColumnsTest` | `iNorm`/`iTicNorm` on a known scan computed by hand; single-peak scan gives **exactly** `1.0` for both; all-zero scan gives `NaN`, no throw. |
 | `RowMaskTest` | and/or/not; immutability of operands; length-mismatch throws; `cardinality`; `scansWithAnyRow`. |
-| `StoreScaleTest` | Build ~1M rows across ~30k scans; assert `mzWindow` is not doing linear work — e.g. total time for 100k random windows stays within a generous bound. Guards the `SPIKE.md` §7 performance criterion at the unit level, where the cause is obvious. |
+| `StoreScaleTest` | Build ~1M rows across ~30k scans; assert **both** window methods are not doing linear work — e.g. total time for 100k random windows stays within a generous bound. Guards the `SPIKE.md` §7 performance criterion at the unit level, where the cause is obvious. |
 
 ## Done when
 
@@ -289,5 +309,6 @@ can run before the readers exist.
 - `SPIKE.md` §2 (why the dataframe is written, not imported), §4 (`spectra/` sketch), §6a (store reductions),
   §7 Step 2 item 1 (order and the `OTHERSCAN` seam), §8 (`OTHERSCAN` out of scope)
 - `massql_query.py:163` — `ms2_df.groupby("scan")["i"].idxmax()`, the pandas behaviour `argmax` must match
+- `msql_engine_filters.py:253` — the strict `>`/`<` bounds behind `mzWindowExclusive` (Correction C37)
 - Consumers: [Step 6](Tech_Step6.md) and [Step 7](Tech_Step7.md) populate it; [Step 9](Tech_Step9.md) masks and
-  reduces; [Step 10](Tech_Step10.md) uses `argmax` and `mzWindow`
+  reduces via **`mzWindowExclusive`**; [Step 10](Tech_Step10.md) uses `argmax` and the **inclusive** `mzWindow`

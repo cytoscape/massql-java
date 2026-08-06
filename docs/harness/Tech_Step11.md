@@ -104,7 +104,7 @@ Where the query is `scaninfo(MS1DATA)`, `execute` returns rows with `ms1DataShap
 
 ### 2. Diagnostics
 
-The SDK logs nothing (`DEPENDENCY_POLICY.md` constraint 5). [Step 9](Tech_Step9.md) §5 produces diagnostics for
+The SDK logs nothing (`DEPENDENCY_POLICY.md` **constraint 2**). [Step 9](Tech_Step9.md) §5 produces diagnostics for
 valid-but-degenerate queries; surface them on the API so the CLI can print them to stderr and the Phase-2 app can
 show them in a dialog:
 
@@ -114,6 +114,25 @@ public record ExecutionResult(List<ScanInfoResult> rows, List<String> diagnostic
 
 Add `Massql.executeWithDiagnostics(...)` returning this, keeping `execute` as the simple list-returning form.
 Do not make callers parse diagnostics out of a log they cannot see.
+
+> **Where the `diagnostics` list comes from — the seam this spec left unstated** (Correction **C35(b)**, which
+> replaced Step 9's whole-file `execute` signature with a per-scan callback plus a summary record).
+> [Step 9](Tech_Step9.md) is already implemented and returns:
+>
+> ```java
+> public record ExecutionSummary(int qualifyingScans, int scansExamined, List<String> diagnostics) { }
+> ```
+>
+> from `QueryExecutor.execute(...)`. So `ExecutionResult.diagnostics` is **`ExecutionSummary.diagnostics`
+> passed straight through** — this step neither generates nor reformats diagnostic text; doing so would put
+> the same message in two places with two wordings. Its job is to carry the list from the executor to the
+> caller.
+>
+> `qualifyingScans` and `scansExamined` are **not** part of `ExecutionResult`: the row count already gives the
+> first, and the second is a progress statistic with no consumer in the published contract. If the CLI ever
+> wants "examined N scans, matched M", read it from the summary rather than widening the SDK's result record —
+> the record is a contract the Phase-2 app depends on, and `ResultJson`'s 12 keys are frozen at
+> [Step 10](Tech_Step10.md) §5.
 
 ### 3. The CLI
 
@@ -207,7 +226,7 @@ on it. So:
 
 ## Done when
 
-- [ ] `mvn test` green.
+- [ ] `make test` green (and `make verify` before calling the step done).
 - [ ] The three entry points match the `SPIKE.md` §4 sketch exactly.
 - [ ] `ApiEncapsulationTest` passes — no third-party type on the public surface.
 - [ ] CLI arg order, flag and default match `massql_query.py`; a manual run against `data/small.mzML` +

@@ -220,6 +220,19 @@ reads the element text and is immune — but it must not assume attributes are p
 - **Truncated file** → `MassqlException`, **no partial results**, per [Step 6](Tech_Step6.md) §6. This also
   exercises the end-of-stream behaviour of the reused `ByteBufferInputStream` (§1).
 - **`peaksCount="0"`** → an empty scan, which [Step 5](Tech_Step5.md) supports; must not throw.
+- ⛔ **Zero-*intensity* peaks are RETAINED — Correction C36.** Distinct from `peaksCount="0"` above, and the
+  distinction is the point: `peaksCount="0"` is a scan with no peaks, whereas this is a scan whose peaks have
+  intensity `0.0`. **mzXML and mzML keep every such peak; MGF drops them** — `msql_fileloading.py`'s MGF branch
+  builds its peak dict under `if intensity > 0`, while the mzML/mzXML branches append unconditionally.
+  Verified on `small.mzML`, whose first MS1 scan opens with **eight** `0x0.0p+0` intensities that appear in
+  MassQL's loaded table and in our reader's output alike, so the Step 8 digests already pin it.
+
+  **Do not "tidy up" either side into agreement.** A reader that filtered zero peaks here would break
+  `mz_sha256` on every mzML and mzXML fixture at once; one that retained them in MGF breaks the MGF digests.
+  C36 was found in Step 9 because **no fixture contained a zero-intensity peak in a format where the two rules
+  differ** — `micro_zeroint.mgf` exists solely to close that hole, and it is an MGF file precisely because the
+  mzXML side was already covered by `small.mzML`'s eight leading zeros. `docs/READER_RULES.md` records the
+  contrast per format.
 
 ### 5. Wire into `SpectraFile`
 
@@ -244,6 +257,8 @@ spec previously called it `SpectraFileCloseTest`) must now be re-run against an 
 - **Reading `precursorScanNum` because it's there.** `small.mzXML` may have it after conversion. Ignoring it is
   the *correct* behaviour, and this fixture is the only one where the difference is observable.
 - **Forgetting that `precursorIntensity` may be absent.** A bare `<precursorMz>` with no attributes crashes MassQL (Step 2 finding); we read element text and are immune, but must not require attributes either.
+- **Skipping zero-intensity peaks by analogy with the MGF reader.** MGF drops them, mzXML keeps them (C36, §4).
+  Copying that `if (intensity == 0.0) continue;` across breaks `i_sha256` on every mzML and mzXML fixture.
 
 ## Tests required
 
@@ -258,7 +273,13 @@ spec previously called it `SpectraFileCloseTest`) must now be re-run against an 
 | `MzxmlReaderTest` | unit | The Step 6-style oracle cross-check for `small.mzXML`, plus the **flat-vs-nested row-for-row equivalence** on the micro pair, `precursorScanNum` ignored (with the 34 occurrences asserted present first), and mzXML `charge` absent → 0 contrasted against MGF's 1. |
 | `StreamingMemoryTest` (extended) | unit | Step 7 §5: the Ewing file streams inside a **48 MB heap** and retains ~87 KB. mzXML holds a mapped region plus one scan's base64, which is a different retention shape from MGF's reader, so it needs its own proof. |
 | `InstrumentAttributeCrossCheckIT` | IT | A free check with **no Python in the loop**: the Ewing file's own `basePeakMz`, `basePeakIntensity` and `totIonCurrent` scan attributes vs our computed values. Hand-check the `peaksCount="3"` scans noted in Step 2. Expect minor float drift on `tic`; a **systematic** mismatch is a bug. (Full form in [Step 8](Tech_Step8.md).) |
-| `VendoredProvenanceTest` | unit | Every file under `io/vendor/` contains the provenance header and the string `EPL-1.0` — makes the licence obligation a build-enforced fact rather than a convention. |
+| `VendoredProvenanceTest` | unit | Every **upstream** file under `io/vendor/` carries its provenance header, a 40-character pinned commit, its stated modifications, and the string `EPL-1.0` — makes the licence obligation a build-enforced fact rather than a convention. Also asserts **`docs/VENDORED.md` exists and names every vendored file**, since all eleven headers defer to it. ⛔ **Written only at Correction C38** — this row sat unimplemented, and `docs/VENDORED.md` (a [Step 6](Tech_Step6.md) deliverable that this spec's exit criteria recorded as "unchanged") **did not exist at all** while every vendored header pointed readers at it. The headers themselves were correct throughout; nothing existed to notice the missing document. Non-vendored files in the package — `LittleEndianDataInput` (the C16 Guava replacement) and `package-info` — are skipped via a **"Not vendored" marker in the file itself**, not a filename list in the test, so a genuinely vendored file cannot be exempted from the licence assertions quietly. |
+
+### Renamed and folded test classes
+
+| Spec-era name | → Real home | Note |
+|---|---|---|
+| `SpectraFileCloseTest` | → `SpectraStreamCloseTest` | renamed under **C22**: the *stream* cursor holds the mapping, not the file handle. §5 already recorded the rename in prose; this row is what `make spec-audit` check 4 reads |
 
 ## Done when
 

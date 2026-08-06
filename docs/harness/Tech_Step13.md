@@ -46,7 +46,7 @@ questions), §6d.
 | Path | Content |
 |---|---|
 | `README.md` | The primary review artifact |
-| `Makefile` | `verify` target, filling in the [Step 3](Tech_Step3.md) stub |
+| `Makefile` | ✅ **Already filled in at Step 9** (the Step 3 stub grew a full target set, and both workflows now call it). This step adds only the **differential table** to `verify` |
 | `dependency-audit.txt` | Final `mvn dependency:tree` + measured total (updated from Step 6) |
 | `scripts/check-osgi-readiness.sh` | The §9 assertions, scripted |
 | `docs/FEATURE_MATRIX.md` | Parses / executes / rejects, generated from `UnsupportedConstructs` |
@@ -121,11 +121,35 @@ accumulation-order tolerance was accepted, it is a deviation and belongs here.
 
 ### 3. `make verify`
 
+> ✅ **The Makefile was filled in early, at Step 9** — ad-hoc `mvn` invocations had already begun to diverge
+> from what CI ran, so the convention was pulled forward: **`mvn` is never invoked directly; the Makefile is
+> the only entry point**, and both workflows call its targets. What remains for this step is the
+> **differential table** below, not the plumbing.
+>
+> Already in place: `build`, `test`, `it` (integration only, skipping the unit suite), `verify`,
+> `skipcheck` (C26's zero-skip guard, previously duplicated inline in `ci.yml`), `audit`,
+> **`spec-audit`**, `fixtures`, `report`, `clean`, `set-version`, `deploy`, `test-one`/`it-one`, and a
+> `help` default goal.
+
 ```
-make verify   →  mvn verify
-              +  the three differential comparisons
-              +  prints a per-format pass/fail table
+make verify   →  mvn verify (unit + integration + JaCoCo + enforcer)
+              +  make skipcheck   (tests ran, and NONE were skipped)
+              +  make audit       (dependency tree + size budget)
+              +  make spec-audit  (the specs still describe the code)
+              +  the three differential comparisons        ← THIS STEP
+              +  prints a per-format pass/fail table       ← THIS STEP
 ```
+
+**`make spec-audit` (added after Step 9) is the harness auditing itself.** The three drifts it fails on are
+the three this project actually produced: a fixture or golden on disk that no spec names; a stated count that
+no longer matches the filesystem (three documents once held **15**, **14** and the true **16**); and a
+correction naming a step that never cites it back — the check that would have caught **C18 → C35(a)**, where
+the same finding was recorded twice, five steps apart, because the named spec was never edited.
+
+Its own header records that check 2 was **silently vacuous on first write** (its regex missed
+`**16 dumps.**`, punctuation inside the bold) and was only caught by injecting drift and getting no failure.
+Every check is verified to fail before being trusted, which is C26's lesson applied to the guard rather than
+to the tests.
 
 The table is the review artifact. `SPIKE.md` §6d: *"The reviewer should not have to reconstruct how to validate
 the thing."* Shape:
@@ -143,7 +167,9 @@ MGF      DP00570_F02.mgf      …/…       ok    ok      n/a      ok   ok      
 visible in the table itself. **Non-zero exit on any FAIL.** Skipped fixtures print `SKIP` with the reason, and a
 run where nothing executed must fail rather than print an empty table.
 
-Also add `make test` (unit only, fast) and `make audit` (dependency tree + size).
+✅ `make test` (unit only, fast) and `make audit` (dependency tree + size) already exist, added when the
+Makefile was filled in at Step 9 — along with `it`, `skipcheck`, `spec-audit`, `fixtures`, `report`, `build`,
+`set-version`, `deploy` and `test-one`/`it-one`. Nothing to add here but the differential table.
 
 ### 4. Dependency audit
 
@@ -191,7 +217,8 @@ re-specify them here. This step only *adds* to the existing `ci.yml`:
 - confirmation that **no test reaches the network** (`DEPENDENCY_POLICY.md` constraint 8) — the 46 parse
   goldens are checked-in files, never live calls to `massql.gnps2.org/parse`.
 
-Already in place from Step 3 and not to be duplicated: JDK 17, `mvn verify` (not `mvn test` — every gate lives
+Already in place from Step 3 and not to be duplicated: JDK 17, **`make verify`** (which wraps `mvn verify`, not
+`mvn test` — every gate lives
 in an `*IT.java`), the dependency audit as a gate, and the "assert tests actually ran" guard that stops a
 skip-everything run from passing green — **strengthened by Correction C26** to also assert the skipped-test
 count is **0**, plus a floor on the number executed, and a `fetch-fixtures.sh` step with an `actions/cache`
@@ -276,8 +303,16 @@ exposure than `SPIKE.md` assumed.
   canary), §11 (the eight questions), §6d (build wiring and `make verify`), §10 (Phase-2 sketch — context only)
 - Inputs: `docs/PARITY_REPORT.md` ([Step 8](Tech_Step8.md)), `docs/DIFFERENTIAL_REPORT.md`
   ([Step 12](Tech_Step12.md)), `docs/RESULT_CONTRACT.md` ([Step 10](Tech_Step10.md)),
-  `docs/SEMANTICS.md` ([Step 9](Tech_Step9.md)), `docs/VENDORED.md` ([Step 7](Tech_Step7.md)),
-  `docs/READER_RULES.md` (Steps [6](Tech_Step6.md), [7](Tech_Step7.md))
+  `docs/SEMANTICS.md` ([Step 9](Tech_Step9.md)), `docs/VENDORED.md` ([Step 6](Tech_Step6.md), owned by
+  [Step 7](Tech_Step7.md)), `docs/READER_RULES.md` (Steps [6](Tech_Step6.md), [7](Tech_Step7.md))
+
+  > ⚠ **Correction C38 — check each of these exists before relying on it as a review artifact.**
+  > `docs/VENDORED.md` was listed here, recorded as a completed Step 6 deliverable, and referenced by all
+  > eleven vendored source headers — and **did not exist**. It does now, asserted by
+  > `VendoredProvenanceTest`. Nothing was verifying that a named artifact was actually on disk; a review
+  > gate whose inputs may be absent is not a gate. `make spec-audit` check 1 covers fixtures and goldens,
+  > check 4 covers test classes; **the review documents in this list are still checked by eye**, so check
+  > them here rather than assuming a ticked exit criterion means the file is there.
 - Corrections C1–C5 in [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md) — C2, C3, C4 answer §11 questions directly
 - Phase-2 patterns, for the reviewer's context: `../cytoscape-mcp/.../CyActivator.java`,
   `../open-cyweb/pom.xml:116-132`, `../cytoscape-mcp/build.gradle:143-200`

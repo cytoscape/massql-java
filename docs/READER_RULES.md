@@ -84,6 +84,19 @@ each occurrence takes the *last* and disagrees. Both of ours did, and no fixture
 `micro_multiprec.{mzML,mzXML}` now pin it; the mzML one carries a second `<selectedIon>` **and** a second
 `<precursor>`, so honouring only one nesting level still fails.
 
+**Zero-intensity peaks are dropped by MGF and kept by mzML/mzXML** (Correction C36). MassQL's MGF loader
+opens its peak loop with `if intensity == 0: continue`, so such a peak never becomes a row and cannot be
+matched, counted or summed. The other two loaders have **no such guard** — `small.mzML`'s parity dump records
+`i_hex_first8` as eight `0x0.0p+0` entries, retained on both sides and compared bit-for-bit by the Step 8 gate.
+**Generalising the MGF skip would break every mzML fixture in that gate**; `ZeroIntensityPeakTest` asserts both
+directions in one class so the asymmetry cannot be tidied away.
+
+A block whose peaks are *all* zero-intensity therefore reduces to a **zero-peak scan** — MassQL emits no rows
+for it at all, and the engine's zero-peak guard (Tech_Step9 §1, C35c) is what makes the two agree.
+
+`iNorm`/`iTicNorm` are unaffected: MassQL computes `i_max`/`i_sum` from the full array *before* the skip, and a
+zero changes neither a max nor a sum.
+
 **Levels > 2** are skipped and reported through `SpectraStream.diagnostics()`.
 
 **Malformed input throws `MassqlException` with no partial result.** A reader that returns 40 of 48 scans
@@ -103,6 +116,7 @@ Specification: `_load_data_mgf_pyteomics` (`msql_fileloading.py:155-244`).
 | **`rt`** | `RTINSECONDS`÷60. **Absent → `0.0`, not null** |
 | **`scan`** | `SCANS=` when present, else the **1-based block index** (Correction C7) |
 | `ms1scan` | Hardcoded **0** (`:394`) |
+| **zero-intensity peaks** | ⛔ **DROPPED** — `if intensity == 0: continue` opens the peak loop. MGF **only**: mzML/mzXML retain them (Correction C36) |
 | **`polarity`** | Not read from any header — but **hardcoded `1`** (positive), not 0. ⚠ **Correction C33 fixes C8**, which said "not read → 0": both loaders write `"polarity": 1  # Default` (`:67`, `:86`). Measured `{1: all}` across 866k MGF rows. Reading a rule off the *parse* path missed a default set elsewhere in the function |
 
 > **⚠ MGF `charge` is never null.** SPIKE.md §3 says "null if absent"; the live loader uses

@@ -144,8 +144,8 @@ class ReaderParityHarnessTest {
             assertFalse(d.scans().isEmpty(), f + " parsed to zero scans");
             assertTrue(d.peakRows() > 0, f + " reports no peak rows");
         }
-        assertEquals(14, ReaderParityIT.FIXTURES_WITH_DUMPS.size(),
-                "expected 14 fixtures with dumps; if this changed, update PARITY_REPORT.md's coverage table");
+        assertEquals(16, ReaderParityIT.FIXTURES_WITH_DUMPS.size(),
+                "expected 16 fixtures with dumps; if this changed, update PARITY_REPORT.md's coverage table");
     }
 
     @Test

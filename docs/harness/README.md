@@ -12,6 +12,27 @@ three internal gates, settled decisions, and the numbered corrections to `SPIKE.
 | [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md) | The index. Read this first. |
 | `Tech_Step1.md` … `Tech_Step13.md` | One spec per step. **Numbered 1–13; there is no Tech_Step0**, and the numbering is unrelated to SPIKE.md's 0–3 (the index has the mapping). |
 
+## Building and testing — `make` only, never `mvn`
+
+**The `Makefile` is the only entry point.** `make` with no argument lists every target. CI and
+`release.yml` call the same targets, so what you run locally and what runs on a push cannot drift.
+
+| | |
+|---|---|
+| `make build` | compile and package the jar |
+| `make test` | unit tests only (surefire, `*Test.java`) — seconds, for the edit loop |
+| `make it` | integration tests only (failsafe, `*IT.java`), **skipping** the unit suite — the fast way to re-check a gate |
+| `make verify` | the review entry point: unit + integration + JaCoCo + enforcer, then `skipcheck` and `audit` |
+| `make skipcheck` | asserts tests ran **and none were skipped** (Correction C26) |
+| `make audit` | regenerate `dependency-audit.txt` and check the ~1.5 MB budget |
+| `make fixtures` | download the two gitignored Ewing-lab fixtures |
+| `make test-one T=X` / `make it-one T=X` | a single suite |
+
+**If you need something `make` does not do, add a target** — do not reach for `mvn`. A one-off
+invocation is how the ad-hoc commands that prompted this file came to diverge from CI in the first
+place. `mvn` appears in these specs only where it *describes the mechanism* a target wraps (the
+surefire/failsafe split in [Step 3](Tech_Step3.md)) or in a completed step's record of what was run.
+
 ## ⚠ Two locations, and the specs reference both
 
 This is not obvious from the file paths, so read this before following a path in a spec.
@@ -27,7 +48,7 @@ behavioural contract and to produce the goldens the Java test suite diffs agains
 > ⚠ **Correction C26 — the test suite no longer reads from the oracle directory at all.**
 > Fixtures and goldens are **committed to this repo** under `src/test/resources/`, because CI
 > checks out only `massql-java` and the old arrangement made every fixture-dependent test skip
-> silently. `mvn verify` now needs nothing outside this repo. See [`../FIXTURES.md`](../FIXTURES.md).
+> silently. `make verify` now needs nothing outside this repo. See [`../FIXTURES.md`](../FIXTURES.md).
 
 Paths in the specs resolve like this:
 

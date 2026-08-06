@@ -87,13 +87,25 @@ public final class SpectrumTable {
      * Rows within one scan whose m/z lies in {@code [lo, hi]} — <b>both bounds
      * inclusive</b>, exactly.
      *
+     * <p><b>Which of the two window methods you want depends on the caller</b> (Correction C37), and the
+     * distinction is not cosmetic — MassQL genuinely differs between them, both verified by execution:
+     *
+     * <table border="1">
+     *   <caption>Bound semantics by caller</caption>
+     *   <tr><th>Caller</th><th>Bound</th><th>Method</th></tr>
+     *   <tr><td>Tech_Step10 precursor lookup (`massql_query.py:101-103`, {@code >=}/{@code <=})</td>
+     *       <td><b>inclusive</b></td><td><b>this method</b></td></tr>
+     *   <tr><td>Tech_Step9 condition windows (`msql_engine_filters.py:253` etc., {@code >}/{@code <})</td>
+     *       <td><b>strict</b></td><td>{@link #mzWindowExclusive}</td></tr>
+     * </table>
+     *
      * <p>Two binary searches bounded to the scan's own slice, so this is O(log n) not O(n).
      * If the MGF fixture is ever slower than pandas, this method is the first place to look
      * (Tech_Step12 §5).
      *
      * <p><b>No epsilon is applied here, ever.</b> The caller computes {@code lo}/{@code hi}
-     * from a tolerance (Tech_Step9 §3); a "helpful" epsilon at this level would silently
-     * widen every tolerance in the system.
+     * from a tolerance; a "helpful" epsilon at this level would silently widen every tolerance
+     * in the system.
      *
      * @return a half-open row range; {@link IntRange#EMPTY} if nothing matches
      */
@@ -106,6 +118,41 @@ public final class SpectrumTable {
         int start = lowerBound(from, to, lo);
         if (start == to) return IntRange.EMPTY;
         int end = upperBound(from, to, hi);
+        return start >= end ? IntRange.EMPTY : new IntRange(start, end);
+    }
+
+    /**
+     * Rows within one scan whose m/z lies in {@code (lo, hi)} — <b>both bounds STRICT</b>. A peak exactly
+     * on either bound is <b>excluded</b>.
+     *
+     * <p>This is what Tech_Step9's condition windows require. MassQL filters with
+     * {@code (df["mz"] > mz_min) & (df["mz"] < mz_max)} in all four condition functions
+     * (`msql_engine_filters.py:253`, `:410`, `:493`, `:607`), and it was confirmed by execution rather than
+     * inferred: {@code micro.mzML} scan 3 has a peak at exactly {@code 201.0}, and
+     * {@code MS2PROD=201.5:TOLERANCEMZ=0.5} — window {@code [201.0, 202.0]} — returns <b>0 rows</b>.
+     * {@code test_micro_edge.massql} pins that with an empty golden.
+     *
+     * <p><b>Do not "unify" this with {@link #mzWindow}.</b> Correction C37 exists because the spec assumed
+     * one rule served both callers; collapsing them would silently change Tech_Step10's {@code ms1_i} and
+     * {@code ms1_precmz}, which Tech_Step12 compares at 1e-9.
+     *
+     * <p>Implemented by shifting the inclusive bounds off the exact values: {@code upperBound(lo)} skips
+     * every row equal to {@code lo}, and {@code lowerBound(hi)} stops before every row equal to {@code hi}.
+     * That is exact — no epsilon, and correct in the presence of duplicate m/z.
+     *
+     * @return a half-open row range; {@link IntRange#EMPTY} if nothing matches
+     */
+    public IntRange mzWindowExclusive(int scanOrdinal, double lo, double hi) {
+        if (hi <= lo) return IntRange.EMPTY;
+        int from = index.rowStart(scanOrdinal);
+        int to = index.rowEnd(scanOrdinal);
+        if (from == to) return IntRange.EMPTY;
+
+        // upperBound(lo) = first row with mz > lo  -> excludes rows equal to lo
+        int start = upperBound(from, to, lo);
+        if (start == to) return IntRange.EMPTY;
+        // lowerBound(hi) = first row with mz >= hi -> excludes rows equal to hi
+        int end = lowerBound(from, to, hi);
         return start >= end ? IntRange.EMPTY : new IntRange(start, end);
     }
 

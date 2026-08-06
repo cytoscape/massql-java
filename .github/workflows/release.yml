@@ -45,14 +45,28 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Set version in pom.xml
-        run: mvn -B versions:set -DnewVersion=${{ steps.version.outputs.version }} -DgenerateBackupPoms=false
+        run: make set-version V=${{ steps.version.outputs.version }}
 
-      # Full suite: unit + integration + enforcer bans. Also produces the jar.
+      # REQUIRED, and it was missing. Correction C26 made an absent fixture a HARD FAILURE
+      # rather than a skip, so `verify` cannot pass without the two gitignored Ewing files --
+      # Ms1ScanDocumentOrderIT and ReaderParityIT both need them. Before this step existed, any
+      # release build would have failed at the parity gate. Cached, like ci.yml.
+      - name: Cache the fetched Ewing fixtures
+        uses: actions/cache@v4
+        with:
+          path: |
+            src/test/resources/data/DP00570_F02.mzxml
+            src/test/resources/data/DP00570_F02.mgf
+          key: ewing-fixtures-3761778-2196881
+
+      - name: Fetch uncommitted fixtures
+        run: make fixtures
+
+      # Full suite: unit + integration + enforcer bans, then skipcheck and the dependency
+      # audit. Also produces the jar. `make verify` runs the audit itself, so there is no
+      # separate audit step any more.
       - name: Build and verify release JAR
-        run: mvn -B verify
-
-      - name: Dependency audit
-        run: bash scripts/dependency-audit.sh
+        run: make verify
 
       - name: Upload JAR to release
         run: |
@@ -65,7 +79,7 @@ jobs:
       # Requires REPO_USER / REPO_PWD in the MVN environment, and a <server> whose <id>
       # matches distributionManagement's repository id (cytoscape_releases).
       - name: Deploy to Cytoscape nexus
-        run: mvn -B deploy -DskipTests
+        run: make deploy
         env:
           REPO_USER: ${{ secrets.REPO_USER }}
           REPO_PWD: ${{ secrets.REPO_PWD }}

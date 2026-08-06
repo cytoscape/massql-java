@@ -77,6 +77,22 @@ compare field by field.
 Also compare **row count** and **row order** (ascending scan id) before comparing fields, so a mismatch reports
 "expected 664 rows, got 663" rather than a field-level diff on misaligned rows.
 
+> ⚠ **Correction C37 — this layer is where a wrong m/z-window choice shows up, far from its cause.**
+> [Step 5](Tech_Step5.md) §4 provides **two** window methods: `mzWindowExclusive` (strict, what
+> [Step 9](Tech_Step9.md)'s conditions use) and `mzWindow` (inclusive, what [Step 10](Tech_Step10.md) §3.4's
+> precursor lookup uses). They are not interchangeable, and picking the wrong one produces exactly the failure
+> shape this table is built to detect:
+>
+> | Wrong choice | Symptom here |
+> |---|---|
+> | Step 9 using the **inclusive** window | **Row count** off — a scan qualifies that the golden excludes |
+> | Step 10 using the **exclusive** window | `ms1_i`/`ms1_precmz` **null where the golden has a value** — caught by the *"exact null-vs-value"* row, not by any tolerance |
+>
+> Both are silent at the unit level unless a peak lands exactly on a bound, which is why
+> [Step 5](Tech_Step5.md)'s `MzWindowTest` and [Step 10](Tech_Step10.md)'s `PrecursorLookupTest` each assert the
+> on-bound case directly. **If a differential failure has this shape, check the window method before suspecting
+> the decoder or the tolerance arithmetic.**
+
 > ⛔ **Correction C34 — `tic` was grouped with the bit-identical intensities and CANNOT be.** This row used
 > to read *"`tic`, `base_peak_i`, `ms1_i`, `ms1_base_peak_i` | Bit-identical"*, with a caveat suggesting that
 > a `tic`-only failure "in the last bits" would be an **accumulation-order** artifact. The instinct was
@@ -117,6 +133,8 @@ Fixtures and expected counts:
 | `data/small.mzML` | `test_ms1.massql` | `output/small_mzml_ms1_results.json` | **14 rows**, MS1DATA shape — see below |
 | `fixtures/micro/micro.{mgf,mzML,mzXML}` | `test_micro.massql` | `output/micro_*_results.json` | **2 rows** each |
 | `fixtures/micro/micro_rtseconds.mzML` | `test_micro.massql` | `output/micro_mzml_rtseconds_results.json` | **2 rows** — the mzML `unitName="second"` side of the RT conditional |
+| `fixtures/micro/micro.mzML` | **`test_micro_edge.massql`** *(added Step 9)* | `output/micro_mzml_edge_results.json` | **0 rows.** ⚠ **An empty golden is a real assertion here, not a missing one** — do not treat `[]` as "nothing to check" or skip the pair. `MS2PROD=201.5:TOLERANCEMZ=0.5` puts the window bound exactly on scan 3's `201.0` peak, and MassQL excludes it; this file *is* the executed evidence for the strict half of Correction C37 (§1). A build that used inclusive bounds for conditions returns 1 row and fails here — the only golden that catches it |
+| `fixtures/micro/micro_ms1var.mzML` | **`test_micro_ms1var.massql`** *(added Step 9)* | `output/micro_ms1var_results.json` | **1 row**, scan `2`. Two conditions ANDed across different MS levels (`MS1MZ=400.0 AND MS2PROD=200.0`) against the only fixture whose two MS1 scans differ, so it is the only golden that can catch an `MS1MZ` condition resolved against the wrong linked MS1 scan. Every value is hand-computable: `tic` 2000.0, `base_peak_i` 1500.0, `base_peak_mz` 200.0, `ms1_base_peak_i` 2000.0, and `ms1_i`/`ms1_precmz` **null** — a [Step 10](Tech_Step10.md) §3.2 tolerance miss on a file small enough to check by hand |
 
 ⚠ **The MS1DATA shape is 9 keys, not 4** (Correction C15). `precmz`/`ms1scan`/`charge` are absent as
 documented, but the reference wrapper adds the five computed columns unconditionally and they come back
@@ -230,7 +248,8 @@ Compare against the pandas path (re-run `massql_query.py` under `/usr/bin/time -
 isn't at least as fast as pandas on the MGF, something is quadratic (probably a linear scan where a binary search
 belongs)."* The MGF is the fixture that matters — 34,513 spectra.
 
-If Java is slower, treat it as a finding and look at `mzWindow` first ([Step 5](Tech_Step5.md) §4). Put the numbers
+If Java is slower, treat it as a finding and look at the two window methods first ([Step 5](Tech_Step5.md) §4) —
+`mzWindowExclusive` is the hotter of the pair, being called per condition per scan. Put the numbers
 in `DIFFERENTIAL_REPORT.md`; they answer `SPIKE.md` §11 Q8.
 
 ### 6. The differential report
@@ -260,6 +279,9 @@ Answer these `SPIKE.md` §11 questions here, one sentence each: **Q2** (same row
   the failure mode this replaced. CI asserts the skipped-test count is **0**.
 - **Exit 1 for a no-match query.** It is exit 0 with `[]`.
 - **Comparing `rt` with a tolerance.** It is bit-identical, which is why `scanRt` is a double.
+- **Blaming the decoder for a null `ms1_i` where the golden has a value.** Check the m/z-window method first:
+  [Step 10](Tech_Step10.md)'s lookup must use the **inclusive** `mzWindow`, not Step 9's exclusive variant
+  (Correction C37, §1).
 
 ## Tests required
 
@@ -275,7 +297,7 @@ Answer these `SPIKE.md` §11 questions here, one sentence each: **Q2** (same row
 
 ## Done when
 
-- [ ] `mvn verify` green.
+- [ ] `make verify` green.
 - [ ] The differential table reads **6/6 on `small.mzML`, 664/664 on `PlusRise.mgf`, and the full mzXML golden —
       per column**.
 - [ ] The MS1DATA differential passes with precursor keys **absent**.

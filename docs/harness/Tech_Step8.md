@@ -13,7 +13,7 @@ loader — before any query logic is written.
 
 | Step | Why |
 |---|---|
-| [Step 2](Tech_Step2.md) | Provides the loader-parity dumps — per-scan peak counts, intensity sums, SHA-256 digests and first-8 values from MassQL's own loaded tables, floats as hex. This step's entire input. ⚠ They are **`.json.gz`** and live at **`src/test/resources/goldens/loader-parity/`**, committed in-repo (C26) — *not* `oracle/loader-parity/*.json` as this row used to say. C32 extended them to 14 fixtures. |
+| [Step 2](Tech_Step2.md) | Provides the loader-parity dumps — per-scan peak counts, intensity sums, SHA-256 digests and first-8 values from MassQL's own loaded tables, floats as hex. This step's entire input. ⚠ They are **`.json.gz`** and live at **`src/test/resources/goldens/loader-parity/`**, committed in-repo (C26) — *not* `oracle/loader-parity/*.json` as this row used to say. C32 extended them from 8 fixtures to 14, and C36/C37 later added `micro_zeroint.mgf` and `micro_ms1var.mzML` for **16** — see §2, which holds the authoritative list. |
 | [Step 6](Tech_Step6.md) | MGF and mzML readers. |
 | [Step 7](Tech_Step7.md) | mzXML reader. |
 
@@ -120,8 +120,23 @@ dump for — use them in the failure message rather than only for manual diagnos
 
 ### 2. What to assert, per fixture
 
-Parameterize over every fixture with a dump: `small.mzML`, `small.mzXML`, `PlusRise.mgf`,
-`DP00570_F02.mzxml`, `DP00570_F02.mgf`, and the three original micro-fixtures.
+Parameterize over every fixture with a dump — **16 of them**, listed in `ReaderParityIT.FIXTURES_WITH_DUMPS`,
+which is the single source of truth for both the sweep and its per-fixture reader-only counts:
+
+| Group | Fixtures |
+|---|---|
+| Real files | `small.mzML`, `small.mzXML`, `PlusRise.mgf`, `DP00570_F02.mzxml`, `DP00570_F02.mgf` |
+| Original micro | `micro.mzML`, `micro.mzXML`, `micro.mgf` |
+| RT unit | `micro_rtseconds.mzML` |
+| Decode variants (C32) | `micro_p64.mzXML`, `micro_zlib.mzXML`, `micro_p64_zlib.mzXML`, `micro_nested.mzXML` |
+| First precursor (C31) | `micro_multiprec.mzXML` |
+| **Zero-intensity peaks (C36)** | **`micro_zeroint.mgf`** — added in Step 9 |
+| **Differing MS1 scans (C37)** | **`micro_ms1var.mzML`** — added in Step 9 |
+
+This started as *"the three original micro-fixtures"* and grew by seven as later corrections found decode and
+metadata branches with no bit-identity check. `make spec-audit` now asserts that the count stated here, the
+count in `FIXTURES.md`, the number of files in `goldens/loader-parity/` and `FIXTURES_WITH_DUMPS.size()` all
+agree — they had drifted to three different numbers before that check existed.
 
 > ⚠ **Correction C28 — the dumps are authoritative per SCAN, never for ORDER.**
 > `dump_loader_parity.py` builds its `scans` list from `ms1_df` then `ms2_df`, so a dump holds **all MS1
@@ -156,6 +171,23 @@ Parameterize over every fixture with a dump: `small.mzML`, `small.mzXML`, `PlusR
 > only. `micro_multiprec.mzXML` gives C31's first-precursor rule a golden. `micro_multiprec.mzML` is
 > deliberately excluded: a second `<precursor>` adds nothing for *peak* parity over the mzXML one, and C31
 > is already pinned by `MultiPrecursorTest`.
+
+> ✅ **Corrections C36 and C37 added two more, by the same route.** Both were found in Step 9 and both are
+> the same failure shape as C32 — a rule the code got right with no fixture able to prove it:
+>
+> ```bash
+> oracle/.venv/bin/python oracle/dump_loader_parity.py oracle/loader-parity \
+>   fixtures/micro/micro_zeroint.mgf fixtures/micro/micro_ms1var.mzML
+> ```
+>
+> `micro_zeroint.mgf` (**C36**) pins the rule that **MGF drops zero-intensity peaks while mzML/mzXML keep
+> them** — a divergence no fixture contained, so a reader that "tidied up" either side would have passed
+> everywhere. Its all-zero block reduces to a zero-peak scan and vanishes from MassQL's dataframe, giving
+> exactly **1** reader-only scan.
+>
+> `micro_ms1var.mzML` (**C37**) is the only fixture whose two MS1 scans carry **different** peaks, so it is
+> the only one that can distinguish an `MS1MZ` condition evaluated against the correct linked MS1 scan from
+> one evaluated against the wrong scan. Every scan has peaks, so it has **0** reader-only scans.
 
 > ⛔ **Two fixtures MUST be excluded from this sweep — MassQL cannot load them at all**
 > (Correction C27c). `micro_nopolarity.mzXML` raises `KeyError: 'polarity'` and
@@ -202,8 +234,17 @@ Parameterize over every fixture with a dump: `small.mzML`, `small.mzXML`, `PlusR
 > assert the NUMBER of such reader-only scans equals a per-fixture expected value
 >     PlusRise.mgf                                  = 12,571
 >     small.mzML / small.mzXML / DP00570_F02.*      = 0
->     micro* (the zero-peak MS1 at scan 4)          = 1
+>     micro mzML/mzXML variants (zero-peak MS1 #4)  = 1
+>     micro.mgf         (MS2-only: that MS1 never   = 0
+>                        existed on our side)
+>     micro_zeroint.mgf (all-zero block -> 0 peaks) = 1     <- C36
+>     micro_ms1var.mzML (every scan has peaks)      = 0     <- C37
 > ```
+>
+> The last three are why this cannot be written as a blanket `micro* = 1`: `micro.mgf` is MS2-only, so the
+> zero-peak MS1 the mzML/mzXML variants contribute never existed on our side, and the two Step 9 fixtures
+> land on opposite values for unrelated reasons. The authoritative per-fixture numbers live in
+> `ReaderParityIT.FIXTURES_WITH_DUMPS` as the map's values.
 >
 > **Assert that count, do not merely tolerate reader-only scans** — otherwise a reader that dropped real
 > spectra passes this gate silently, which is the exact failure mode the gate exists to catch.
@@ -341,12 +382,23 @@ nothing. Test the test — and prove it has teeth by breaking the input on purpo
 > residual value (every expected dump present and consumed) folds into `ReaderParityIT`, where the count
 > it guards actually lives.
 
+### Renamed and folded test classes
+
+Redirects for names this spec required, kept rather than deleted so the original requirement stays reviewable.
+Read by `make spec-audit` check 4 (Correction **C38**), which fails the build when a completed step names a
+test class that neither exists nor redirects — the phantom-name problem that let three Step 9 conditions go
+untested while the table implied otherwise.
+
+| Spec-era name | → Real home | Note |
+|---|---|---|
+| `ParityCoverageTest` | → `ReaderParityIT` | dropped as a separate class under **C32** (see the note above); the dump-count half of its purpose is additionally enforced outside the test suite by `make spec-audit` check 2, which compares the files on disk against `FIXTURES_WITH_DUMPS` and against every count stated in the docs |
+
 ## Done when
 
 - [x] `mvn verify` green — **369 unit + 23 IT, 0 skipped**.
 - [x] For **all three formats**: scan counts, scan ids (as a set keyed by `(mslevel, scan)`), per-scan peak
       counts, polarity and `rt` all match the dumps exactly.
-- [x] `mz` and `i` are **bit-identical** via `i_sha256` / `mz_sha256` on all **14** fixtures with a dump — no
+- [x] `mz` and `i` are **bit-identical** via `i_sha256` / `mz_sha256` on all **16** fixtures with a dump — no
       tolerance. The set now includes the four decode variants that previously had none.
 - [x] The reader-only scan count is **asserted** per fixture, not tolerated: PlusRise **12,571**, micro
       **1** each, `small.*` and `DP00570_F02.*` **0**.

@@ -132,6 +132,29 @@ public record NumberLiteral(double value) implements Expr { }
 public record BinaryExpr(Expr left, char op, Expr right) implements Expr { }   // + - * /
 ```
 
+> ⚠ **This sketch is superseded on two counts; the implemented shape is below.** `Comparator.NONE` never
+> existed (**C18**, next bullet), and the `Expr` type names here are wrong — **Correction C35(e)** found the
+> phantom `NumberLiteral` / `BinaryExpr` names propagated as far as [Step 9](Tech_Step9.md) §4, whose
+> constant-folder spec described folding *"`BinaryExpr` over `NumberLiteral`s"* and consequently **never
+> mentioned unary negation at all**, so a folder written to it would silently leave `MS2NL=-18` unfolded.
+> Nested records, not top-level ones:
+>
+> ```java
+> public enum Comparator { EQ, GT, LT }             // no NONE -- C18
+> public enum Op { ADD, SUB, MUL, DIV }             // an enum, not a char
+>
+> public sealed interface Expr {
+>     record Literal(double value)             implements Expr { }
+>     record Binary(Expr left, Op op, Expr right) implements Expr { }
+>     record Unary(Op op, Expr operand)        implements Expr { }   // ADD/SUB only, enforced in the ctor
+> }
+> ```
+>
+> `Unary` rejects `MUL`/`DIV` in its own constructor, which makes the invalid state unrepresentable rather
+> than merely unevaluatable — so [Step 9](Tech_Step9.md)'s folder guard for it is defensive and unreachable,
+> and `ConstantFoldingTest` asserts `IllegalArgumentException` from the AST rather than `MassqlException`
+> from the fold.
+
 Three requirements on the AST that later steps depend on:
 
 - ⚠ **`Comparator.NONE` was REMOVED — Correction C18.** This spec required it "distinct from `EQ`". Verified
@@ -142,7 +165,8 @@ Three requirements on the AST that later steps depend on:
   Step 9; that rule is untouched.
 - **`MS2MZ` is an alias for `MS2PROD`.** Resolve the alias in the AST builder — one `ConditionType` value, not
   two — and note it in `GRAMMAR_NOTES.md`.
-- **Arithmetic stays a tree.** Do not evaluate `NumberLiteral` arithmetic here; [Step 9](Tech_Step9.md) folds it.
+- **Arithmetic stays a tree.** Do not evaluate `Expr.Literal` arithmetic here; [Step 9](Tech_Step9.md) folds it —
+  including `Expr.Unary`, which is the part C35(e) found missing from that spec.
 
 **Canonical equality.** Give the AST value-based `equals`/`hashCode` (records do this) plus a `canonical()`
 string form used by the conformance test. Ordering matters: if the grammar treats `AND` conditions as an
@@ -255,8 +279,13 @@ from the five link fixes above. Mixing a move with edits makes the diff unreview
 - **Comparing goldens as JSON text.** The conformance test must compare **canonical ASTs**. MassQL's JSON AST
   serialization includes ordering and defaulting details that are explicitly out of scope, so a text diff would
   fail on differences that don't matter and pass on some that do.
-- **Normalizing `Comparator.NONE` to `EQ` or `GT` at parse time.** Feels tidy; erases a distinction
-  [Step 9](Tech_Step9.md) needs. Keep the source's shape and interpret it downstream.
+- ⚠ ~~**Normalizing `Comparator.NONE` to `EQ` or `GT` at parse time.**~~ **Retired by C18** — this warned
+  against normalizing a state that cannot exist. Every in-scope qualifier carries `=`, `>` or `<`, so
+  `Comparator` is `{EQ, GT, LT}` and there is nothing to normalize. The *real* rule this trap was groping
+  toward survives and is stronger: **keep the source's shape and interpret it downstream** — `=` means `>=`
+  for intensity qualifiers, and that reinterpretation belongs in [Step 9](Tech_Step9.md), not here.
+- **Interpreting `=` as equality in the parser.** The above, stated positively. `EQ` records what the source
+  said; [Step 9](Tech_Step9.md) §3 turns it into `>=` for intensity columns.
 - **Left-recursion alternative order.** ANTLR derives operator precedence from the order of alternatives.
   Reordering them while "cleaning up" the grammar silently changes arithmetic precedence.
 
@@ -269,7 +298,7 @@ All unit (`*Test.java`), all offline.
 | `ParseConformanceTest` | ⚠ **Corrected by C17.** `@ParameterizedTest` over all 46 files. The split is **15 parse / 31 reject**, not "every `scaninfo` golden parses" — 20 of the 35 `scaninfo` goldens contain out-of-scope constructs. Expected dispositions live in the checked-in `corpus-manifest.tsv`. For the reject set, assert the reported construct is **one of** the unsupported constructs the query contains (asserting a specific one would pin traversal order, which has no user-visible meaning). Assert the corpus count is 46 so a missing corpus fails loudly instead of vacuously passing. |
 | `ParseRejectionTest` | One case per §4 item. Assert the exception **type**, that `construct()` equals the expected token, and that the message names it. Explicitly include `QUERY scaninfo WHERE MS2PROD=100` and assert the message mentions the function-call form. |
 | `KeywordCaseMatrixTest` | Every accepted form in the §2 table parses; `filter`, `or`, and lowercase condition/qualifier names reject. Table-driven, one row per cell. |
-| `AstShapeTest` | `MS2MZ` and `MS2PROD` produce the same `ConditionType`; `Comparator.NONE` survives when the source omits a comparator; arithmetic remains an unfolded `BinaryExpr`; `OR` value lists collapse to `ValueList`. |
+| `AstShapeTest` | `MS2MZ` and `MS2PROD` produce the same `ConditionType`; arithmetic remains an unfolded **`Expr.Binary`**; `OR` value lists collapse to `ValueList`. ⚠ **This row used to require *"`Comparator.NONE` survives when the source omits a comparator"* — retired by C18**, which found no in-scope qualifier omits its comparator, so the requirement contradicted both the enum and the passing test. Assert instead that **`Comparator` has exactly three constants** (`EQ`, `GT`, `LT`): that is a real check, and it fails if someone reintroduces `NONE`. |
 | `ParseEntryPointTest` | Leading/trailing whitespace and trailing newline tolerated; empty and blank input rejected with a clear message. |
 
 An empty or unreadable `reference_parses/` directory must **fail** `ParseConformanceTest`, not skip it.

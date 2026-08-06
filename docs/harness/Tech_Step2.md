@@ -47,6 +47,9 @@ Governing sections: `SPIKE.md` §6c, §7 Step 0.
 | `data/.gitignore` | Excludes the Ewing files (unstated provenance — referenced by URL, not committed) |
 | `fixtures/micro/micro.{mgf,mzML,mzXML}` + `micro_rtseconds.mzML` | 5 scans, <7 KB each. **Generated** by `oracle/make_micro_fixtures.py` from one explicit data table rather than hand-typed three times — the three encodings must contain identical peak data for the cross-format tests to mean anything. The table is the hand-written part. |
 | **Six more mzXML variants** (added in Step 7) | `micro_p64`, `micro_zlib`, `micro_p64_zlib`, `micro_nested`, `micro_nopolarity`, `micro_noprecursor`. Same generator, **one variable changed each**. Added because Corrections C27/C29 found that the primary fixtures are *all* `precision="32"` / uncompressed / `network`, leaving the 64-bit and zlib decode branches untested, and that the writer emitted no `precursorCharge` at all — so the charge path passed for the wrong reason. The last two are **not parity fixtures**: MassQL raises `KeyError` on both, so they pin our contract only |
+| **Two multi-precursor variants** (added in Step 8) | `micro_multiprec.mzXML` — two `<precursorMz>` elements, the second a decoy — and `micro_multiprec.mzML`, which adds a second `<selectedIon>` **and** a second `<precursor>`, so honouring one nesting level but not the other still fails. Added by Correction **C31**: MassQL indexes `[0]`, and no existing fixture had more than one precursor, so a last-wins reader passed everywhere |
+| **`fixtures/micro/micro_zeroint.mgf`** (added in Step 9) | **Zero-intensity peaks.** Correction **C36**: MGF *drops* them while mzML/mzXML keep them, and no fixture contained one, so the divergence was invisible. One block is entirely zeros and therefore reduces to a zero-peak scan — MassQL emits no rows for it at all, making this the fixture's second job: it is the MGF case where a scan vanishes from the dataframe but not from our reader (exactly one reader-only scan) |
+| **`fixtures/micro/micro_ms1var.mzML`** (added in Step 9) | **Two MS1 scans with *different* peaks.** Correction **C37**: every other fixture's MS1 scans are identical, so nothing could distinguish an `MS1MZ` condition evaluated against the correct linked MS1 scan from one evaluated against the wrong scan, nor discriminate condition **evaluation order**. Condition-order independence was proven from the reference source *and* here; a rule with no fixture able to falsify it is the recurring failure shape this whole harness exists to catch. Every scan has peaks, so nothing is reader-only |
 | `fixtures/micro/EXPECTED.md` | Hand-computed expected values per micro-fixture, with the arithmetic shown |
 | `fixtures/edge/empty_msLevel_tag.mzXML` | From MSDK's `msdk-io-mzxml` test resources |
 | `output/*_results.json` | One golden per (fixture, query) pair — see the matrix below |
@@ -173,10 +176,13 @@ missing/empty `msLevel` tag, which [Step 7](Tech_Step7.md) must handle without c
 
 Every golden comes from the Step 1 oracle, via `massql_query.py`, captured from **stdout** only.
 
-**Every golden must record the non-default flags it was generated with.** [Step 1](Tech_Step1.md) §3a found the
-original `small_mzml_results.json` had been produced at an unrecorded ~60 ppm tolerance, which cost a gate
-failure to diagnose. Encode the flags per golden in `oracle/generate-all.sh` and in
-`oracle/reproduce-goldens.sh`.
+**Every golden must record the non-default flags it was generated with** — Correction **C10**.
+[Step 1](Tech_Step1.md) §3a found the original `small_mzml_results.json` had been produced at an unrecorded
+~60 ppm tolerance, which cost a gate failure to diagnose. It was regenerated at the documented 20 ppm default
+and the original bytes preserved as `small_mzml_tol60_results.json`, so there are now **two** mzML goldens —
+and the 20 ppm one is what supplies golden coverage of the *"a tolerance miss nulls `ms1_i`/`ms1_precmz` but
+not `ms1_base_peak_i`"* rule ([Step 10](Tech_Step10.md) §3.2), which previously had none. Encode the flags per
+golden in `oracle/generate-all.sh` and in `oracle/reproduce-goldens.sh`.
 
 | Fixture | Query | Flags | Golden | Expected |
 |---|---|---|---|---|
@@ -188,6 +194,11 @@ failure to diagnose. Encode the flags per golden in `oracle/generate-all.sh` and
 | `data/DP00570_F02.mgf` | `test.massql` | `output/dp00570_mgf_results.json` | new; `ms1scan` + all `ms1_*` **null** |
 | `data/small.mzML` | `test_ms1.massql` *(new)* | `output/small_mzml_ms1_results.json` | new; the **4-key** MS1DATA shape |
 | each `fixtures/micro/*` | `test.massql` and `test_ms1.massql` | `output/micro_*_results.json` | new |
+| `fixtures/micro/micro.mzML` | **`test_micro_edge.massql`** *(added Step 9)* | *(defaults)* | `output/micro_mzml_edge_results.json` | **0 records — and an empty golden is a real assertion, not a missing one.** `MS2PROD=201.5:TOLERANCEMZ=0.5` puts the window bound exactly on scan 3's `201.0` peak; MassQL returns nothing, which is the executed proof of the **strict** half of Correction **C37**. A reader that used inclusive bounds for conditions would return a row here |
+| `fixtures/micro/micro_ms1var.mzML` | **`test_micro_ms1var.massql`** *(added Step 9)* | *(defaults)* | `output/micro_ms1var_results.json` | **1 record**, scan `2`. Two conditions ANDed across *different* levels (`MS1MZ=400.0` and `MS2PROD=200.0`), which only this fixture can discriminate. Note `ms1_i`/`ms1_precmz` are **null** while `ms1_base_peak_i` is `2000.0` — the [Step 10](Tech_Step10.md) §3.2 rule again, on a hand-computable file |
+
+Both Step 9 queries live in `goldens/queries/` alongside the others, per §5's rule that a golden records the
+query and flags it was produced with.
 
 Create `test_ms1.massql` containing a `scaninfo(MS1DATA)` query — e.g.
 `QUERY scaninfo(MS1DATA) WHERE MS1MZ=810.79:TOLERANCEMZ=1.0` — so the 4-key shape has a golden. Confirm from
@@ -260,10 +271,12 @@ Scripts, verified by running them:
 - [x] Four micro-fixtures exist (three formats + an mzML `unitName="second"` variant), each <10 KB, each exercising every row of the design table, with
       `EXPECTED.md` showing the arithmetic and agreeing with the oracle.
 - [x] `fixtures/edge/empty_msLevel_tag.mzXML` present (118,392 B).
-- [x] All 13 goldens exist; the two pre-existing ones still reproduce bit-identically; the MS1DATA
-      golden confirmed to have precursor keys **absent, not null**.
+- [x] All goldens exist; the two pre-existing ones still reproduce bit-identically; the MS1DATA
+      golden confirmed to have precursor keys **absent, not null**. **This read "All 13 goldens" and the count
+      is now 15** — Step 9 added `micro_mzml_edge_results.json` and `micro_ms1var_results.json`. Counts that
+      later steps grow are exactly what `make spec-audit` checks, rather than a number maintained by hand.
 - [x] `oracle/loader-parity/` has one gzipped file per fixture (4.7 MB total; digests, not full hex arrays), floats as hex, with per-scan peak counts and intensity
-      sums.
+      sums. **16 dumps** as of C37; see [Step 8](Tech_Step8.md) §2 for the authoritative list.
 - [x] The `small.mzML` vs `small.mzXML` golden comparison is recorded, whatever the result.
 
 ## References

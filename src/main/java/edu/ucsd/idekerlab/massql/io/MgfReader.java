@@ -112,13 +112,34 @@ final class MgfReader implements SpectraStream {
                 throw new MassqlException("malformed peak line in " + path + " block " + blockIndex
                         + " (expected 'mz intensity'): " + t);
             }
+            double peakMz;
+            double peakIntensity;
             try {
-                mz[n] = Double.parseDouble(t.substring(0, sp));
-                in[n] = Double.parseDouble(t.substring(sp + 1).trim().split("\\s+")[0]);
+                peakMz = Double.parseDouble(t.substring(0, sp));
+                peakIntensity = Double.parseDouble(t.substring(sp + 1).trim().split("\\s+")[0]);
             } catch (NumberFormatException e) {
                 throw new MassqlException("unparseable peak in " + path + " block " + blockIndex
                         + ": " + t, e);
             }
+
+            // Correction C36: MGF drops ZERO-INTENSITY peaks. `_load_data_mgf_pyteomics` opens its peak
+            // loop with `if intensity == 0: continue` (msql_fileloading.py), so such a peak never becomes
+            // a row and MassQL cannot match it, count it, or sum it.
+            //
+            // ⚠ MGF ONLY. The mzML and mzXML loaders have no such guard -- small.mzML's parity dump
+            // carries eight leading `0x0.0p+0` intensities, retained on both sides. Applying this to the
+            // other readers would break the Step 8 gate on every mzML fixture.
+            //
+            // This was latent: no MGF fixture contained a zero-intensity peak, so the Step 8 gate passed
+            // while unable to detect the divergence. micro_zeroint.mgf exists to close that.
+            //
+            // iNorm/iTicNorm are unaffected: MassQL computes i_max/i_sum from the FULL array *before* the
+            // skip, and a zero changes neither a max nor a sum -- so our builder's denominators, computed
+            // over the retained peaks, are identical.
+            if (peakIntensity == 0.0) continue;
+
+            mz[n] = peakMz;
+            in[n] = peakIntensity;
             n++;
         }
 

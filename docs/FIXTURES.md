@@ -16,7 +16,7 @@ see it. CI was green for four steps while proving only that the code compiled.
 | `data/` | The four real spectra files, one per format plus the MGF/mzXML pair |
 | `fixtures/micro/` | Hand-written 5-scan files with hand-computable values, one variable each — see below |
 | `fixtures/edge/` | Pathological inputs — currently MSDK's `empty_msLevel_tag.mzXML` |
-| `goldens/loader-parity/` | **14 dumps.** Per scan: counts, hex intensity sum, SHA-256 of the m/z **and** intensity arrays, the leading 8 values of each as hex, `rt_hex` and `polarity` — all from MassQL's own loaded tables. The input to the Step 8 parity gate |
+| `goldens/loader-parity/` | **16 dumps.** Per scan: counts, hex intensity sum, SHA-256 of the m/z **and** intensity arrays, the leading 8 values of each as hex, `rt_hex` and `polarity` — all from MassQL's own loaded tables. The input to the Step 8 parity gate. The count is asserted by `make spec-audit` against `ReaderParityIT.FIXTURES_WITH_DUMPS` and the file count, because it was wrong in three places at once before that check existed |
 | `goldens/query-results/` | `scaninfo` output from the reference implementation, per fixture/query |
 | `goldens/queries/` | The `.massql` query files those goldens were produced from |
 | `reference_parses/` | MassQL's own 46-file parse corpus (+ manifest) — `ParseConformanceTest` |
@@ -29,6 +29,7 @@ every expected value follows from arithmetic you can check by hand (`fixtures/mi
 | File | The one thing it varies |
 |---|---|
 | `micro.mgf` | MGF baseline: MS2 only, no `SCANS=` → scan ids are block indices 1–3, not 1/3/5 |
+| `micro_zeroint.mgf` | **zero-intensity peaks** — dropped by MGF, kept by mzML/mzXML (C36). One block is all-zero, so it reduces to a zero-peak scan |
 | `micro.mzML` | mzML baseline, `unitName="minute"` → RT **not** converted |
 | `micro_rtseconds.mzML` | `unitName="second"` → RT **÷60**. The pair catches a silent 60× error |
 | `micro.mzXML` | mzXML baseline: `precision="32"`, uncompressed, `network`, flat |
@@ -40,11 +41,12 @@ every expected value follows from arithmetic you can check by hand (`fixtures/mi
 | `micro_noprecursor.mzXML` | MS2 with **no** `<precursorMz>` — non-parity, see below |
 | `micro_multiprec.mzXML` | **Two** `<precursorMz>` elements; the second is a decoy. MassQL indexes `[0]`, so first wins (C31) |
 | `micro_multiprec.mzML` | Same idea, plus a second `<selectedIon>` **and** a second `<precursor>` — so honouring one nesting level but not the other still fails |
+| `micro_ms1var.mzML` | **Two MS1 scans with different peaks.** The baseline's two MS1 scans are identical, so no existing fixture could tell an `MS1MZ` condition evaluated against the *right* linked MS1 scan from one evaluated against the wrong one — nor discriminate condition **order** (C37). Every scan here has peaks, so nothing is reader-only |
 
 ## Parity coverage — which fixtures have a dump, and which cannot
 
-All 14 fixtures with a dump are compared **bit-identically** against MassQL by the Step 8 gate
-(`docs/PARITY_REPORT.md`). Three fixtures deliberately have none:
+All **16** fixtures with a dump are compared **bit-identically** against MassQL by the Step 8 gate
+(`docs/PARITY_REPORT.md`). **Four** fixtures deliberately have none:
 
 | Fixture | Why no dump |
 |---|---|
@@ -89,7 +91,7 @@ closed.
 ewinglab.org, which publishes no redistribution terms, so this project does not republish them.
 
 ```bash
-bash scripts/fetch-fixtures.sh     # downloads both into src/test/resources/data/
+make fixtures     # downloads both into src/test/resources/data/
 ```
 
 CI runs that script and caches the result, so the flaky upstream is contacted once rather than per run.

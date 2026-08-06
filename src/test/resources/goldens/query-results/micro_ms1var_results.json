@@ -1,0 +1,16 @@
+[
+  {
+    "scan": 2,
+    "precmz": 450.0,
+    "ms1scan": 1,
+    "rt": 0.1,
+    "charge": null,
+    "tic": 2000.0,
+    "mslevel": 2,
+    "base_peak_i": 1500.0,
+    "base_peak_mz": 200.0,
+    "ms1_i": null,
+    "ms1_precmz": null,
+    "ms1_base_peak_i": 2000.0
+  }
+]

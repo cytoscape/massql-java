@@ -1,11 +1,14 @@
 # Runs the full test suite on every push to master and every PR.
 #
-# Modelled on ../cy-ndex-2/.github/workflows/ci.yml, with three deliberate differences:
+# Modelled on ../cy-ndex-2/.github/workflows/ci.yml, with four deliberate differences:
 #
-#   1. `mvn verify`, NOT `mvn test`. cy-ndex-2 runs `mvn test`, which invokes surefire
-#      only. All three of this spike's gates live in *IT.java files run by failsafe
-#      (reader parity, the differential, the CLI contract), so `mvn test` would report
-#      green while skipping every gate.
+#   0. Every step calls `make`, never `mvn`. The Makefile is the only entry point, so what CI
+#      runs and what a developer runs cannot drift — and a guard like the zero-skip assertion
+#      lives in a target that is runnable locally rather than only here.
+#   1. `make verify` wraps `mvn verify`, NOT `mvn test`. cy-ndex-2 runs `mvn test`, which
+#      invokes surefire only. All three of this spike's gates live in *IT.java files run by
+#      failsafe (reader parity, the differential, the CLI contract), so a test-only run would
+#      report green while skipping every gate.
 #   2. JDK 17, not 11 — DEPENDENCY_POLICY.md constraint 7 (matches Cytoscape 3.10.4).
 #   3. No `xvfb-run`. cy-ndex-2 needs a virtual display because Cytoscape touches AWT;
 #      nothing in massql-java does (SPIKE.md §6d: "No display needed").
@@ -49,51 +52,23 @@ jobs:
       # skipping when the fixture is absent. Letting this step pass on error would only move the
       # failure later and make it look like a reader bug.
       - name: Fetch uncommitted fixtures
-        run: bash scripts/fetch-fixtures.sh
+        run: make fixtures
 
-      # Unit + integration tests, JaCoCo, and the enforcer dependency bans (which run at
-      # the validate phase, so a banned dependency fails the build rather than the bundle).
+      # Unit + integration tests, JaCoCo, the enforcer dependency bans (which run at the
+      # validate phase, so a banned dependency fails the build rather than the bundle), then
+      # `skipcheck` and `audit`.
+      #
+      # `make verify` rather than `mvn -B verify`: the Makefile is the ONLY entry point, so what
+      # CI runs and what a developer runs cannot drift. The zero-skip assertion used to be
+      # duplicated inline here -- it now lives in `make skipcheck`, which means it is also
+      # runnable locally, which is the only way a guard like that actually gets used.
+      #
+      # What skipcheck guards (Correction C26): fixtures once lived outside the repo and
+      # Fixtures.require() used assumeTrue, so every parity assertion SKIPPED while the counter --
+      # which includes skips in "Tests run" -- stayed healthy. CI was green for four steps while
+      # proving only that the code compiled. It now asserts a floor AND zero skips.
       - name: Verify
-        run: mvn -B verify
-
-      # DEPENDENCY_POLICY.md as an executable check: exits non-zero if the shipping
-      # closure exceeds ~1.5 MB or if any artifact carries META-INF/services,
-      # META-INF/versions or a native library.
-      - name: Dependency audit
-        run: bash scripts/dependency-audit.sh
-
-      # Guards against a vacuous green run, from both directions (Correction C26).
-      #
-      # The original version only checked that SOMETHING ran, and that was not enough: fixtures
-      # lived outside the repo and Fixtures.require() used assumeTrue, so every parity assertion
-      # SKIPPED while the counter -- which includes skips in "Tests run" -- stayed healthy. CI was
-      # green for four steps while proving only that the code compiled.
-      #
-      # So assert both: a floor on the number executed, AND that nothing was skipped.
-      - name: Assert tests actually ran, and none were skipped
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          total=0 skipped=0
-          for f in target/surefire-reports/*.txt target/failsafe-reports/*.txt; do
-            line=$(grep -ohE 'Tests run: [0-9]+, Failures: [0-9]+, Errors: [0-9]+, Skipped: [0-9]+' "$f" | head -1 || true)
-            [ -z "$line" ] && continue
-            n=$(sed -E 's/Tests run: ([0-9]+).*/\1/' <<<"$line")
-            s=$(sed -E 's/.*Skipped: ([0-9]+).*/\1/' <<<"$line")
-            total=$((total + n)); skipped=$((skipped + s))
-          done
-          echo "tests executed: $total (skipped: $skipped)"
-          if [ "$total" -lt 275 ]; then
-            echo "FAIL: only $total tests ran; expected at least 275. Suites are not being" >&2
-            echo "      discovered, which is how a green run can prove nothing." >&2
-            exit 1
-          fi
-          if [ "$skipped" -ne 0 ]; then
-            echo "FAIL: $skipped test(s) skipped. Under C26 a missing fixture must FAIL, so a skip" >&2
-            echo "      means an assumeTrue/@Disabled was reintroduced. Find it and remove it." >&2
-            grep -l 'Skipped: [1-9]' target/surefire-reports/*.txt target/failsafe-reports/*.txt || true
-            exit 1
-          fi
+        run: make verify
 
       - name: Upload reports on failure
         if: failure()

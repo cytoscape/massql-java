@@ -37,7 +37,7 @@ owning step.
 | [6](Tech_Step6.md) | `SpectraStream` cursor + MGF reader + mzML reader | 3, 5, 1, 2 | 1.5 d | | ✅ **DONE 2026-08-03 — 275 tests** |
 | [7](Tech_Step7.md) | **Hand-written** mzXML reader (C23) | 3, 5, 6, 2 | 1 d | | ✅ **DONE 2026-08-03 — 335 tests** |
 | [8](Tech_Step8.md) | Reader parity — bit-identical vs Python | 2, 6, 7 | 0.5 d | ⛔ **GATE** | ✅ **GATE GREEN 2026-08-03 — 392 tests** |
-| [9](Tech_Step9.md) | Condition filters (9a required + 9b) | 4, 5, 8 | 2 d | | not started |
+| [9](Tech_Step9.md) | Condition filters (9a required + 9b) | 4, 5, 8 | 2 d | | ✅ **DONE 2026-08-05 — 453 tests** |
 | [10](Tech_Step10.md) | `scaninfo` collation, result model, JSON | 9, 5 | 1.5 d | | not started |
 | [11](Tech_Step11.md) | Public API surface + CLI | 10 | 0.5 d | | not started |
 | [12](Tech_Step12.md) | Integration layers 2–4 + error paths | 11, 2, 8 | 1.5 d | ⛔ **GATE** | not started |
@@ -107,6 +107,33 @@ These are decided. Specs implement them; they are not open for re-litigation ins
 ## Corrections to `SPIKE.md`
 
 Verified after `SPIKE.md` was written. **These override it.**
+
+> ### Adding a Correction — read this first
+>
+> **From C38 onward, a `Fallout:` line is mandatory and `make verify` fails without it.** Full rationale in
+> [*Where a discovery goes — the fallout protocol*](#where-a-discovery-goes--the-fallout-protocol), rule 2b;
+> the template:
+>
+> ```markdown
+> **C39 — one-line statement of what was wrong.**
+>
+> **Fallout:** Tech_Step5.md, Tech_Step10.md
+>
+> <the evidence, measured or executed rather than reasoned>
+> ```
+>
+> Use `**Fallout:** none -- <reason>` when nothing needs editing. Then **edit each declared spec and cite the
+> correction's label in it** — `make spec-audit` check 3 fails if a declared file never mentions it.
+>
+> Corrections **C1–C37 predate the rule** and keep the older convention, where the obligation is inferred from
+> `Tech_StepX.md` links in the body. Do not retrofit them: 12 link no step at all, and inventing affected-sets
+> for them would make the ledger look authoritative while being guesswork. The gap is written down instead.
+>
+> Two habits this ledger has earned the hard way, both worth more than the numbering:
+> **state the evidence, not the reasoning** — C34, C36 and C37 were all found by *running* the reference
+> implementation, and C33's cause was misattributed for a whole step by inference that sounded right; and
+> **a rule with no test able to falsify it is not yet a rule** — C36, C37 and C38 are all instances of code
+> that was correct with nothing able to prove it, which is the single most common shape of defect here.
 
 **C1 — `msdk-io-mzxml` is not usable as a dependency (§5 is wrong, by ~20 MB).**
 `SPIKE.md` §5 says taking mzXML transitively is "convenient" and instructs "exclude CDK + Guava and slf4j."
@@ -223,6 +250,262 @@ differential runs `--output <tmp>` and diffs the **file**; stream hygiene stays 
 **Not affected: the SDK.** The Cytoscape app calls `Massql.execute` and writes the JSON into the node
 table in-process. There is no stdout, no temp file and no process boundary anywhere in the app's data
 path — the layer the reader assumed was at issue was never involved.
+
+### Corrections found while auditing the real §3 authority
+
+**C37 — most of [Step 9](Tech_Step9.md) §3's rules live in `msql_engine_filters.py`, a file §3 never names,
+and two of them are wrong.** §3 cites `msql_engine.py` as *"the authority for every rule in §3"*. The
+tolerance computation, the intensity comparators and all four condition functions are in
+**`msql_engine_filters.py`**. That mis-citation is the plausible root cause of the errors below.
+
+**(a) The m/z window is STRICT, not inclusive.** §3 said *"both bounds inclusive… a peak exactly at an edge
+matches"*. All four condition functions use `>` and `<` — `:253` (MS2PROD), `:410` (MS2PREC), `:493`/`:519`
+(MS1MZ), `:607` (`ms1_filter`).
+
+**Proven by execution, not just by reading.** `micro.mzML` scan 3 has a peak at exactly `201.0`; the query
+`MS2PROD=201.5:TOLERANCEMZ=0.5` gives the window `[201.0, 202.0]`, putting that peak precisely on the lower
+bound. **MassQL returns 0 rows.**
+
+**(b) …but Step 10's precursor lookup is INCLUSIVE, so the two callers genuinely differ.**
+`massql_query.py:101-103` uses `>=` / `<=`. Also proven: at `--precursor-tol-ppm 7.8125` the
+`499.99609375` peak lands exactly on the bound and **`ms1_i` comes back populated** (`1000.0`).
+
+**Resolution: `mzWindow` stays inclusive for Step 10; Step 9 gets `mzWindowExclusive`.** Changing the single
+primitive would have silently broken `ms1_i`/`ms1_precmz`, the columns Step 12 checks at 1e-9 — a new
+divergence introduced while fixing an old one. `MzWindowTest`'s comment claimed *"an exclusive bound here
+would silently narrow every tolerance"*; the reasoning is backwards, and it is corrected in place.
+
+**(c) `INTENSITYTICPERCENT` also divides by 100.** §3 stated the ÷100 rule for `INTENSITYPERCENT` only. Both
+carry `scale = 100.0`.
+
+**(d) The 0.99 cap covers BOTH percent qualifiers.** Known-traps said *"it is `>` and `INTENSITYPERCENT`
+only"*. The guard is `if scale > 1.0`, which includes `INTENSITYTICPERCENT`. §3's other half — *"apply the cap
+only for `>`"* — **is** correct: it sits inside the `greaterthan` branch.
+
+**(e) The implicit `> 0` is per column, on all three.** An absent qualifier yields
+`i > 0 AND i_norm > 0 AND i_tic_norm > 0`, not one blanket check.
+
+**(f) `MS2NL` matches per peak on `(precmz − mz)`**, not against a precomputed target — algebraically the same
+window, so either implementation is faithful. Two notes: the source carries
+`#TODO: This is incorrect logic if it comes to PPM accuracy`, because with `TOLERANCEPPM` the tolerance is
+derived from the neutral-loss *value* rather than an m/z — bug-for-bug fidelity means reproducing that. And a
+`precmz == 0` scan is excluded **naturally** (`0 − mz` is negative, the window positive), so §3's rule needs
+no explicit guard.
+
+**Verified CORRECT, recorded so nobody re-derives them:** PPM beats Da and the default is `0.1`; `=` → `>=`
+(`:89`); the cap applies only to `>`; `RTMIN`/`RTMAX` strict vs `SCANMIN`/`SCANMAX` inclusive — the asymmetry
+is real; `POLARITY` → `==1`/`==2`; `CHARGE` → `==`; an OR value list without `CARDINALITY` is `pd.concat`,
+i.e. union.
+
+**Scan-level intersection is confirmed, and this is the strongest result of the audit.** Every condition
+reduces to a *scan set* and then re-admits **all rows of those scans** (`:283-288`, `:557-562`). So a later
+condition sees every peak of each surviving scan, which is exactly why two conditions may be satisfied by
+different peaks. §1's central claim holds.
+
+**(g) Condition order is provably irrelevant for the in-scope set — and no existing fixture could test it.**
+Because each condition re-admits all rows of surviving scans, no predicate ever sees a *reduced* peak list; so
+each condition is a pure intersection `S ← S ∩ P` with `P` fixed by the file, and intersection commutes. The
+constructs that *do* read filtered state — `OTHERSCAN`, `INTENSITYMATCH*`, `CARDINALITY`, `EXCLUDED` — are
+**all rejected at parse**, which is what makes the argument airtight rather than merely plausible.
+
+Empirical backing needed a new fixture: `small.mzML`'s MS1 scans are profile-mode on an **identical m/z grid**
+(19,800 peaks each, verified), so no `MS1MZ` value can distinguish them, and `micro.mzML` has one usable MS1
+scan. **Neither could discriminate.** `micro_ms1var.mzML` has two MS1 scans with *different* peaks; the mixed
+query returns `[2]` with the conditions in **either** order — not `[2,4]` (no MS1 filtering) or `[]`
+(over-filtering).
+
+**(h) Two errors in §Tests' description of the property tests.** It called them *"pure profit — these need
+no reference data"*. The properties are self-referential, but **the tests as written need two fixtures we do
+not have** — `featurelist_pos.mgf` and `GNPS00002_A3_p.mzML`, MassQL's own test data, verified absent — so they
+had to be reconstructed on our fixtures rather than ported.
+
+And the described properties are not all real:
+- **"tripartite partition (`<` ∪ `=` ∪ `>` covers everything exactly once)" is impossible.** `=` means `>=`,
+  which *contains* `>` by construction. The reference test asserts the actual relationship, `>` ⊆ `=`, which is
+  the more useful assertion anyway — it directly encodes the `=` → `>=` rule.
+- **Disjointness of `>` and `<` is not general.** Under scan-level semantics a scan may hold one peak above the
+  threshold and another below it, so it belongs in *both* sets — correctly. The reference test avoids this with
+  a narrow `TOLERANCEMZ=0.01` window; `IntensityAlgebraTest` constructs that precondition and **asserts it**,
+  so the disjointness test cannot pass or fail for unrelated reasons.
+
+Monotonicity is general and needs no precondition.
+
+**New fixtures and goldens:** `test_micro_edge.massql` pins the strict bound against Python with an **empty**
+golden — itself a meaningful assertion, and the reason the error survived is that no prior query isolated that
+peak. `micro_ms1var.mzML` + `test_micro_ms1var.massql` pin order-independence. Both added to the Step 8 gate,
+now **16 fixtures**.
+
+### Corrections found while executing Step 9
+
+**C36 — MGF drops ZERO-INTENSITY peaks; our reader kept them. mzML and mzXML keep them on both sides.**
+
+`_load_data_mgf_pyteomics` opens its peak loop with `if intensity == 0: continue`, so such a peak never
+becomes a row — MassQL cannot match it, count it or sum it. **The mzML and mzXML loaders have no such
+guard**, and that asymmetry is genuine: `small.mzML`'s parity dump records `i_hex_first8` as **eight
+`0x0.0p+0` entries**, retained on both sides and compared bit-for-bit by the Step 8 gate.
+
+**Why it was latent, and why that keeps happening.** Not one of the three MGF fixtures contained a single
+zero-intensity peak — measured — so the parity gate passed while structurally unable to see the
+divergence. That is now the fifth instance of the same shape (C27b, C28, C29, C31, C33): *a rule with no
+fixture that can discriminate*. `micro_zeroint.mgf` closes it, with three deliberately different blocks:
+
+| Block | Contents | MassQL | Ours |
+|---|---|---|---|
+| 1 | real peaks with a zero **between** two of them and one **trailing** | 3 rows | 3 peaks |
+| 2 | **every** peak zero-intensity | **no rows at all** — the scan vanishes from `ms2_df` | yielded with **0 peaks** |
+| 3 | control, one normal peak | 1 row | 1 peak |
+
+Block 2 is the interesting one: it reduces to a zero-peak scan, which is exactly what C35(c)'s executor
+guard then has to skip. The two corrections meet there.
+
+**`iNorm`/`iTicNorm` needed no change**, verified rather than assumed: MassQL computes `i_max`/`i_sum` from
+the **full** array *before* the skip, and a zero alters neither a max nor a sum — so our builder's
+denominators, computed over the retained peaks, are identical. No Step 5 change.
+
+**Proven to have teeth.** With the skip reverted, `ZeroIntensityPeakTest` fails 4 of 6 (`expected <4> but
+was <8>` on the peak total) **and** `ReaderParityIT` fails with `micro_zeroint.mgf MS2 scan 1: peak count
+expected: <3> but was: <5>`. Both directions catch it.
+
+**Do not generalise the skip to mzML/mzXML.** `ZeroIntensityPeakTest` asserts both formats *retain* their
+zeros, in the same class as the MGF assertions, so a future tidy-up that unifies the three readers fails
+loudly rather than breaking every mzML fixture in the gate.
+
+### Corrections found while auditing spec-vs-code drift after Step 9
+
+**C38 — ten test classes named by [Step 9](Tech_Step9.md) were never written, and under that cover THREE
+conditions had no execution test while the exit criterion claiming otherwise sat ticked.**
+
+**Fallout:** Tech_Step6.md, Tech_Step7.md, Tech_Step8.md, Tech_Step9.md, Tech_Step13.md
+
+Step 9's *"Tests required"* table listed 14 classes; 10 did not exist. The coverage had been consolidated into
+five classes during implementation — which is fine — but the table kept the original names, so *"does
+`ConditionCoverageTest` exist?"* was a question with no answer that nobody thought to ask.
+
+**What hid there.** `MS2PREC`, `CHARGE` and `MS2NL` are implemented in `ConditionFilters` and were exercised
+**only by parse tests**. The whole filter for any of them could have been inverted and the suite stayed green,
+while *"every 9a and 9b condition has a positive and a negative test"* was checked in Done-when. This is the
+recurring shape — C36, C37 and now C38 are all *a rule with nothing able to falsify it* — except that here the
+missing coverage was **disguised as present coverage** by a phantom class name.
+
+Closed by six methods in `QueryExecutorTest`. The `MS2PREC` strict bound is sabotage-verified: flipping
+`>`/`<` to `>=`/`<=` at `ConditionFilters:76` fails with `expected: <[]> but was: <[3, 5]>`.
+
+**The same drift existed in three earlier "complete" steps**, and — unlike Step 9 — none of it was a real
+coverage gap, which is worth recording because it is the reassuring half of the finding:
+
+| Spec | Phantom | Reality |
+|---|---|---|
+| [Step 6](Tech_Step6.md) | `MgfScanNumberingTest`, `Ms1ScanDocumentOrderTest`, `ReaderErrorPathTest` | all covered — folded into `MgfReaderTest`, promoted to `Ms1ScanDocumentOrderIT`, split across `MzmlReaderTest`/`FormatSniffTest` |
+| [Step 7](Tech_Step7.md) | `SpectraFileCloseTest` | renamed to `SpectraStreamCloseTest` under C22; §5 already said so in prose |
+| [Step 8](Tech_Step8.md) | `ParityCoverageTest` | deliberately dropped under C32 |
+
+**One genuinely missing deliverable surfaced too.** `VendoredProvenanceTest` ([Step 7](Tech_Step7.md)) was
+never written, and **`docs/VENDORED.md` did not exist at all** — a [Step 6](Tech_Step6.md) deliverable that
+Step 7's exit criteria recorded as *"unchanged"* and [Step 13](Tech_Step13.md) lists as a review artifact,
+while **all eleven vendored files' headers point readers at it**. Every header was correct; the central record
+they defer to was absent, and the licence election (MSDK is dual-licensed, this project elects **EPL-1.0**) was
+a convention rather than a build-enforced fact. Both now exist. Writing the test found a second thing: not
+everything under `io/vendor/` is upstream — `LittleEndianDataInput` is ours (C16) — so the test detects
+non-vendored files by a **marker in the file itself** rather than a filename allowlist in the test, which is
+what stops a genuinely vendored file from being exempted quietly.
+
+**Now enforced by `make spec-audit` check 4**: a **completed** step naming a test class that neither exists nor
+carries a `→` redirect fails the build. Completion is read from each spec's own Done-when checkboxes, so
+Steps 10–13 are exempt until they land and the scope widens by itself.
+
+**C39 — the spec-audit guard was twice wrong in the direction that reads as coverage; fallout is now DECLARED
+from C38 onward rather than inferred.**
+
+**Fallout:** none — this correction is about `scripts/spec-audit.sh` and the recording convention, both of
+which are documented at [*Adding a Correction*](#corrections-to-spikemd) and in the fallout protocol rule 2b.
+No step spec's content changes.
+
+Two bugs in the guard itself, both found by using it rather than by reading it, and both of the same shape —
+**a check that passes while proving nothing**:
+
+| Bug | Effect | Found by |
+|---|---|---|
+| Check 2's regex missed `**16 dumps.**` — punctuation *inside* the bold | **silently vacuous** on `FIXTURES.md`, the one file whose three contradictory counts (15 / 14 / 16) motivated writing it | injecting the drift and getting **no failure** |
+| Check 3's citation test was a **prefix match** (`\bC1[a-z(]?` matches the `C1` inside `C18`) | every single-digit correction counted as cited in specs that never mention it — C1 "cited" in 8 | an ad-hoc count returning an implausible 8 |
+
+Neither was concealing a real gap — verified both ways, and all four single-digit fallout claims (C6→Steps 6
+and 10, C7→Step 6, C8→Step 9) do cite correctly under the fixed pattern — but each would have passed one.
+**Every check is now demonstrated to fail on injected drift before being trusted**, procedure in the script's
+`DEMONSTRATING FAILURE` block. Re-run it after touching any pattern.
+
+**The ratchet.** Inferring obligation from `Tech_StepX.md` links protects only corrections that link a step,
+and **12 of C1–C37 link none** — including [C22](#c22), the largest correction in the project. Hand-audited:
+all 12 are genuinely propagated (C22 by prose), so the hole was prospective. From **C38** a `Fallout:` line is
+**required**, and check 3 fails on a missing line as well as on a declared-but-uncited spec. Deliberately not
+retrofitted: ~30 of the older entries would need an affected-set invented, and a ledger that reads as
+authoritative while being guesswork is worse than one whose gap is recorded.
+
+**What this still cannot catch.** A divergence nobody records as a Correction at all. That is rule 4 (*do not
+silently fix a spec*), and it is not mechanizable — the build can check that a declared obligation was met, not
+that a discovery was declared.
+
+### Corrections found while reviewing Step 9 as its implementer
+
+**C35 — [Step 9](Tech_Step9.md) names a type that does not exist, and its §1 contradicts itself.** Five
+defects, of which **(a) is retired into [C18](#c18)** as a duplicate — leaving four live. The code is right in
+every case; the spec would have pushed an implementer to break it.
+
+**(a) ⛔ RETIRED — superseded by [C18](#c18), which recorded this same finding when Step 4 completed. See C18.**
+
+Nothing else changes: the finding stands, and every existing citation of **C35(a)** — in
+[Step 9](Tech_Step9.md), `Comparator.java`'s javadoc, `ComparatorSemanticsTest` and
+`IntensityQualifiers.java` — resolves correctly by landing here and following the link. No numbering moved and
+no reference was rewritten.
+
+**Why it is retired rather than merged.** C35(a) and C18 are the *same* conclusion (`Comparator` is
+`{EQ, GT, LT}`; "a missing comparator defaults to greater-than" is about an **absent qualifier**, the implicit
+`> 0`) recorded **five steps apart**. Keeping two entries invites a future reader to think there were two
+findings, or to fix one and leave the other. C18 has priority as the original.
+
+**And the duplication is itself the lesson.** C18 named Step 9 §3 as affected but **Step 9 was never edited**,
+so at Step 9 the fact was rediscovered from scratch and written down again. That is the fallout protocol —
+*"a Correction is not done until the affected specs are edited"* — failing in the one way discipline cannot
+catch, which is why `make spec-audit` check 3 now asserts mechanically that a correction naming a step is
+referenced in that step's file.
+
+**(b) §1's `execute` signature contradicted the C22 note eight lines above it.** It read
+`execute(MassqlQuery, SpectrumTable ms1, SpectrumTable ms2)` returning "ordinals (not scan ids)" — exactly the
+whole-file tables C22 abolished. Under streaming there is no whole-file ordinal space; a single-scan table's
+only ordinal is **0**. Replaced with a **per-scan callback**: `QualifyingScanConsumer` plus
+`ExecutionSummary(qualifyingScans, diagnostics)`. That keeps retained memory at one scan + one MS1 (the C22
+property proven under `-Xmx48m`), needs one pass, and yields scan-id-ascending order from document order for
+free. Step 10's collation *is* the consumer.
+
+**(c) Zero-peak scans must be skipped, and §1's skeleton had no guard.** MassQL's loaders `continue` on an
+empty intensity array, so its dataframes hold no rows for them. Measured: **PlusRise's dump reports 21,942 MS2
+scans where our reader yields 34,513**; `micro.mzML`'s `ms1_df` is `[2]`, with the zero-peak scan 4 absent.
+
+A *peak-based* condition fails an empty scan naturally — but a **scan-level** condition (`POLARITY`, `RTMIN`,
+`SCANMIN`, `CHARGE`) never looks at peaks, so without the guard a scan-level-only query returns **34,513 where
+MassQL returns 21,942**. A third of the result set, silently. Guard added before the MS1 retention, since an
+empty MS1 must also not become an `ms1scan` link (C27b) — the same rule one layer up. Pinned by
+`ZeroPeakScanExclusionTest`.
+
+**(d) Two stale references.** §3 still instructed the implementer to *"derive the exact definition"* of
+`MASSDEFECT` from the Python source, while §2 marks it out of scope (C19) and `UnsupportedConstructs:59`
+rejects it **by name** — research spent on a construct the SDK refuses. And §1 named
+`SpectrumTable.scansWithAnyRow`; it is `RowMask.scansWithAnyRow(SpectrumTable)` → `BitSet`.
+
+**(e) §4 named two AST types that do not exist and omitted one that does.** It said `ConstantFolder` reduces
+"`BinaryExpr` over `NumberLiteral`s". The AST is `sealed interface Expr` with **three** records:
+`Expr.Literal`, `Expr.Binary` and **`Expr.Unary`** — never mentioned. A folder written to the spec would
+silently leave a negated literal such as `MS2NL=-18` unfolded. `ConstantFoldingTest` now covers `Unary`.
+
+Also corrected: §5 (and [Step 11](Tech_Step11.md) §2) cited `DEPENDENCY_POLICY.md` **constraint 5** for "the
+SDK logs nothing" — that is constraint **2**; 5 is "No split packages". And "All ten §3 rules" in Done-when
+became "every rule" — there are ~14, and a hard count goes stale the moment one is added.
+
+**Verified sound, so recorded rather than re-derived:** `test_query_py_reference.py` exists (42 KB), so the
+property tests are portable; `test.massql`'s golden really is **664** rows with the three-`MS2PROD` shape;
+`MS2MZ` is collapsed to `MS2PROD` at `AstBuilder:160`, so the engine never sees the alias; `MOBILITY` and
+`MASSDEFECT` are rejected at parse; `ConditionType`/`QualifierType` cover every in-scope condition; and the
+in-scope qualifier set is exactly `TOLERANCEMZ`, `TOLERANCEPPM`, `INTENSITYVALUE`, `INTENSITYPERCENT`,
+`INTENSITYTICPERCENT`.
 
 ### Corrections propagated FROM Step 8 into later steps
 
@@ -653,6 +936,7 @@ construct is *one of* those present, not a specific one. Asserting a specific on
 traversal order, which has no user-visible meaning. `AstBuilder` reports the first in
 **source order** (it validates a condition before its qualifiers for that reason).
 
+<a id="c18"></a>
 **C18 — `Comparator.NONE` is unreachable and was removed.** Step 4 §3 required a `NONE`
 value "distinct from `EQ`". Verified against the corpus: every in-scope qualifier carries
 `=`, `>` or `<`; the only comparator-less qualifiers are the out-of-scope ones
@@ -660,6 +944,25 @@ value "distinct from `EQ`". Verified against the corpus: every in-scope qualifie
 "a missing comparator defaults to greater-than" refers to an **absent qualifier** — the
 implicit `> 0` on an unqualified intensity column ([Step 9](Tech_Step9.md) §3) — not to a
 qualifier that parsed without one. `Comparator` is `{EQ, GT, LT}`.
+
+Affected specs, **edited only in the C35 round rather than here**: [Step 4](Tech_Step4.md) §3 (the
+`Comparator` sketch, the Known-traps entry warning against normalizing a state that cannot exist, and the
+`AstShapeTest` row that still *required* `NONE` to survive) and [Step 9](Tech_Step9.md) §3.
+
+> ⚠ **This correction is also the harness's own worst fallout failure, and it is recorded here deliberately.**
+> C18 named Step 9 §3 as affected and **nobody edited Step 9**, so five steps later the identical finding was
+> rediscovered from scratch and written down again as **C35(a)** — now retired back to this entry. Two Step 4
+> statements requiring `NONE` also survived until that round.
+>
+> The protocol — *"a Correction is not done until the affected specs are edited"* — was correct and was simply
+> not carried out, which is the failure mode a written rule cannot prevent. `make spec-audit` check 3 therefore
+> asserts mechanically that **every correction whose body links `Tech_StepX.md` is referenced in that file**.
+> This entry is the check's reason for existing, and the case it is validated against.
+>
+> Note the shape, since it recurs: the *code* was right the whole time. What drifted was the spec, and a spec
+> that contradicts working code is worse than a silent one — it argues an implementer into breaking something.
+> `AstShapeTest.comparatorHasExactlyThreeConstantsAndNoNONE` now pins the enum's arity so a reintroduction
+> fails at the AST rather than downstream.
 
 **C19 — three constructs the specs never mentioned, all now rejected by name.** Found by
 reading `msql.ebnf`: **`ANY`** (`wildcard: "ANY"`, so `MS2PROD=ANY` is legal MassQL);
@@ -845,6 +1148,39 @@ Rules:
    this protocol exists to prevent — the engineer building Step 12 will not think to re-read Step 2's notes.
 2. **Reference the Correction by its label** (`Correction C13`) in the spec edit, so the two stay findable
    from each other.
+2b. ⛔ **Every Correction from C38 onward MUST carry a `Fallout:` line. The build enforces it.**
+
+   ```
+   **C39 — one-line statement of what was wrong.**
+
+   **Fallout:** Tech_Step5.md, Tech_Step10.md
+   ```
+
+   or, when genuinely nothing needs editing:
+
+   ```
+   **Fallout:** none -- records a measurement; changes no spec.
+   ```
+
+   Then edit each declared file and cite `C39` in it. `make spec-audit` check 3 fails the build if the line
+   is missing **or** if a declared file never mentions the correction. Both halves matter: the second catches
+   the C18 failure, and the first stops you escaping the check by declaring nothing.
+
+   **Why C38 and not C1 — this is a ratchet, deliberately.** Before the ratchet, obligation was *inferred*
+   from `Tech_StepX.md` links in a correction's body. That protects only corrections that happen to link a
+   step, and **12 of the first 37 link none** — including [C22](#c22), the largest correction in the project,
+   which reshaped Steps 5–11 and yet carried **zero** enforced obligations. Those 12 were audited by hand and
+   are all genuinely propagated (C22 by prose rather than links), so the hole is prospective rather than a
+   live defect. Retrofitting them would mean **inventing affected-sets for roughly 30 entries**, producing a
+   ledger that reads as authoritative and is guesswork — worse than one whose gap is known and written down.
+   So the old entries keep link inference, and everything new declares.
+
+   **The declaration is authoritative, and that is a deliberate trade.** Only the author can tell a fallout
+   claim (*"Step 5's attribution is backwards"*) from a background pointer (*"full analysis in Step 1 §3a"*) —
+   they are identical in shape, which is why inference over-fires. Writing `Fallout: none` on a correction
+   that plainly changes a spec is therefore a **visible false statement in the ledger** rather than a silent
+   omission. That is the same trade `VendoredProvenanceTest` makes, where a file declares itself
+   *"Not vendored"* instead of the test keeping a filename allowlist: put the claim where a reviewer reads it.
 3. **When a step completes, audit the propagation** rather than trusting recall: list the Corrections that
    step produced and confirm each is referenced by every spec it affects. Note that
    `data/CONVERSION_NOTES.md` scope grew during Step 2 — it is now fixture provenance for the whole spike, not
@@ -852,6 +1188,41 @@ Rules:
 4. **Do not silently fix a spec.** If an implementation deviates from what the spec says, either the spec was
    wrong (Correction) or the implementation is (fix it). Quietly diverging leaves the spec lying to the next
    reader.
+5. **Rule 3 is now enforced by the build, because rule 3 alone was not enough.** Rules 1–3 are discipline, and
+   discipline failed — [C18](#c18) named Step 9 §3, Step 9 was never edited, and five steps later the identical
+   finding was rediscovered and filed again as C35(a). Nothing could have caught it: prose has no test suite.
+
+   **`make spec-audit`** (in `make verify`) now fails the build on five drifts, **every one of which this
+   project actually produced** — none is hypothetical:
+
+   | Check | Fails when | The case it was written for |
+   |---|---|---|
+   | 1 | a fixture, golden, query or dump on disk is named by no spec — or a spec names one that no longer exists | `micro_zeroint.mgf` and `micro_ms1var.mzML` were created, dumped and used by passing tests while Step 2 and `FIXTURES.md` said nothing about either |
+   | 2 | a **stated count** disagrees with the filesystem or with `ReaderParityIT.FIXTURES_WITH_DUMPS` | three documents held **15**, **14** and the true **16** simultaneously |
+   | 3 | a C38+ correction has no `Fallout:` line, or any declared/linked spec never cites the correction | **C18 → C35(a)**: the same finding recorded twice, five steps apart, because the named spec was never edited |
+   | 4 | a **completed** step names a test class that neither exists nor carries a `→` redirect | **C38**: Step 9's table named 10 classes that were never written, and under that cover `MS2PREC`, `CHARGE` and `MS2NL` had no execution test while the exit criterion claimed all ten conditions did |
+   | 5 | a **completed** step names a `docs/*.md` review artifact that does not exist | **C38**: `docs/VENDORED.md` was a ticked Step 6 deliverable, a Step 13 review input, and the target of eleven vendored source headers — and was absent for three steps |
+
+   Checks 4 and 5 read completion from each spec's own **Done-when checkboxes**, so Steps 10–13 are exempt
+   until they land and the scope widens by itself rather than needing a hardcoded list maintained by hand.
+
+   One design note worth keeping, because the wrong version is seductive: deriving a correction's affected set
+   from *the specs that already cite it* passes **by construction** — a correction nobody propagated gets an
+   empty set and therefore no obligation, defining the target failure out of existence. That is C26's mistake
+   in new clothing. Obligation must come from something independent of the citation: a body link (legacy) or an
+   explicit declaration (C38+, rule 2b).
+
+   A pre-C38 link that is a background pointer rather than a fallout claim goes in the script's
+   `POINTERS_NOT_FALLOUT` list **with a written reason** — currently three, argued individually.
+
+   **Widening a pattern until nothing fails is not an option, and this script has twice been the thing at
+   fault.** Check 2 was silently *vacuous* when first written: its regex missed `**16 dumps.**` (punctuation
+   inside the bold), on the very file whose contradictory counts motivated it. Check 3's citation test was a
+   **prefix match** (`\bC1[a-z(]?` matched the `C1` inside `C18`), so every single-digit correction counted as
+   cited in specs that never mention it. Neither was hiding a real gap when found — verified both ways — but
+   both would have passed one. Every check here is demonstrated to fail on injected drift before it is
+   trusted; the procedure is in the script's `DEMONSTRATING FAILURE` block. **Re-run it after any edit to a
+   pattern.**
 
 ### Two rules that keep 13 documents consistent
 

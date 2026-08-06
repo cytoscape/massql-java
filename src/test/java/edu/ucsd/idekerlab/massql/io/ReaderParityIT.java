@@ -77,6 +77,13 @@ class ReaderParityIT {
         FIXTURES_WITH_DUMPS.put("micro_nested.mzXML", 1);
         FIXTURES_WITH_DUMPS.put("micro_multiprec.mzXML", 1);
         FIXTURES_WITH_DUMPS.put("micro.mgf", 0);
+        // Correction C36: MGF drops zero-intensity peaks. Block 2 of this fixture is ALL zeros, so
+        // MassQL emits no rows for it and it vanishes from the dataframe -- our reader still yields
+        // the block, now with zero peaks, hence exactly one reader-only scan.
+        FIXTURES_WITH_DUMPS.put("micro_zeroint.mgf", 1);
+        // C37: two MS1 scans with DIFFERENT peaks -- the only fixture that can discriminate
+        // condition ORDER. Every scan has peaks, so nothing is reader-only.
+        FIXTURES_WITH_DUMPS.put("micro_ms1var.mzML", 0);
     }
 
     /** Where each fixture lives under {@code src/test/resources}. */

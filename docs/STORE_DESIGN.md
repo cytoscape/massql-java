@@ -102,27 +102,43 @@ the correct in-band "undefined", and Tech_Step10 maps NaN to JSON `null`. Substi
 would report a real value where there is none; substituting `1` would claim every peak is the
 base peak. Meanwhile `sum` is genuinely `0.0` — the TIC of an all-zero scan really is zero.
 
-## `mzWindow` — the performance-critical primitive
+## The m/z window — the performance-critical primitive
 
 ```java
-IntRange mzWindow(int scanOrdinal, double lo, double hi)   // [lo, hi] INCLUSIVE both ends
+IntRange mzWindow(int scanOrdinal, double lo, double hi)            // [lo, hi] INCLUSIVE both ends
+IntRange mzWindowExclusive(int scanOrdinal, double lo, double hi)   // (lo, hi) STRICT both ends
 ```
 
 Two binary searches bounded to the scan's own slice: O(log n), not O(n). If the MGF fixture is
 ever slower than pandas, this is the first place to look (SPIKE.md §7: *"something is quadratic
 — probably a linear scan where a binary search belongs"*).
 
-Three details that are each a silent wrong answer if changed:
+**There are two methods because MassQL genuinely has two rules** (Correction C37). This
+originally documented one inclusive method and attributed the bounds to Tech_Step9; that was
+backwards. The split, both halves verified by running the reference implementation:
 
-- **Both value bounds are inclusive, exactly.** A peak whose m/z equals `hi` to the bit is in
-  the window. Tech_Step9 computes the bounds from a tolerance, so an exclusive bound here would
-  narrow every tolerance in the system.
+| Caller | Bound | Method | Source |
+|---|---|---|---|
+| Tech_Step9 condition windows (`MS2PROD`, `MS2PREC`, `MS1MZ`, `MS2NL`) | **STRICT** | `mzWindowExclusive` | `msql_engine_filters.py:253` + three siblings, `>`/`<` |
+| Tech_Step10 precursor lookup | **INCLUSIVE** | `mzWindow` | `massql_query.py:101-103`, `>=`/`<=` |
+
+**Do not unify them to remove the apparent duplication.** Each caller's parity depends on
+getting its own bound, so collapsing to one rule trades one silent divergence for another. The
+exclusive variant is the same two searches with the roles swapped — `upperBound(lo)` skips every
+row equal to `lo`, `lowerBound(hi)` stops before every row equal to `hi` — so it is exact and
+stays correct across duplicate m/z.
+
+Three further details, each a silent wrong answer if changed:
+
+- **Bounds are exact in both directions.** A peak whose m/z equals `hi` to the bit **is** in the
+  inclusive window and **is not** in the exclusive one. No rounding at the boundary.
 - **No epsilon is applied, ever.** A "helpful" epsilon at this level would widen every
-  tolerance invisibly. Bounds arrive exact.
+  tolerance invisibly. Bounds arrive exact from the caller, which computes them from a tolerance.
 - **`Arrays.binarySearch` is NOT used.** Its behaviour on **duplicate keys is unspecified** —
   it may return any matching index — and duplicate m/z does occur in real centroided data. The
   hand-rolled `lowerBound`/`upperBound` return the true first and last positions, so a
-  duplicate run at either boundary is included whole.
+  duplicate run at either boundary is included whole by `mzWindow` and dropped whole by
+  `mzWindowExclusive`.
 
 The returned `IntRange` is **half-open** `[start, end)`, matching Java array conventions, so
 `for (int r = range.start(); r < range.end(); r++)` is the natural loop. Do not confuse that
@@ -184,9 +200,16 @@ From `StoreScaleTest` on an Apple M2, for Tech_Step12 §5 to compare against:
 |---|---|---|
 | Build | 990,000 peaks / 30,000 scans | **38 ms** |
 | 200,000 `mzWindow` calls | over 300 scans | 18 ms |
-| 200,000 `mzWindow` calls | over 30,000 scans | **10 ms** |
+| 200,000 `mzWindow` calls | over 30,000 scans | **13 ms** |
+| 200,000 `mzWindowExclusive` calls | over 300 scans | 22 ms |
+| 200,000 `mzWindowExclusive` calls | over 30,000 scans | **7 ms** |
 | `sum` + `argmax` per scan | 20,000 scans / 1,000,000 peaks | **16 ms** |
 
-The window figure is the meaningful one: cost is **flat** as the table grows 100×, which is what
-a binary search looks like. A linear scan would track table size. The test asserts the shape
-(ratio bounded) rather than an absolute time, so it does not flake on a busy machine.
+The window figures are the meaningful ones: cost is **flat** — in fact slightly *faster* at 100×
+the scans, since the per-scan slice is unchanged and the warmed JIT dominates — which is what a
+binary search looks like. A linear scan would track table size. The tests assert the shape (ratio
+bounded) rather than an absolute time, so they do not flake on a busy machine.
+
+Both methods are timed separately. `mzWindowExclusive` is the busier of the two in practice —
+Tech_Step9 calls it per condition per scan, while `mzWindow` runs once per *qualifying* scan in
+Tech_Step10's lookup — so timing only the inclusive one would have guarded the cooler path.

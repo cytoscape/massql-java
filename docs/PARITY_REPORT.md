@@ -1,7 +1,7 @@
 # Reader parity report — integration layer 1 (Tech_Step8, the gate)
 
 **Verdict: GREEN.** All three readers decode **bit-identically** to MassQL's own Python loader across
-**14 fixtures**, with no tolerance on any individual `mz`, `i` or `rt` value.
+**16 fixtures**, with no tolerance on any individual `mz`, `i` or `rt` value.
 
 > **`SPIKE.md` §11 Q1 — "Do all three readers produce bit-identical decoded intensities vs. the Python
 > loader? If not, what tolerance becomes the contract?"**
@@ -30,6 +30,7 @@ SHA-256 over both peak arrays — all matching. Keyed by `(mslevel, scan)`, neve
 | `PlusRise.mgf` | MGF | 34,513 | 0 | 34,513 | 758,544 | **12,571** | ✅ |
 | `micro.mzML` | mzML | 5 | 2 | 3 | 10 | 1 | ✅ |
 | `micro_rtseconds.mzML` | mzML | 5 | 2 | 3 | 10 | 1 | ✅ |
+| `micro_ms1var.mzML` | mzML | **4** | 2 | 2 | **8** | **0** | ✅ |
 | `micro.mzXML` | mzXML | 5 | 2 | 3 | 10 | 1 | ✅ |
 | `micro_p64.mzXML` | mzXML | 5 | 2 | 3 | 10 | 1 | ✅ |
 | `micro_zlib.mzXML` | mzXML | 5 | 2 | 3 | 10 | 1 | ✅ |
@@ -37,12 +38,20 @@ SHA-256 over both peak arrays — all matching. Keyed by `(mslevel, scan)`, neve
 | `micro_nested.mzXML` | mzXML | 5 | 2 | 3 | 10 | 1 | ✅ |
 | `micro_multiprec.mzXML` | mzXML | 5 | 2 | 3 | 10 | 1 | ✅ |
 | `micro.mgf` | MGF | 3 | 0 | 3 | 7 | 0 | ✅ |
+| `micro_zeroint.mgf` | MGF | 3 | 0 | 3 | **4** | 1 | ✅ |
 
 **"Reader-only" scans are expected and their count is *asserted*, not tolerated.** MassQL's loaders
 `continue` on an empty intensity array, so its dataframes hold no rows for zero-peak scans; our readers yield
-them and let the engine filter (C24b, C27b). PlusRise's 12,571 are its peak-less blocks; each micro variant's
-1 is the deliberate zero-peak MS1 at scan 4. Asserting the number is what stops a reader that *dropped* real
-spectra from passing — tolerating an unbounded count would defeat the gate.
+them and let the engine filter (C24b, C27b). PlusRise's 12,571 are its peak-less blocks; each micro mzML/mzXML
+variant's 1 is the deliberate zero-peak MS1 at scan 4. Asserting the number is what stops a reader that
+*dropped* real spectra from passing — tolerating an unbounded count would defeat the gate.
+
+Three rows sit outside that pattern, each for its own reason: `micro.mgf` is MS2-only so the zero-peak MS1
+never existed on our side; **`micro_zeroint.mgf`** reaches 1 by a different route — its all-zero block is
+dropped *peak by peak* under **C36**, leaving a scan with 0 peaks rather than one that was empty in the file;
+and **`micro_ms1var.mzML`** has 4 scans where every other micro fixture has 5, because it drops the zero-peak
+MS1 entirely and gives its two MS1 scans **differing peaks** instead — the property **C37** needed and no other
+fixture had.
 
 **MGF MS1 counts are 0 on our side against dumps reporting 1.** That single dump entry is MassQL's fabricated
 MS1 row, which our readers correctly omit — MGF has no survey scans. See C33(b): it is all-zero on

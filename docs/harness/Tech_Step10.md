@@ -11,7 +11,7 @@ verbatim.
 | Step | Why |
 |---|---|
 | [Step 9](Tech_Step9.md) | Provides the qualifying scan set. |
-| [Step 5](Tech_Step5.md) | Provides `argmax` (row index, ties → lowest), `mzWindow`, `Reductions`, and the exact double `scanRt`. |
+| [Step 5](Tech_Step5.md) | Provides `argmax` (row index, ties → lowest), the **inclusive `mzWindow`** — *not* the exclusive variant Step 9 uses, see §3 rule 4 — `Reductions`, and the exact double `scanRt`. |
 
 ## Context
 
@@ -137,14 +137,14 @@ if ms1scan is present (non-zero) and the MS1 table has that scan:
     ms1_base_peak_i = max(i) across the WHOLE MS1 scan        # independent of any match
     if precmz is present (non-zero, not NaN):
         tol  = precmz * precursorTolPpm / 1e6                 # default 20.0 ppm
-        cand = MS1 peaks in that scan with mz in [precmz - tol, precmz + tol]
+        cand = MS1 peaks in that scan with mz in [precmz - tol, precmz + tol]   # INCLUSIVE, see rule 4
         if cand is non-empty:
             best      = the candidate CLOSEST IN m/z TO precmz     # <-- NOT the most intense
             ms1_i     = i[best]
             ms1_precmz = mz[best]
 ```
 
-Three rules inside that, each independently testable:
+Four rules inside that, each independently testable:
 
 1. **Closest, not most intense.** `massql_query.py:104` — `cand.iloc[(cand["mz"] - precmz).abs().argmin()]`.
    Picking the most intense peak in the window is the intuitive reading and it is wrong. `SPIKE.md` §6a calls the
@@ -155,6 +155,26 @@ Three rules inside that, each independently testable:
    independently of, the window search.
 3. **Ties in "closest".** If two candidates are equidistant from `precmz`, pandas' `argmin` returns the **first**
    occurrence — the lower m/z, given ascending sort. Match that.
+4. ⛔ **Use the INCLUSIVE `mzWindow` here. Do not carry [Step 9](Tech_Step9.md)'s choice over.** Added by
+   **Correction C37**, which was discovered while implementing Step 9 and split
+   [Step 5](Tech_Step5.md) §4's single method in two. `massql_query.py:101-103` builds this window with
+   `>=`/`<=`:
+
+   ```python
+   ms1_peaks = ms1_peaks[ms1_peaks["mz"] >= precmz - tol]
+   ms1_peaks = ms1_peaks[ms1_peaks["mz"] <= precmz + tol]
+   ```
+
+   whereas Step 9's condition filters use `>`/`<` (`msql_engine_filters.py:253`) and therefore
+   `mzWindowExclusive`. **The two genuinely differ and must not be unified** — an implementer arriving here
+   straight from Step 9 is exactly the failure mode this rule exists to stop, and it fails *silently*: the only
+   symptom is a peak sitting exactly on a bound, which changes `ms1_i`/`ms1_precmz` from a value to `null`.
+   Those are columns [Step 12](Tech_Step12.md) compares at **1e-9**, so it surfaces as an unexplained parity
+   failure far from its cause.
+
+   Verified by execution rather than inferred: at `--precursor-tol-ppm 7.8125` — chosen so the tolerance lands
+   the window edge exactly on an MS1 peak — the reference implementation returns `ms1_i = 1000.0`. The
+   exclusive variant would return `null`. **Assert this**, do not merely read it.
 
 `ms1_base_peak_i` is the normalization reference: relative precursor abundance = `ms1_i / ms1_base_peak_i`.
 
@@ -165,6 +185,15 @@ selects scans; this one matches the precursor peak within an already-selected sc
 ### 4. Null, sentinel and NaN rules
 
 **`0` → null for `precmz`, `ms1scan`, `charge` — and only those three.**
+
+> **Correction C20 — read all three off `ScanIndex`, not off a peak column.** They are per-**scan**
+> metadata: MassQL's `ms2_df` carries them per peak only because pandas is a flat frame, and each has exactly
+> one distinct value per scan. [Step 5](Tech_Step5.md) stores them on the scan index accordingly, which is both
+> semantically right and far smaller — a 20,000-peak scan would otherwise hold 20,000 copies of its own
+> precursor m/z. Two consequences for this step: they arrive carrying MassQL's raw **`0` sentinel**, so the
+> conversion below is *this* step's job and nothing upstream has done it; and **`ms1_df` has no such columns at
+> all**, so on an MS1 table they are `0` throughout — which is why the MS1DATA shape omits them rather than
+> emitting three nulls.
 
 | Column | Why 0 can't be real |
 |---|---|
@@ -272,6 +301,8 @@ When the MS1 table is empty (MGF), all three `ms1_*` are null without any lookup
 - **`argmax` ties resolving to the last row.** Must be first, matching pandas `idxmax`
   ([Step 5](Tech_Step5.md) §6).
 - **Conflating `precursorTolPpm` with the query's `TOLERANCEPPM`.** Two different knobs. §3.
+- ⛔ **Reaching for `mzWindowExclusive` because [Step 9](Tech_Step9.md) uses it.** This step's window is
+  **inclusive**. §3.4, Correction C37. Fails silently and surfaces as a Step 12 parity failure.
 
 ## Tests required
 
@@ -279,7 +310,7 @@ All unit (`*Test.java`), on the [Step 2](Tech_Step2.md) micro-fixtures and hand-
 
 | Test | Pins |
 |---|---|
-| **`PrecursorLookupTest`** | **The most important test in this step.** A window containing two peaks where the **closer one is less intense** → `ms1_i`/`ms1_precmz` come from the **closer** peak. Also: tolerance miss → `ms1_i`/`ms1_precmz` null but `ms1_base_peak_i` **populated**; no linked MS1 scan → all three null; equidistant tie → lower m/z wins; `precmz == 0` → no lookup. |
+| **`PrecursorLookupTest`** | **The most important test in this step.** A window containing two peaks where the **closer one is less intense** → `ms1_i`/`ms1_precmz` come from the **closer** peak. Also: tolerance miss → `ms1_i`/`ms1_precmz` null but `ms1_base_peak_i` **populated**; no linked MS1 scan → all three null; equidistant tie → lower m/z wins; `precmz == 0` → no lookup. **Plus the C37 bound case: a peak sitting exactly on `precmz ± tol` IS a candidate** — at `precursorTolPpm` 7.8125 the reference gives `ms1_i = 1000.0`, and this assertion is the only thing standing between a future refactor and a silent switch to `mzWindowExclusive`. |
 | `BasePeakTest` | `base_peak_i`/`base_peak_mz` from argmax; a tie resolves to the **first** (lowest-m/z) row; single-peak scan; the mz read comes from the argmax row, not from a separate max. |
 | `SentinelNullTest` | `precmz`/`ms1scan`/`charge` `0` → null; **`rt` `0.0` preserved** (assert `0.0`, not null, and assert it is not `null` explicitly); no other column converted. |
 | `NanNullTest` | NaN → null; `+∞`/`−∞` → null; the resulting JSON parses. |
@@ -292,9 +323,11 @@ All unit (`*Test.java`), on the [Step 2](Tech_Step2.md) micro-fixtures and hand-
 
 ## Done when
 
-- [ ] `mvn test` green.
+- [ ] `make test` green (and `make verify` before calling the step done).
 - [ ] `PrecursorLookupTest` proves **closest, not most intense**, on a fixture where they differ.
 - [ ] `ms1_base_peak_i` survives a tolerance miss, with a test.
+- [ ] The lookup calls **`mzWindow`**, not `mzWindowExclusive` (C37, §3.4), and a test asserts the on-bound peak
+      is a candidate.
 - [ ] `rt = 0.0` is preserved and asserted non-null.
 - [ ] Both JSON shapes exact: 12 keys ordered for MS2DATA, 4 keys with precursor keys **absent** for MS1DATA.
 - [ ] Every emitted float round-trips to identical bits.
@@ -307,7 +340,8 @@ All unit (`*Test.java`), on the [Step 2](Tech_Step2.md) micro-fixtures and hand-
 - `SPIKE.md` §3 (the contract, the 7/5 split, the population table, the exact rules), §4 (boxed types;
   `ResultJson` as published contract), §6a (precursor lookup, null/sentinel, result JSON rows)
 - `RESULT_SCHEMA.md` — the per-column prose contract
-- **`massql_query.py`** — `add_precursor_intensity` at **62-116** (the precursor rules), `:51-59` (`clean_nan`),
+- **`massql_query.py`** — `add_precursor_intensity` at **62-116** (the precursor rules), **`:101-103`** (the
+  `>=`/`<=` window — the inclusive half of C37), `:51-59` (`clean_nan`),
   `:154-159` (the `i`→`tic` rename and the dropped columns), `:163-167` (base peak via `idxmax`), `:170-179` (the
   empty-MS1 branch), `:189-191` (the three sentinel columns and the comment excluding `rt`)
 - `output/small_mzml_results.json`, `output/plusrise_results.json` — the anchors

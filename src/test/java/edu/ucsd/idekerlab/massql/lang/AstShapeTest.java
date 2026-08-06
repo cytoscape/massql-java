@@ -6,6 +6,8 @@ import edu.ucsd.idekerlab.massql.Massql;
 import edu.ucsd.idekerlab.massql.lang.ast.*;
 import edu.ucsd.idekerlab.massql.lang.ast.Comparator;
 
+import java.util.Arrays;
+
 import org.junit.jupiter.api.Test;
 
 /** Pins the AST decisions Tech_Step9 depends on. */
@@ -152,5 +154,18 @@ class AstShapeTest {
         assertTrue(q.where().isEmpty());
         assertTrue(q.filter().isEmpty());
         assertEquals("SCANINFO(MS1DATA)", q.canonical());
+    }
+
+    @Test
+    void comparatorHasExactlyThreeConstantsAndNoNONE() {
+        // Correction C18 removed Comparator.NONE. Tech_Step4's AstShapeTest row previously required the
+        // OPPOSITE -- "Comparator.NONE survives when the source omits a comparator" -- so the spec
+        // contradicted the code for five steps and C35(a) rediscovered the same fact from scratch at
+        // Step 9. Asserting the enum's arity directly is what makes reintroducing NONE fail HERE, rather
+        // than in whatever downstream switch forgets to handle it.
+        assertEquals(3, Comparator.values().length,
+                "expected exactly {EQ, GT, LT} but found " + Arrays.toString(Comparator.values()));
+        assertThrows(IllegalArgumentException.class, () -> Comparator.valueOf("NONE"),
+                "NONE models a state the grammar cannot produce -- see C18");
     }
 }

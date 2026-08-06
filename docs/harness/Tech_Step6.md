@@ -157,6 +157,7 @@ Structure: `BEGIN IONS` … `END IONS` blocks, each with `TITLE=`, `PEPMASS=`, `
 | **`polarity`** | **Hardcoded `1`** (positive). ⚠ **Correction C33 fixes C8**, which said "not read at all → 0". Not read from any *header* is true; but both loaders write `"polarity": 1  # Default` into every peak dict (`msql_fileloading.py:67`, `:86`), so MassQL emits **1** for every MGF row — measured `{1: all}` across 866k rows. A `POLARITY` condition still cannot meaningfully filter an MGF, since the value is a constant rather than data. **This row already said "verify the value MassQL actually emits rather than assuming", and the implementation assumed anyway** — the note below records why that was easy to miss. |
 | **`rt`** | `float(RTINSECONDS)/60.0`. **Absent → `0.0`, not null** (`msql_fileloading.py:179-181, :327-328`). |
 | **`ms1scan`** | **Hardcoded `0`** for every scan (`msql_fileloading.py:394`). Not derived, not looked up. |
+| **zero-intensity peaks** | ⛔ **DROPPED.** `if intensity == 0: continue` opens the peak loop. **MGF only** — mzML/mzXML retain them, and `small.mzML`'s dump proves it with eight leading `0x0.0p+0` intensities. Latent until Correction C36: no MGF fixture had a zero-intensity peak, so the Step 8 gate could not detect that we kept them. `micro_zeroint.mgf` now pins it. |
 | **`scan`** | **`SCANS=` when present, else the 1-based index of the block in the file** — `scan = params.get('scans', index + 1)` (`msql_fileloading.py:177`). Resolved in Correction C7; the golden's first record is `scan: 576`. Check whether `PlusRise.mgf` actually carries `SCANS=` so you know which branch the fixture exercises. |
 
 **Scan numbering — resolved (Correction C7).** `msql_fileloading.py:177`:
@@ -353,6 +354,18 @@ Unit (`*Test.java`), on the [Step 2](Tech_Step2.md) micro-fixtures — no large 
 | `ReaderErrorPathTest` | Truncated mzML → throws, **no partial table**; empty file; missing path; directory instead of file. |
 | `SpectraStreamCloseTest` | `close()` idempotent; 200 open/close cycles without exhausting descriptors. Meaningful now precisely because the cursor holds the mapping (C22). |
 | `StreamingMemoryTest` | **Prove the C22 claim, do not assert it**: stream `PlusRise.mgf` (758,545 peaks) sampling used heap, asserting peak retained heap is bounded by *scan* size, not file size. |
+
+### Renamed and folded test classes
+
+Redirects for the names this spec required, kept rather than deleted so the original requirement stays
+reviewable. Read by `make spec-audit` check 4 (Correction **C38**), which fails the build when a completed
+step names a test class that neither exists nor redirects.
+
+| Spec-era name | → Real home | Note |
+|---|---|---|
+| `MgfScanNumberingTest` | → `MgfReaderTest` | `scanIdIsScansWhenPresentElseTheOneBasedBlockIndex` — both the `SCANS=` path and the block-index fallback in one method |
+| `Ms1ScanDocumentOrderTest` | → `Ms1ScanDocumentOrderIT` | **became an integration test**, which is the right home: the decisive `spectrumRef`-vs-document-order distinction needs the Ewing fixture (916 scans, zero `precursorScanNum`), and no micro-fixture can make it |
+| `ReaderErrorPathTest` | → `MzmlReaderTest` + `FormatSniffTest` | `truncatedMzmlThrowsWithNoPartialResult`; `missingEmptyAndDirectoryPathsFailClearly` and `unknownContentThrowsAndNamesTheFile`. Split because the sniffer owns path- and content-level failures while the reader owns truncation mid-parse |
 
 ## Done when
 
