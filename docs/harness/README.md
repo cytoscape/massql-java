@@ -4,13 +4,41 @@ The execution record for this SDK: one spec per implementation step, written to 
 one engineer and finished without reading the others.
 
 **Start at [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md)** — status table, dependency graph, the
-three internal gates, settled decisions, and the numbered corrections to `SPIKE.md`.
+three internal gates, settled decisions, and the numbered corrections to [`SPIKE.md`](SPIKE.md).
+
+### The specs
 
 | | |
 |---|---|
 | [`SPIKE.md`](SPIKE.md) | The original spike document. Source of record for **rationale**; every spec cites it by section. Where it and a spec disagree, **the spec wins** — see the corrections list in the index. |
 | [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md) | The index. Read this first. |
 | `Tech_Step1.md` … `Tech_Step13.md` | One spec per step. **Numbered 1–13; there is no Tech_Step0**, and the numbering is unrelated to SPIKE.md's 0–3 (the index has the mapping). |
+
+### The engineering record — what each step produced
+
+| | Owner |
+|---|---|
+| [`FIXTURES.md`](FIXTURES.md) | test fixtures and goldens, and why they are committed in-repo (C26) — [Step 2](Tech_Step2.md) |
+| [`GRAMMAR_NOTES.md`](GRAMMAR_NOTES.md) | every deliberate divergence from the Lark source, and what a re-sync needs — [Step 4](Tech_Step4.md) |
+| [`STORE_DESIGN.md`](STORE_DESIGN.md) | `SpectrumTable` internals and the measured baselines — [Step 5](Tech_Step5.md) |
+| [`READER_RULES.md`](READER_RULES.md) | the per-format rule table — [Step 6](Tech_Step6.md), [Step 7](Tech_Step7.md) |
+| [`PARITY_REPORT.md`](PARITY_REPORT.md) | the reader-parity gate verdict — [Step 8](Tech_Step8.md) |
+| [`SEMANTICS.md`](SEMANTICS.md) | every condition rule with the source line that establishes it — [Step 9](Tech_Step9.md) |
+| [`oracle/`](oracle/README.md) | the pin, the verified loader facts, fixture provenance, and MassQL's own grammar — the yardstick everything above is measured against |
+
+> These moved here from `docs/` under Correction **C41**, together with four artifacts that had been sitting in a
+> non-versioned directory outside the repository. They are the *engineering record* — read by someone confirming
+> or continuing the work, not by someone consuming the SDK.
+
+### Not here, deliberately
+
+Two documents stay at [`docs/`](..) because they are **published**, not internal — and both are read at runtime
+by tests, so their paths are code:
+
+| | |
+|---|---|
+| [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) | the frozen 12-key result contract the Phase-2 app consumes and `MASSQL_PARSE` reads back. `ResultSchemaContractTest` parses it |
+| [`VENDORED.md`](../VENDORED.md) | the EPL-1.0 election and vendored-code provenance a redistributor needs. `VendoredProvenanceTest` asserts it |
 
 ## Building and testing — `make` only, never `mvn`
 
@@ -33,22 +61,25 @@ invocation is how the ad-hoc commands that prompted this file came to diverge fr
 place. `mvn` appears in these specs only where it *describes the mechanism* a target wraps (the
 surefire/failsafe split in [Step 3](Tech_Step3.md)) or in a completed step's record of what was run.
 
-## ⚠ Two locations, and the specs reference both
+## ⚠ Two locations, and only one of them matters for reading
 
-This is not obvious from the file paths, so read this before following a path in a spec.
+**This repo (`massql-java`) is the only deliverable, and now holds every document.** Production code, tests,
+these specs, and the engineering record above. Nothing outside it ships, and nothing outside it needs reading.
 
-**This repo (`massql-java`) is the only deliverable.** Production code, tests, and these
-specs. Nothing outside it ships.
+**The oracle working directory (`../massql`, relative to this repo's root)** holds the pinned Python MassQL
+install and the scripts that *generate* fixtures and goldens — `massql_query.py`, `generate-all.sh`,
+`reproduce-goldens.sh`, `dump_loader_parity.py`, `make_micro_fixtures.py`, `mzml_to_mzxml.py`,
+`venv-setup.sh`, `test_query_py_reference.py`, `requirements.freeze.txt`, the venv, and the pinned MassQL clone.
+It is **never shipped**, is **not a git repo**, and is now **executable tooling only**.
 
-**The oracle working directory (`../massql`, relative to this repo's root)** holds the
-pinned Python MassQL install, `massql_query.py`, and the scripts that *generate* the fixtures
-and goldens. It is **never shipped** and is not a git repo. It exists to define the
-behavioural contract and to produce the goldens the Java test suite diffs against.
-
-> ⚠ **Correction C26 — the test suite no longer reads from the oracle directory at all.**
-> Fixtures and goldens are **committed to this repo** under `src/test/resources/`, because CI
-> checks out only `massql-java` and the old arrangement made every fixture-dependent test skip
-> silently. `make verify` now needs nothing outside this repo. See [`../FIXTURES.md`](../FIXTURES.md).
+> ⚠ **Corrections C26 and C41 — nothing outside this repo is required to build, test, or read.**
+> **C26** moved the fixtures and goldens in: they are committed under `src/test/resources/`, because CI checks
+> out only `massql-java` and the old arrangement made every fixture-dependent test skip *silently*.
+> **C41** finished the job for documentation. Four artifacts the specs actively cite — the pin, the verified
+> loader facts, fixture provenance, and MassQL's own grammar — were still in that unversioned directory, which is
+> how `SPIKE.md` came to exist in two copies that **forked**, and how `PINNED.md` lost a record its own code
+> comment pointed at. `make verify` needs nothing outside this repo. See [`FIXTURES.md`](FIXTURES.md) and
+> [`oracle/README.md`](oracle/README.md).
 
 Paths in the specs resolve like this:
 
@@ -56,9 +87,9 @@ Paths in the specs resolve like this:
 |---|---|
 | `src/main/java/…`, `docs/…`, `pom.xml` | **this repo** |
 | `data/…`, `fixtures/…`, `goldens/…`, `reference_parses/…` | **this repo**, under `src/test/resources/` (C26) |
-| `oracle/…` (e.g. `oracle/PINNED.md`, `oracle/msql.ebnf`) | the oracle directory |
+| [`oracle/PINNED.md`](oracle/PINNED.md), [`oracle/msql.ebnf`](oracle/msql.ebnf) and siblings | **this repo**, `docs/harness/oracle/` (C41 — these were in the oracle directory until then) |
 | `output/…` (where goldens are *generated*) | the oracle directory; the committed copies are `src/test/resources/goldens/query-results/` |
-| `data/CONVERSION_NOTES.md` | the oracle directory — per-fixture provenance and generation notes |
+| a `.py` or `.sh` under `oracle/` | the oracle directory — tooling, not something a spec cites as design input |
 
 The one exception is the two Ewing-lab fixtures (`data/DP00570_F02.*`), gitignored because
 ewinglab.org states no redistribution terms. `scripts/fetch-fixtures.sh` retrieves them and CI
@@ -71,6 +102,11 @@ a correction is not done until the affected specs are edited, because the engine
 Step 12 will never think to re-read Step 2's notes. In short:
 
 - a spec is wrong, or a later step's assumption breaks → a numbered **Correction in the
-  index** *and* an edit at the point of use in every affected spec;
-- a fact about a fixture → `data/CONVERSION_NOTES.md` in the oracle directory;
-- a fact about the oracle → `oracle/PINNED.md` or `oracle/NOTES_fileloading.md`.
+  index** *and* an edit at the point of use in every affected spec. **From C38 onward the Correction must carry
+  a `Fallout:` line**, and `make spec-audit` fails the build until every spec it names cites it back;
+- a fact about a fixture → [`oracle/CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md);
+- a fact about the oracle → [`oracle/PINNED.md`](oracle/PINNED.md) or
+  [`oracle/NOTES_fileloading.md`](oracle/NOTES_fileloading.md).
+
+All three are **in this repo** as of C41. They were in the unversioned oracle directory, which is exactly how one
+of them lost a record it was the designated home for.

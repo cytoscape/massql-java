@@ -16,12 +16,12 @@ one table, and judge whether the spike succeeded.
 
 ## Context
 
-`SPIKE.md` §7 Step 3 frames this precisely: *"What makes the repo reviewable rather than just working."* The
+[`SPIKE.md`](SPIKE.md) §7 Step 3 frames this precisely: *"What makes the repo reviewable rather than just working."* The
 engineering is done by now; this step exists because a spike that cannot be independently validated has not
 actually answered its questions. The review gate is the deliverable, and the artifacts below are what gets
 reviewed.
 
-Governing sections: `SPIKE.md` §7 Step 3, §8 (honest framing), §9 (the constraints to assert), §11 (the eight
+Governing sections: [`SPIKE.md`](SPIKE.md) §7 Step 3, §8 (honest framing), §9 (the constraints to assert), §11 (the eight
 questions), §6d.
 
 ## Scope
@@ -32,12 +32,12 @@ questions), §6d.
 - The checked-in dependency audit.
 - A scripted OSGi-readiness check.
 - JaCoCo coverage reporting.
-- Written answers to all eight `SPIKE.md` §11 questions.
+- Written answers to all eight [`SPIKE.md`](SPIKE.md) §11 questions.
 - CI.
 
 **Out of scope**
 - **Everything Phase 2.** The activator, menu, dialog, node-table write-back and `MASSQL_PARSE` are sketched in
-  `SPIKE.md` §10 for review context only.
+  [`SPIKE.md`](SPIKE.md) §10 for review context only.
 - New features or semantics. If something is missing, it belongs to its owning step.
 - **The OSGi canary** — presented as a decision *for* the reviewer, not performed. See §7.
 
@@ -64,7 +64,7 @@ The reviewer's entry point. Required content:
   this SHA *is* the definition of "MassQL-compliant" here.
 - **The supported-feature matrix** — what parses, what executes, what rejects. Link `docs/FEATURE_MATRIX.md`.
 - **The 12-key result contract** — **one shape** for both MS1DATA and MS2DATA, discriminated by `mslevel`, with
-  no key ever absent. Point at **[`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md)**, the single definition; do not
+  no key ever absent. Point at **[`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md)**, the single definition; do not
   restate the key set in the README. ⚠ This bullet read *"and the 4-key MS1DATA shape, with the absent-vs-null
   distinction called out … point at `RESULT_CONTRACT.md`"* — both the second shape and that document are
   gone under Correction **C40**. (Path deliberately written without its `docs/` prefix so `spec-audit` check 5
@@ -88,7 +88,7 @@ The reviewer's entry point. Required content:
   [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md)): the stream rules above govern the **Java CLI**. The **SDK**
   writes to no stream at all and returns `List<ScanInfoResult>` — which is what Phase 2 consumes, so a
   reviewer must not read the CLI's stdout contract as an SDK behaviour.
-- **Honest framing**, per `SPIKE.md` §8: "full MassQL parity" means bug-for-bug agreement with *one commit* of a
+- **Honest framing**, per [`SPIKE.md`](SPIKE.md) §8: "full MassQL parity" means bug-for-bug agreement with *one commit* of a
   tool whose own docs advertise functions that don't exist (`scanmaxmz`, `scanrun`) while `scanmz` and `OTHERSCAN`
   exist undocumented. **Call it a `scaninfo` subset.** Overclaiming here is the one documentation failure that
   would actively mislead Phase 2.
@@ -155,7 +155,7 @@ Its own header records that check 2 was **silently vacuous on first write** (its
 Every check is verified to fail before being trusted, which is C26's lesson applied to the guard rather than
 to the tests.
 
-The table is the review artifact. `SPIKE.md` §6d: *"The reviewer should not have to reconstruct how to validate
+The table is the review artifact. [`SPIKE.md`](SPIKE.md) §6d: *"The reviewer should not have to reconstruct how to validate
 the thing."* Shape:
 
 ```
@@ -211,7 +211,7 @@ Wire it into `make verify` and CI so a future dependency change fails the build 
 ### 6. Coverage, CI, and the §11 answers
 
 **JaCoCo** — *"not as a target to game, but so the reviewer can see which of the §3 rules are actually
-exercised."* Do not add a coverage-percentage gate. Instead, in the README, map each `SPIKE.md` §3 rule to the
+exercised."* Do not add a coverage-percentage gate. Instead, in the README, map each [`SPIKE.md`](SPIKE.md) §3 rule to the
 test that pins it — a short table is far more useful to a reviewer than a percentage.
 
 **CI — already built in [Step 3](Tech_Step3.md) §8**, which owns `ci.yml` and `release.yml`. Do not
@@ -233,7 +233,7 @@ carrying forward:
 
 | # | Question | Source |
 |---|---|---|
-| 1 | Bit-identical decoded intensities vs Python? If not, what tolerance is the contract? | [Step 8](Tech_Step8.md) `PARITY_REPORT.md` |
+| 1 | Bit-identical decoded intensities vs Python? If not, what tolerance is the contract? | [Step 8](Tech_Step8.md) [`PARITY_REPORT.md`](PARITY_REPORT.md) |
 | 2 | Same rows on `small.mzML` and `small.mzXML`? | [Step 12](Tech_Step12.md) layer 3 Pair A |
 | 3 | Closure under ~1.5 MB? Both javolution forks in the released pom? | **Answered:** ≈1.17 MB; **no** — the plain fork is commented out (Correction C2). Final number from §4 |
 | 4 | Is MSDK's licence shippable? | **Answered:** dual LGPL-2.1 / EPL-1.0; **we elect EPL-1.0** (Correction C3). Not blocking |
@@ -251,7 +251,7 @@ thing a review exists to surface.
 Stop here. The reviewer checks `massql-java` against the goldens, the test suite and the README before any
 `massql-app` work begins.
 
-**Present the OSGi canary as a decision, not a deliverable.** `SPIKE.md` §9 recommends a 2-hour throwaway bundle
+**Present the OSGi canary as a decision, not a deliverable.** [`SPIKE.md`](SPIKE.md) §9 recommends a 2-hour throwaway bundle
 that embeds `massql-java` and logs a scan count from `small.mzML` inside Cytoscape. Its value: it is the one risk
 that, if it fails, forces a change *inside* `massql-java` (vendoring more of MSDK rather than depending on it) —
 and discovering that after the gate is expensive. Its cost: it is not pure Java, so it breaks the spike's clean
@@ -259,7 +259,7 @@ boundary. **Put both sides in the README and let the reviewer choose.** Do not r
 
 Note for the reviewer that the vendoring in [Step 7](Tech_Step7.md) has already removed the largest OSGi risk —
 `ServiceLoader`-bearing and multi-megabyte dependencies — so the canary is now cheaper insurance on a smaller
-exposure than `SPIKE.md` assumed.
+exposure than [`SPIKE.md`](SPIKE.md) assumed.
 
 ## Known traps
 
@@ -303,16 +303,16 @@ exposure than `SPIKE.md` assumed.
 
 ## References
 
-- `SPIKE.md` §7 Step 3 (this step), §8 (honest framing and the out-of-scope list), §9 (the constraints and the
+- [`SPIKE.md`](SPIKE.md) §7 Step 3 (this step), §8 (honest framing and the out-of-scope list), §9 (the constraints and the
   canary), §11 (the eight questions), §6d (build wiring and `make verify`), §10 (Phase-2 sketch — context only)
-- Inputs: `docs/PARITY_REPORT.md` ([Step 8](Tech_Step8.md)), `docs/DIFFERENTIAL_REPORT.md`
-  ([Step 12](Tech_Step12.md)), **`docs/RESULT_SCHEMA.md`** ([Step 10](Tech_Step10.md) — renamed from the
+- Inputs: [`PARITY_REPORT.md`](PARITY_REPORT.md) ([Step 8](Tech_Step8.md)), `docs/DIFFERENTIAL_REPORT.md`
+  ([Step 12](Tech_Step12.md)), **[`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md)** ([Step 10](Tech_Step10.md) — renamed from the
   never-written `RESULT_CONTRACT.md` by **C40**, which folded it into the one existing definition),
-  `docs/SEMANTICS.md` ([Step 9](Tech_Step9.md)), `docs/VENDORED.md` ([Step 6](Tech_Step6.md), owned by
-  [Step 7](Tech_Step7.md)), `docs/READER_RULES.md` (Steps [6](Tech_Step6.md), [7](Tech_Step7.md))
+  [`SEMANTICS.md`](SEMANTICS.md) ([Step 9](Tech_Step9.md)), [`VENDORED.md`](../VENDORED.md) ([Step 6](Tech_Step6.md), owned by
+  [Step 7](Tech_Step7.md)), [`READER_RULES.md`](READER_RULES.md) (Steps [6](Tech_Step6.md), [7](Tech_Step7.md))
 
   > ⚠ **Correction C38 — check each of these exists before relying on it as a review artifact.**
-  > `docs/VENDORED.md` was listed here, recorded as a completed Step 6 deliverable, and referenced by all
+  > [`VENDORED.md`](../VENDORED.md) was listed here, recorded as a completed Step 6 deliverable, and referenced by all
   > eleven vendored source headers — and **did not exist**. It does now, asserted by
   > `VendoredProvenanceTest`. Nothing was verifying that a named artifact was actually on disk; a review
   > gate whose inputs may be absent is not a gate. `make spec-audit` check 1 covers fixtures and goldens,

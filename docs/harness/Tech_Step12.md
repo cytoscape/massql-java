@@ -18,16 +18,16 @@ the same rows across formats, that the CLI honours its contract, and that every 
 
 ## Context
 
-Three of `SPIKE.md` §6b's four layers land here (layer 1 was [Step 8](Tech_Step8.md)). Their jobs differ: the
+Three of [`SPIKE.md`](SPIKE.md) §6b's four layers land here (layer 1 was [Step 8](Tech_Step8.md)). Their jobs differ: the
 **differential** proves we match Python; **cross-format equivalence** catches reader-specific bugs a per-format
 golden structurally cannot see; the **CLI contract** protects the interface Phase 2 and the differential both
 depend on.
 
-Layer 3 is worth more than its size suggests. `SPIKE.md` §6b: *"Both are stronger than any single golden."* A
+Layer 3 is worth more than its size suggests. [`SPIKE.md`](SPIKE.md) §6b: *"Both are stronger than any single golden."* A
 per-format golden can hide a bug that affects both the Java reader and — because the golden was generated through
 the same Python loader — nothing at all. Comparing two formats of the same data has no such blind spot.
 
-Governing sections: `SPIKE.md` §6b layers 2–4, §3 (the population table), §7 Step 2 done-criteria, §11.
+Governing sections: [`SPIKE.md`](SPIKE.md) §6b layers 2–4, §3 (the population table), §7 Step 2 done-criteria, §11.
 
 ## Scope
 
@@ -143,7 +143,7 @@ Fixtures and expected counts:
 > discriminated by `mslevel`, with no key ever absent.
 >
 > **This file also contradicted itself** — `:139` said 9 keys while the `DifferentialIT` row said 4. Both now
-> read one 12-key shape. The contract is [`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md); do not restate it here.
+> read one 12-key shape. The contract is [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md); do not restate it here.
 >
 > For the MS1DATA pair specifically: `precmz`/`ms1scan`/`charge` and the three `ms1_*` columns are **present and
 > `null`**, while **`base_peak_i`/`base_peak_mz` carry real values**. `small_mzml_ms1_results.json` was
@@ -170,7 +170,7 @@ Including populated `ms1_*`. This catches reader-specific bugs — a byte-order 
 that a per-format golden would not reveal, because that golden came through the same Python loader either way.
 
 Caveat from [Step 2](Tech_Step2.md) §1: if msconvert dropped `precursorScanNum` or renumbered scans,
-`CONVERSION_NOTES.md` says so and this comparison degrades to the non-`ms1_*` columns. **Read that file before
+[`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md) says so and this comparison degrades to the non-`ms1_*` columns. **Read that file before
 debugging a failure here** — the cause may be the conversion, not the code. If degraded, the test must state the
 degradation in its failure message rather than silently comparing fewer columns.
 
@@ -256,13 +256,13 @@ Each of these, for each of the three formats where applicable:
 
 Record, don't gate — but record honestly. Per fixture: **wall-clock** and **peak heap**.
 
-Compare against the pandas path (re-run `massql_query.py` under `/usr/bin/time -l`). `SPIKE.md` §7: *"if Java
+Compare against the pandas path (re-run `massql_query.py` under `/usr/bin/time -l`). [`SPIKE.md`](SPIKE.md) §7: *"if Java
 isn't at least as fast as pandas on the MGF, something is quadratic (probably a linear scan where a binary search
 belongs)."* The MGF is the fixture that matters — 34,513 spectra.
 
 If Java is slower, treat it as a finding and look at the two window methods first ([Step 5](Tech_Step5.md) §4) —
 `mzWindowExclusive` is the hotter of the pair, being called per condition per scan. Put the numbers
-in `DIFFERENTIAL_REPORT.md`; they answer `SPIKE.md` §11 Q8.
+in `DIFFERENTIAL_REPORT.md`; they answer [`SPIKE.md`](SPIKE.md) §11 Q8.
 
 ### 6. The differential report
 
@@ -270,7 +270,7 @@ in `DIFFERENTIAL_REPORT.md`; they answer `SPIKE.md` §11 Q8.
 builds on it. Per format: rows expected vs matched, per-column pass/fail, any adopted tolerance with its
 justification, layer 3 results including the Pair B intersection size, and the performance numbers.
 
-Answer these `SPIKE.md` §11 questions here, one sentence each: **Q2** (same rows on `small.mzML` and
+Answer these [`SPIKE.md`](SPIKE.md) §11 questions here, one sentence each: **Q2** (same rows on `small.mzML` and
 `small.mzXML`?), **Q6** (measured LOC — does 1,200–1,800 hold?), **Q8** (wall-clock and heap vs pandas).
 
 ## Known traps
@@ -279,7 +279,7 @@ Answer these `SPIKE.md` §11 questions here, one sentence each: **Q2** (same row
   parsed values. §1.
 - **Loosening a policy to reach green.** The table *is* the exit criterion. A relaxed tolerance converts a found
   bug into a permanent unknown. The one permissible exception is documented in §1, and only for `tic`.
-- **Debugging Pair A before reading `CONVERSION_NOTES.md`.** The cause may be msconvert, recorded in Step 2.
+- **Debugging Pair A before reading [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md).** The cause may be msconvert, recorded in Step 2.
 - **A vacuous Pair B pass** from a near-empty scan-id join. Report the intersection size.
 - **Testing stream separation in-process.** Use a subprocess; an in-process `System.setOut` test can pass while
   the real CLI interleaves streams. This is why §3(b) survives as a subprocess test rather than being folded
@@ -314,7 +314,7 @@ Answer these `SPIKE.md` §11 questions here, one sentence each: **Q2** (same row
       per column**.
 - [ ] The MS1DATA differential passes with the **same 12 keys** as every other row (C40): precursor keys
       **present and `null`**, `base_peak_i`/`base_peak_mz` **non-null**. This box used to require them "absent".
-- [ ] Layer 3 Pair A: identical rows, or a degradation documented and traced to `CONVERSION_NOTES.md`.
+- [ ] Layer 3 Pair A: identical rows, or a degradation documented and traced to [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md).
 - [ ] Layer 3 Pair B: shared columns equal, `ms1_*` differing exactly as predicted, intersection size reported.
 - [ ] CLI: all of §3, including the tight-tolerance case.
 - [ ] Every §4 error path behaves as specified; 200+ file cycles leak nothing.
@@ -324,9 +324,9 @@ Answer these `SPIKE.md` §11 questions here, one sentence each: **Q2** (same row
 
 ## References
 
-- `SPIKE.md` §6b layers 2–4 (per-column policy, the two pairs, the CLI contract, the error-path list), §3 (the
+- [`SPIKE.md`](SPIKE.md) §6b layers 2–4 (per-column policy, the two pairs, the CLI contract, the error-path list), §3 (the
   population table), §7 Step 2 done-criteria and the performance note, §11
 - [Step 10](Tech_Step10.md) §6 — the population table Pair B asserts
 - [Step 7](Tech_Step7.md) — the document-order rule Pair B pins from outside
-- [Step 2](Tech_Step2.md) `data/CONVERSION_NOTES.md` — read before debugging Pair A
+- [Step 2](Tech_Step2.md) [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md) — read before debugging Pair A
 - [Step 8](Tech_Step8.md) §1 — the bit-identity harness and the accumulation-order caveat

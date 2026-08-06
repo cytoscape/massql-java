@@ -18,7 +18,7 @@ this machine at all**, yet "all three formats verified" is the spike's exit crit
 gap and also produces the small hand-written files that make unit-test failures readable: when a tolerance
 assertion fails on a 4-peak spectrum you can see why; on a 34,000-spectrum file you cannot.
 
-Governing sections: `SPIKE.md` §6c, §7 Step 0.
+Governing sections: [`SPIKE.md`](SPIKE.md) §6c, §7 Step 0.
 
 ## Scope
 
@@ -42,7 +42,7 @@ Governing sections: `SPIKE.md` §6c, §7 Step 0.
 | Path | Content |
 |---|---|
 | `data/small.mzXML` | Converted from `data/small.mzML` via ProteoWizard |
-| `data/CONVERSION_NOTES.md` | **Fixture provenance for the whole spike**: what each fixture is, what was verified about it, and every fixture-level finding later steps depend on. See the scope note in [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md) — cross-step *spec* corrections go in the INDEX, fixture *facts* go here. |
+| [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md) | **Fixture provenance for the whole spike**: what each fixture is, what was verified about it, and every fixture-level finding later steps depend on. See the scope note in [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md) — cross-step *spec* corrections go in the INDEX, fixture *facts* go here. ⚠ **Now at `docs/harness/oracle/` (Correction C41)** — it was in the unversioned oracle directory, where [`FIXTURES.md`](FIXTURES.md) and 25 other citations pointed at content that had no git history. |
 | `scripts/fetch-fixtures.sh` | Downloads the Ewing pair to `data/`, with size assertions |
 | `data/.gitignore` | Excludes the Ewing files (unstated provenance — referenced by URL, not committed) |
 | `fixtures/micro/micro.{mgf,mzML,mzXML}` + `micro_rtseconds.mzML` | 5 scans, <7 KB each. **Generated** by `oracle/make_micro_fixtures.py` from one explicit data table rather than hand-typed three times — the three encodings must contain identical peak data for the cross-format tests to mean anything. The table is the hand-written part. |
@@ -68,7 +68,7 @@ standard macOS route). The Docker daemon is confirmed running.
 > (`anon_mmap_fixed: Assertion !((UINT_PTR)start & host_page_mask) failed`). `docker run` still **exits 0**
 > after the core dump. `oracle/mzml_to_mzxml.py` generates the fixture instead, validated by the oracle
 > reading both formats: **11 of 12 columns bit-identical**. Full analysis and the `precision="32"` rationale
-> in [`data/CONVERSION_NOTES.md`](../../../massql/data/CONVERSION_NOTES.md). The command below is kept for the record and for
+> in [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md). The command below is kept for the record and for
 > anyone running on amd64.
 
 ```
@@ -76,7 +76,7 @@ docker run --rm -v "$PWD/data:/data" chambm/pwiz-skyline-i-agree-to-the-vendor-l
   wine msconvert --mzXML /data/small.mzML -o /data
 ```
 
-Record the resolved image digest in `data/CONVERSION_NOTES.md` so the conversion is reproducible.
+Record the resolved image digest in [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md) so the conversion is reproducible.
 
 **Then assert three things, and record each result:**
 
@@ -93,7 +93,7 @@ Record the resolved image digest in `data/CONVERSION_NOTES.md` so the conversion
    grep -c 'precursorScanNum' data/small.mzXML
    ```
 
-   **If the count is 0, say so explicitly in `CONVERSION_NOTES.md`.** The consequence is bounded and known:
+   **If the count is 0, say so explicitly in [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md).** The consequence is bounded and known:
    [Step 12](Tech_Step12.md) layer 3 degrades to comparing only the non-`ms1_*` columns for this pair. That is
    an acceptable, documented degradation — silently accepting it is not.
 
@@ -122,7 +122,7 @@ a silently-changed upstream file becomes a visible error rather than a mysteriou
 > every parity assertion **skipped silently** while the test counter stayed healthy (surefire counts skips
 > inside "Tests run"). A missing fixture is now a **hard failure** carrying the
 > `scripts/fetch-fixtures.sh` command; CI fetches and caches these two files and asserts the skipped-test
-> count is **0**. See `docs/FIXTURES.md`.
+> count is **0**. See [`FIXTURES.md`](FIXTURES.md).
 
 Expected content, for assertion: **916 scans (229 MS1, 687 MS2)**, mzXML schema **2.0**, `precision="32"`,
 `byteOrder="network"`, no compression, and **zero `precursorScanNum` attributes**:
@@ -134,7 +134,7 @@ grep -c 'precursorScanNum' data/DP00570_F02.mzxml   # must be 0
 That zero is what makes this file the only available fixture that can distinguish the document-order `ms1scan`
 rule from the intuitive `precursorScanNum`-resolving implementation.
 
-Some scans carry `peaksCount="3"` — note a few of their scan numbers in `data/CONVERSION_NOTES.md`, as they
+Some scans carry `peaksCount="3"` — note a few of their scan numbers in [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md), as they
 give [Step 8](Tech_Step8.md) hand-checkable assertions.
 
 ### 3. Hand-write the micro-fixtures
@@ -206,7 +206,7 @@ Create `test_ms1.massql` containing a `scaninfo(MS1DATA)` query — e.g.
 > ⚠ **Correction C40 inverts what to confirm here.** This paragraph said to *"confirm that `precmz`, `ms1scan`,
 > `charge` and all three `ms1_*` keys are **absent**, not null."* The opposite is required: they must be
 > **present with the value `null`**, because the contract is a single 12-key union discriminated by `mslevel`
-> ([`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md)). Additionally `base_peak_i`/`base_peak_mz` must be **non-null**
+> ([`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md)). Additionally `base_peak_i`/`base_peak_mz` must be **non-null**
 > — a survey scan has a base peak, and their nulls in the original golden were a `ms2_df` left-join artifact in
 > `massql_query.py`, since fixed.
 
@@ -270,7 +270,7 @@ Scripts, verified by running them:
 ## Done when
 
 - [x] `data/small.mzXML` exists (generated, not msconvert — see above); scan count **48 (14 MS1 / 34 MS2)** and `ms1scan` numbering **2, 9, 16, 23,
-      36, 43** confirmed; the `precursorScanNum` survival result recorded in `CONVERSION_NOTES.md`.
+      36, 43** confirmed; the `precursorScanNum` survival result recorded in [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md).
 - [x] `scripts/fetch-fixtures.sh` retrieves both Ewing files at the exact expected byte counts; `grep -c
       precursorScanNum data/DP00570_F02.mzxml` = **0**; files are gitignored.
 - [x] Four micro-fixtures exist (three formats + an mzML `unitName="second"` variant), each <10 KB, each exercising every row of the design table, with
@@ -287,13 +287,13 @@ Scripts, verified by running them:
 
 ## References
 
-- `SPIKE.md` §6c (fixture table, RT-units table, conversion and download tasks), §7 Step 0
-- [Step 1](Tech_Step1.md) — the oracle and `oracle/NOTES_fileloading.md`
+- [`SPIKE.md`](SPIKE.md) §6c (fixture table, RT-units table, conversion and download tasks), §7 Step 0
+- [Step 1](Tech_Step1.md) — the oracle and [`NOTES_fileloading.md`](oracle/NOTES_fileloading.md)
 - Consumers: [Step 6](Tech_Step6.md), [Step 7](Tech_Step7.md) (micro-fixtures, edge case),
   [Step 8](Tech_Step8.md) (parity dumps), [Step 9](Tech_Step9.md) (micro-fixtures),
   [Step 12](Tech_Step12.md) (goldens)
 - Established facts in [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md)
 
 **✅ STEP 2 COMPLETE — 2026-07-30.** See Corrections C11–C15 in [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md)
-and [`data/CONVERSION_NOTES.md`](../../../massql/data/CONVERSION_NOTES.md). One open decision was deferred to
+and [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md). One open decision was deferred to
 [Step 10](Tech_Step10.md) §5: the `scaninfo(MS1DATA)` key set.

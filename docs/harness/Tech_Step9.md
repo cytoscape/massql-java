@@ -26,7 +26,7 @@ missed: no exception, no warning, just a different set of rows than MassQL would
 historical quirks rather than designed behaviour, and reproducing them faithfully — including `=` meaning `>=` —
 is the requirement.
 
-Governing sections: `SPIKE.md` §3 (exact rules), §6a (tolerance / comparator / algebra rows), §7 Step 2.
+Governing sections: [`SPIKE.md`](SPIKE.md) §3 (exact rules), §6a (tolerance / comparator / algebra rows), §7 Step 2.
 
 ## Scope
 
@@ -56,7 +56,7 @@ Governing sections: `SPIKE.md` §3 (exact rules), §6a (tolerance / comparator /
 | `src/main/java/…/massql/exec/IntensityQualifiers.java` | Comparator + intensity semantics |
 | `src/main/java/…/massql/exec/ConstantFolder.java` | Arithmetic folding, incl. **`Expr.Unary`** (C35e) |
 | `src/test/java/…/exec/*Test.java` | The test set below |
-| `docs/SEMANTICS.md` | The §3 rules, each with the source line that establishes it |
+| [`SEMANTICS.md`](SEMANTICS.md) | The §3 rules, each with the source line that establishes it |
 
 ⚠ **"AST → qualifying scan ordinals" was the old description of `QueryExecutor`** and is wrong under streaming
 (C35b): there are no whole-file ordinals, and it returns a summary rather than an array.
@@ -141,7 +141,7 @@ Per condition, *within* one scan: build a `RowMask` over that scan's rows, then 
 whether bit 0 is set. ⚠ It is a method on **`RowMask`**, not on `SpectrumTable` as this section previously said
 (C35d). Combine across conditions with a per-scan boolean **AND over "did this condition find any peak"** — never
 a row-level AND, because two conditions may be satisfied by *different* peaks in the same scan. That distinction
-is the most likely structural error in the step; state it in `SEMANTICS.md`.
+is the most likely structural error in the step; state it in [`SEMANTICS.md`](SEMANTICS.md).
 
 Scan-level conditions (`RTMIN`, `RTMAX`, `SCANMIN`, `SCANMAX`, `CHARGE`, `POLARITY`, `MS2PREC`) read `ScanView`
 directly and filter the scan with no row mask and **no materialisation**.
@@ -174,7 +174,7 @@ Keep filtering **non-destructive**: produce masks, never a pruned table ([Step 5
 | `INTENSITYVALUE` | Absolute-intensity qualifier |
 | `INTENSITYTICPERCENT` | TIC-relative qualifier (`iTicNorm`) |
 | `FILTER` | Same evaluation as `WHERE`; note **no lowercase form exists** ([Step 4](Tech_Step4.md) §2) |
-| ~~`MASSDEFECT`~~ | ⚠ **Not a condition — Correction C19.** `msql.ebnf` defines it as a *qualifier* taking `massdefect(min=…,max=…)`, alongside `TOLERANCEMZ`. It is out of scope and [Step 4](Tech_Step4.md) rejects it by name, so it never reaches the engine. |
+| ~~`MASSDEFECT`~~ | ⚠ **Not a condition — Correction C19.** [`msql.ebnf`](oracle/msql.ebnf) defines it as a *qualifier* taking `massdefect(min=…,max=…)`, alongside `TOLERANCEMZ`. It is out of scope and [Step 4](Tech_Step4.md) rejects it by name, so it never reaches the engine. |
 | `OR` value lists | A condition satisfied by **any** value in the list |
 | Arithmetic literals | Folded before evaluation (§4) |
 
@@ -192,7 +192,7 @@ Keep filtering **non-destructive**: produce masks, never a pruned table ([Step 5
 
 ### 3. Exact semantics — each one a silent wrong answer if missed
 
-Put every rule in `docs/SEMANTICS.md` alongside the source line that establishes it. Where this spec and the
+Put every rule in [`SEMANTICS.md`](SEMANTICS.md) alongside the source line that establishes it. Where this spec and the
 pinned Python source disagree, **the source wins** — correct the spec and note it.
 
 > ⚠ **Correction C37 — the authority is `msql_engine_filters.py`, not `msql_engine.py`.** This section used to
@@ -227,7 +227,7 @@ pinned Python source disagree, **the source wins** — correct the spec and note
 
 **Comparators**
 
-- **`=` means `>=` for intensity comparisons.** Verbatim from `SPIKE.md` §3: *"preserving historical semantics."*
+- **`=` means `>=` for intensity comparisons.** Verbatim from [`SPIKE.md`](SPIKE.md) §3: *"preserving historical semantics."*
   It looks like a bug; reproduce it.
 - **An intensity column with no explicit qualifier gets an implicit `> 0` — PER COLUMN, on all three.** So a
   bare `MS2PROD=100.0` requires a peak satisfying `i > 0 AND i_norm > 0 AND i_tic_norm > 0`, not merely a
@@ -300,7 +300,7 @@ pinned Python source disagree, **the source wins** — correct the spec and note
 
 > ⛔ **Correction C35(d) — a `MASSDEFECT` paragraph used to sit here telling you to "derive the exact
 > definition from the pinned Python source and record it". Delete that instinct: it is out of scope.** §2
-> already marks it so (Correction C19 — `msql.ebnf` defines it as a *qualifier*, not a condition), and
+> already marks it so (Correction C19 — [`msql.ebnf`](oracle/msql.ebnf) defines it as a *qualifier*, not a condition), and
 > `UnsupportedConstructs:59` rejects it **by name at parse time**, so it can never reach the engine. Researching
 > its semantics would be work spent on a construct this SDK refuses.
 
@@ -410,7 +410,7 @@ file fails the build.
       at Step 9's close; the spec-propagation round that followed added two tests — a `Comparator` arity
       assertion and a scale guard for `mzWindowExclusive`, each closing a spec claim that no test backed.)
 - [x] Every 9a and 9b condition has a positive and a negative test.
-- [x] **Every** rule in §3 has a dedicated assertion, and `docs/SEMANTICS.md` cites the source line for each —
+- [x] **Every** rule in §3 has a dedicated assertion, and [`SEMANTICS.md`](SEMANTICS.md) cites the source line for each —
       pointing at **`msql_engine_filters.py`**, the real authority (C37).
 - [x] Scan-level intersection proven, not row-level AND
       (`QueryExecutorTest.twoConditionsMayBeSatisfiedByDifferentPeaksInTheSameScan`).
@@ -424,7 +424,7 @@ file fails the build.
 
 ## References
 
-- `SPIKE.md` §3 (*"Exact rules — each is one line, and each is a silent wrong-answer bug if missed"*), §6a
+- [`SPIKE.md`](SPIKE.md) §3 (*"Exact rules — each is one line, and each is a silent wrong-answer bug if missed"*), §6a
   (tolerance math, intensity comparators, intensity algebra rows), §7 Step 2 (the 2a/2b split, here 9a/9b)
 - `oracle/test_query_py_reference.py` — the property tests to port
 - `massql/msql_engine.py` @ pinned SHA — the authority for every rule in §3

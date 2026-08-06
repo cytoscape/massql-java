@@ -13,7 +13,7 @@ exactly — so the [Step 12](Tech_Step12.md) differential is a literal `diff`.
 
 ## Context
 
-The public API is the contract with `massql-app`; everything behind it can churn. `SPIKE.md` §4 says to design it
+The public API is the contract with `massql-app`; everything behind it can churn. [`SPIKE.md`](SPIKE.md) §4 says to design it
 deliberately for that reason. Two API rules matter downstream, and both are already satisfied by
 [Step 10](Tech_Step10.md): boxed types so null is testable, and `ResultJson` as a published string contract the
 app stores verbatim.
@@ -29,7 +29,7 @@ Keep the three layers distinct throughout this spec — SDK, Java CLI, reference
 *Terminology* in [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md). §1–§2 are the **SDK**; §3 is the **Java
 CLI**; only the latter has an opinion about streams.
 
-Governing sections: `SPIKE.md` §4.
+Governing sections: [`SPIKE.md`](SPIKE.md) §4.
 
 ## Scope
 
@@ -57,7 +57,7 @@ Governing sections: `SPIKE.md` §4.
 
 ### 1. The public surface
 
-Exactly as sketched in `SPIKE.md` §4 — `massql-app` is written against this, so keep the shape:
+Exactly as sketched in [`SPIKE.md`](SPIKE.md) §4 — `massql-app` is written against this, so keep the shape:
 
 > ⚠ **Correction C22:** `SpectraFile.open` now returns a **`SpectraStream` cursor**, not an object
 > exposing whole-file `ms1()`/`ms2()` tables. The public shape below is unchanged in spirit — the
@@ -94,7 +94,7 @@ Rules on this surface:
 - **A null `opts` means defaults**, not an NPE. `MassqlOptions.defaults()` is `precursorTolPpm = 20.0`.
 - **Return an immutable, possibly empty list.** Never null. A query matching nothing returns `List.of()`.
 - **No MSDK, ANTLR or vendored type appears anywhere in a public signature.** Verify by grep; this is what keeps
-  the reader and parser swappable, and it is a `SPIKE.md` §4 requirement, not a style preference.
+  the reader and parser swappable, and it is a [`SPIKE.md`](SPIKE.md) §4 requirement, not a style preference.
 - Results are ordered by **scan id ascending**, so output is deterministic and `diff`-able. Confirm the goldens are
   in that order (`small_mzml_results.json` starts at scan 3 and `plusrise_results.json` at 576, both ascending);
   if MassQL's own ordering differs anywhere, match MassQL and record it in `docs/API.md`.
@@ -105,7 +105,7 @@ Rules on this surface:
 > **There is one shape.** MS1DATA and MS2DATA both emit the same 12 keys, discriminated by the `mslevel` value
 > rather than by a shape flag, so `ScanInfoResult` has **no `ms1DataShape` component** and `ResultJson` takes no
 > shape parameter. `execute` therefore needs no special case for MS1DATA at all — a simplification, not a
-> restriction. Contract: [`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md).
+> restriction. Contract: [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md).
 
 ### 2. Diagnostics
 
@@ -232,7 +232,7 @@ on it. So:
 ## Done when
 
 - [ ] `make test` green (and `make verify` before calling the step done).
-- [ ] The three entry points match the `SPIKE.md` §4 sketch exactly.
+- [ ] The three entry points match the [`SPIKE.md`](SPIKE.md) §4 sketch exactly.
 - [ ] `ApiEncapsulationTest` passes — no third-party type on the public surface.
 - [ ] CLI arg order, flag and default match `massql_query.py`; a manual run against `data/small.mzML` +
       `test_mzml.massql` produces JSON on stdout that parses.
@@ -245,7 +245,7 @@ on it. So:
 
 ## References
 
-- `SPIKE.md` §4 (the API sketch, the two API rules, the CLI signature)
+- [`SPIKE.md`](SPIKE.md) §4 (the API sketch, the two API rules, the CLI signature)
 - `massql_query.py` — `:119-133` (argparse shape), `:141` (the deliberate stdout→stderr redirect), `:194-195`
   (`json.dump(..., indent=2, allow_nan=False)` then a newline)
 - [Step 10](Tech_Step10.md) §5 — the JSON contract this prints

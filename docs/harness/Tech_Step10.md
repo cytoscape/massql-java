@@ -31,9 +31,9 @@ a dumb loop.
 the node table verbatim and `MASSQL_PARSE` reads it back, so key names, key set and float formatting are all
 frozen here.
 
-Governing sections: `SPIKE.md` §3 (the contract, the population table, the exact rules), §4 (API rules), §6a
+Governing sections: [`SPIKE.md`](SPIKE.md) §3 (the contract, the population table, the exact rules), §4 (API rules), §6a
 (precursor lookup, null/sentinel, result JSON rows). ⚠ **SPIKE.md §3's MS1DATA paragraph is corrected by C40** —
-[`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) is the contract.
+[`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) is the contract.
 
 ## Scope
 
@@ -43,7 +43,7 @@ Governing sections: `SPIKE.md` §3 (the contract, the population table, the exac
 - The null / sentinel / NaN rules.
 - `ScanInfoResult` (boxed types) and `ResultJson`.
 - **The single 12-key output shape**, for both MS2DATA and MS1DATA (Correction **C40**; contract in
-  [`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md)).
+  [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md)).
 
 **Out of scope**
 - Filtering — [Step 9](Tech_Step9.md).
@@ -61,7 +61,7 @@ Governing sections: `SPIKE.md` §3 (the contract, the population table, the exac
 | `src/main/java/…/massql/result/ScanInfoResult.java` | Boxed result row |
 | `src/main/java/…/massql/result/ResultJson.java` | Serializer |
 | `src/test/java/…/result/*Test.java`, `…/exec/*Test.java` | The test set below |
-| **[`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md)** | The frozen key set, ordering, per-field nullability, formatting, and the population-by-format table. ⚠ **Renamed by C40**: this row used to create a second document, `RESULT_CONTRACT.md` (path deliberately not written in full here, so `spec-audit` check 5 does not read a retired name as a live reference). It would have been a *second* place defining the same contract — the duplication that caused C40. `RESULT_SCHEMA.md` already exists and is the single definition; **extend it, do not add a sibling.** |
+| **[`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md)** | The frozen key set, ordering, per-field nullability, formatting, and the population-by-format table. ⚠ **Renamed by C40**: this row used to create a second document, `RESULT_CONTRACT.md` (path deliberately not written in full here, so `spec-audit` check 5 does not read a retired name as a live reference). It would have been a *second* place defining the same contract — the duplication that caused C40. [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) already exists and is the single definition; **extend it, do not add a sibling.** |
 
 ## Specification
 
@@ -91,10 +91,10 @@ public record ScanInfoResult(
 > `plusrise` result, and part of `equals`/`hashCode` for no reason. `ResultJson` takes no shape parameter either.
 >
 > The `basePeakI`/`basePeakMz` comments above read *"never null for MS2DATA"*; under C40 they are **never null at
-> all**, MS1DATA included. See [`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md).
+> all**, MS1DATA included. See [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md).
 
 All the sentinel and NaN rules live **in the SDK**, not in the consuming app — that is the design rule from
-`SPIKE.md` §4, and it is why they are unit-tested here.
+[`SPIKE.md`](SPIKE.md) §4, and it is why they are unit-tested here.
 
 ### 2. The two native computations
 
@@ -112,7 +112,7 @@ All the sentinel and NaN rules live **in the SDK**, not in the consuming app —
   for `scaninfo` specifically; other MassQL functions put a different quantity in `i` (`scanmaxint` puts the base
   peak there), which is why `massql_query.py:154` guards the rename to `scaninfo` queries only. We only support
   `scaninfo`, so the rename is unconditional — the reason is recorded in
-  [`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) so it isn't generalized incorrectly if another function is ever
+  [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) so it isn't generalized incorrectly if another function is ever
   added.
 - **`rt`** comes from `scanRt` at double precision. The mzML golden's `0.011218333333333334` does not survive a
   float round-trip.
@@ -156,7 +156,7 @@ if ms1scan is present (non-zero) and the MS1 table has that scan:
 Four rules inside that, each independently testable:
 
 1. **Closest, not most intense.** `massql_query.py:104` — `cand.iloc[(cand["mz"] - precmz).abs().argmin()]`.
-   Picking the most intense peak in the window is the intuitive reading and it is wrong. `SPIKE.md` §6a calls the
+   Picking the most intense peak in the window is the intuitive reading and it is wrong. [`SPIKE.md`](SPIKE.md) §6a calls the
    test for this *"the test that catches the most likely misreading of the whole contract."* The
    [Step 2](Tech_Step2.md) micro-fixtures were built with a window where those two differ.
 2. **`ms1_base_peak_i` does not depend on the match.** It is populated whenever the linked MS1 scan exists, so a
@@ -225,7 +225,7 @@ is no linked scan.
 ### 5. `ResultJson` — the frozen contract
 
 **⛔ The key set, key order, per-field nullability and float policy are defined in
-[`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md), not here.** Do not restate them in this file — that duplication
+[`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md), not here.** Do not restate them in this file — that duplication
 is what let four documents drift into three different answers (Correction **C40**). Read that file before
 implementing; this section covers only what is specific to *building* the serializer.
 
@@ -255,7 +255,7 @@ Two things this step still owns:
 Output is a **JSON array** of objects; an empty result is `[]`, not `null` and not an error.
 
 **Float formatting — the policy is `Double.toString`, compact, and it lives in
-[`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md).** What matters when writing the serializer: `Double.toString` is
+[`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md).** What matters when writing the serializer: `Double.toString` is
 shortest-round-trip, and **round-trip bit-exactness is the actual requirement** — not matching Python's bytes.
 Java differs from Python in known ways (exponents `1.0E-5` vs `1e-05`; always emitting `.0` on integral values),
 which is exactly why [Step 12](Tech_Step12.md) compares **parsed values, never text**. Emit canonical numbers;
@@ -266,7 +266,7 @@ Write the serializer by hand — no Jackson/Gson. The output shape is 12 fixed k
 
 ### 6. Population by input format
 
-**The authoritative table is in [`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md)** — including the union rule and
+**The authoritative table is in [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md)** — including the union rule and
 the per-field nullability. It is reproduced here only because this is the step that implements it; if the two
 ever disagree, that file wins (Correction **C40**).
 
@@ -276,7 +276,7 @@ ever disagree, that file wins (Correction **C40**).
 | `precmz` | ✔ (from `PEPMASS=`) | ✔ |
 | `ms1scan` | **null** — no survey scans exist | ✔ by **document order** ([Step 6](Tech_Step6.md) §4) |
 | `rt` | **`0.0`, not null** | ✔ |
-| `charge` | ⚠ **never null** — `CHARGE=` if present, else **`1`** (Correction C6; `SPIKE.md` §3 wrongly says null) | ✔ if recorded, else null via the `0` sentinel. ⚠ **mzXML's absent default is `0`, not MGF's `1`** (`msql_fileloading.py:451`), and `DP00570_F02.mzxml` carries **zero** `precursorCharge` attributes — so in practice *every* row from it is null. That makes `charge` a **predicted difference** in [Step 12](Tech_Step12.md)'s Pair B, not a shared column (Correction C29) |
+| `charge` | ⚠ **never null** — `CHARGE=` if present, else **`1`** (Correction C6; [`SPIKE.md`](SPIKE.md) §3 wrongly says null) | ✔ if recorded, else null via the `0` sentinel. ⚠ **mzXML's absent default is `0`, not MGF's `1`** (`msql_fileloading.py:451`), and `DP00570_F02.mzxml` carries **zero** `precursorCharge` attributes — so in practice *every* row from it is null. That makes `charge` a **predicted difference** in [Step 12](Tech_Step12.md)'s Pair B, not a shared column (Correction C29) |
 | `tic` | ✔ sum of MS2 fragment intensities | ✔ |
 | `mslevel` | `2` | `2` |
 | `base_peak_i` / `base_peak_mz` | ✔ | ✔ |
@@ -318,7 +318,7 @@ All unit (`*Test.java`), on the [Step 2](Tech_Step2.md) micro-fixtures and hand-
 | `SentinelNullTest` | `precmz`/`ms1scan`/`charge` `0` → null; **`rt` `0.0` preserved** (assert `0.0`, not null, and assert it is not `null` explicitly); no other column converted. |
 | `NanNullTest` | NaN → null; `+∞`/`−∞` → null; the resulting JSON parses. |
 | `ResultJsonShapeTest` | ⚠ **Rewritten by C40.** **Both** MS2DATA and MS1DATA emit **exactly the same 12 keys in the same order** — assert the key *list*, not a set, so order is pinned. For an MS1 row assert `precmz`/`ms1scan`/`charge`/`ms1_*` are **present with JSON `null`** — i.e. `json.has("precmz") && json.get("precmz").isNull()`, the **opposite** of what this row used to require (`!json.has("precmz")`). Also: `base_peak_i`/`base_peak_mz` **non-null on an MS1 row**; null renders as JSON `null`; empty result → `[]`. |
-| **`ResultSchemaContractTest`** | **Makes [`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) executable.** Parses the key table out of that document and asserts `ResultJson` emits **exactly** those keys in **exactly** that order. This is what makes "defined once" real rather than aspirational — reordering a row in the doc fails the build. Same spirit as `VendoredProvenanceTest`. |
+| **`ResultSchemaContractTest`** | **Makes [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) executable.** Parses the key table out of that document and asserts `ResultJson` emits **exactly** those keys in **exactly** that order. This is what makes "defined once" real rather than aspirational — reordering a row in the doc fails the build. Same spirit as `VendoredProvenanceTest`. |
 | `ResultJsonRoundTripTest` | Every emitted float parses back to the **identical bits** — guards against a formatter that rounds. |
 | `TicIsSumTest` | `tic` is the sum of fragment intensities, not the base peak — the distinction `massql_query.py:154` guards. |
 | `CollationAnchorTest` | Build a table reproducing `small.mzML`'s scan 3 and assert the full first golden record field by field. **At the default 20 ppm** (`output/small_mzml_results.json`): `scan` 3, `precmz` 810.79, `ms1scan` 2, `rt` 0.011218333333333334, `charge` null, **`tic` 586278.875 compared at relative 1e-6** (our float64 sum gives 586278.8533592224 -- the golden is a float32 accumulation, C34), `mslevel` 2, `base_peak_i` 161140.859375, `base_peak_mz` 736.6370849609375, **`ms1_i` null, `ms1_precmz` null**, `ms1_base_peak_i` **183838.71875**. That row is itself the tolerance-miss case — the nearest MS1 peak is 34.8 ppm away, so the match fails while `ms1_base_peak_i` survives. **At 60 ppm** (`output/small_mzml_tol60_results.json`) the same row has `ms1_i` 131528.0625 and `ms1_precmz` 810.8182000219822. Assert both; together they are the cleanest possible anchor for §3.2. |
@@ -343,7 +343,7 @@ the original row records what was *asked for*, and losing it is how a real gap g
 | `ResultJsonShapeTest` | → `ResultJsonTest` | the 12 keys in order for **both** levels; MS1 precursor keys **present and null**; MS1 base peaks **non-null** |
 | `ResultJsonRoundTripTest` | → `ResultJsonTest` | `everyEmittedFloatParsesBackToIDENTICALBITS`, over subnormals, `1e300`, `0.1+0.2` and the golden's `rt` |
 | `CollationAnchorTest` | → **`CollationAnchorIT`** | promoted to an **integration test**: it reads the real `data/small.mzML` and its committed goldens, which is failsafe's job, not surefire's. Asserts the first golden record field by field at **both** 20 and 60 ppm |
-| — | **`ResultSchemaContractTest`** *(new)* | parses `docs/RESULT_SCHEMA.md` and asserts `ResultJson`'s key order matches. **Demonstrated to fail** when two keys are swapped in the document |
+| — | **`ResultSchemaContractTest`** *(new)* | parses [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) and asserts `ResultJson`'s key order matches. **Demonstrated to fail** when two keys are swapped in the document |
 
 ## Done when
 
@@ -355,13 +355,13 @@ the original row records what was *asked for*, and losing it is how a real gap g
 - [x] `rt = 0.0` is preserved and asserted non-null.
 - [x] **One shape, 12 keys, same order, for both MS2DATA and MS1DATA** (C40) — with an MS1 row asserting the
       precursor keys **present and null** and `base_peak_i`/`base_peak_mz` **non-null**.
-- [x] `ResultSchemaContractTest` couples `ResultJson`'s key order to `docs/RESULT_SCHEMA.md`, and is
+- [x] `ResultSchemaContractTest` couples `ResultJson`'s key order to [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md), and is
       **demonstrated to fail** when a key is reordered in the document.
 - [x] `spec-audit` check 6 passes — every non-empty golden carries exactly the 12 keys in order — and is
       demonstrated to fail against the pre-C40 9-key golden.
 - [x] Every emitted float round-trips to identical bits.
 - [x] `CollationAnchorTest` reproduces the first `small.mzML` golden record exactly.
-- [x] `docs/RESULT_SCHEMA.md` is the **only** document defining the key set; no spec restates it.
+- [x] [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) is the **only** document defining the key set; no spec restates it.
 
 ### Also resolved in the pre-implementation review (C40 round)
 
@@ -390,10 +390,10 @@ Seven smaller findings, each verified against the code or the goldens rather tha
 
 ## References
 
-- `SPIKE.md` §3 (the contract, the 7/5 split, the population table, the exact rules), §4 (boxed types;
+- [`SPIKE.md`](SPIKE.md) §3 (the contract, the 7/5 split, the population table, the exact rules), §4 (boxed types;
   `ResultJson` as published contract), §6a (precursor lookup, null/sentinel, result JSON rows)
-- **[`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) — the single definition of the contract** (in-repo; the
-  oracle's `../massql/RESULT_SCHEMA.md` is superseded and now points here)
+- **[`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) — the single definition of the contract** (in-repo; the
+  oracle's [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) is superseded and now points here)
 - [cytoscape/cytoscape#26](https://github.com/cytoscape/cytoscape/issues/26) — the authority behind it
 - **`massql_query.py`** — `add_precursor_intensity` at **62-116** (the precursor rules), **`:101-103`** (the
   `>=`/`<=` window — the inclusive half of C37), `:51-59` (`clean_nan`),

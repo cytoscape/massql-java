@@ -91,7 +91,7 @@ fixtures:
 
 ## report: print the review artifacts' headline results
 report:
-	@for f in docs/PARITY_REPORT.md docs/DIFFERENTIAL_REPORT.md; do \
+	@for f in docs/harness/PARITY_REPORT.md docs/harness/DIFFERENTIAL_REPORT.md; do \
 	  if [ -f "$$f" ]; then \
 	    echo "=== $$f ==="; sed -n '1,12p' "$$f"; echo; \
 	  else \

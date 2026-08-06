@@ -268,7 +268,7 @@ independent Python measurement to three digits, and it depends on no golden, no 
 > ⚠ **The loader-parity dumps are GROUPED BY LEVEL, not document order.** They are built from `ms1_df`
 > then `ms2_df`, so `scans` holds all MS1 entries followed by all MS2 entries. Reconstructing the
 > `ms1scan` chain from a dump therefore yields the *last* MS1 for every MS2 (913, on the Ewing file).
-> Derive document order from the file, not the dump — **[Step 8](harness/Tech_Step8.md) needs this too.**
+> Derive document order from the file, not the dump — **[Step 8](Tech_Step8.md) needs this too.**
 
 `PlusRise.mgf`: 34,513 scans, **758,544** real peaks, streamed inside a **48 MB heap** — the proof that
 retained memory is bounded by scan size, not file size (C22).

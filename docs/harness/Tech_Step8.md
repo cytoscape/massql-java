@@ -19,7 +19,7 @@ loader — before any query logic is written.
 
 ## Context
 
-`SPIKE.md` §6b puts this first among the four integration layers, and §7 Step 2 orders it explicitly: *"The three
+[`SPIKE.md`](SPIKE.md) §6b puts this first among the four integration layers, and §7 Step 2 orders it explicitly: *"The three
 readers, then integration layer 1 (reader parity) — before any query runs. If intensities aren't bit-identical to
 Python's, the decoder is wrong and everything downstream is measuring noise."*
 
@@ -30,7 +30,7 @@ mismatched result rows and gets misdiagnosed as a filtering or collation bug.
 It is a separate spec from the readers because a gate that lives inside another step's test suite gets treated as
 one more failing test rather than as a stop condition.
 
-Governing sections: `SPIKE.md` §6b layer 1, §7 Step 2 item 2, §11 Q1.
+Governing sections: [`SPIKE.md`](SPIKE.md) §6b layer 1, §7 Step 2 item 2, §11 Q1.
 
 ## Scope
 
@@ -55,7 +55,7 @@ Governing sections: `SPIKE.md` §6b layer 1, §7 Step 2 item 2, §11 Q1.
 | `src/test/java/…/io/ReaderParityIT.java` | The parameterized parity suite |
 | `src/test/java/…/io/ReaderParityHarnessTest.java` | Tests the harness itself |
 | `src/test/java/…/io/PeakOrderPreconditionTest.java` | The precondition that makes digest comparison valid (§1) |
-| `docs/PARITY_REPORT.md` | Per-format results table; the artifact the reviewer reads |
+| [`PARITY_REPORT.md`](PARITY_REPORT.md) | Per-format results table; the artifact the reviewer reads. ⚠ **Moved to `docs/harness/` by Correction C41** — it is an engineering record, read by someone confirming the steps rather than by an SDK consumer. |
 
 > ⚠ **Two rows removed from this table (C32).**
 > `src/test/resources/loader-parity/` — the dumps already live at
@@ -107,7 +107,7 @@ comparison is no longer valid"* rather than presenting as a mystery decode bug.
 **One deliberate exception, for sums only.** A per-scan intensity **sum** is an accumulation, and
 floating-point addition is not associative: Python's `numpy.sum` may pairwise-accumulate while a naive Java
 loop goes left to right, giving different last bits from identical inputs. So `i_sum_hex` is a **secondary
-signal only**, at relative 1e-15, recorded explicitly in `PARITY_REPORT.md`. The digests are what establish
+signal only**, at relative 1e-15, recorded explicitly in [`PARITY_REPORT.md`](PARITY_REPORT.md). The digests are what establish
 bit-identity; the sum is a cheap cross-check that costs nothing.
 
 Individual `mz` and `i` values are compared bit-exactly with no exception. Do not extend the sum exception to
@@ -135,7 +135,7 @@ which is the single source of truth for both the sweep and its per-fixture reade
 
 This started as *"the three original micro-fixtures"* and grew by seven as later corrections found decode and
 metadata branches with no bit-identity check. `make spec-audit` now asserts that the count stated here, the
-count in `FIXTURES.md`, the number of files in `goldens/loader-parity/` and `FIXTURES_WITH_DUMPS.size()` all
+count in [`FIXTURES.md`](FIXTURES.md), the number of files in `goldens/loader-parity/` and `FIXTURES_WITH_DUMPS.size()` all
 agree — they had drifted to three different numbers before that check existed.
 
 > ⚠ **Correction C28 — the dumps are authoritative per SCAN, never for ORDER.**
@@ -273,7 +273,7 @@ Fixtures are **committed to this repository** under `src/test/resources/`, and a
 **hard failure** — `Fixtures.require` throws, there is no skip path, and `FixturesContractTest` asserts
 that. The two Ewing files remain gitignored for licence reasons only; `scripts/fetch-fixtures.sh`
 retrieves them, CI runs it and caches the result, and their absence still **fails** with that command in
-the message. CI additionally asserts the skipped-test count is **0**. See `docs/FIXTURES.md`.
+the message. CI additionally asserts the skipped-test count is **0**. See [`FIXTURES.md`](FIXTURES.md).
 
 ### 3. The instrument-attribute cross-check
 
@@ -314,19 +314,19 @@ computed from our loaded table using [Step 5](Tech_Step5.md)'s reductions:
 absence of one. Assert the *shape*: differences must fall on both sides of zero roughly evenly. A
 one-sided distribution means we are consistently dropping or double-counting, which a max-delta check
 cannot see. Step 7's implementation does this by counting how many scans come out high versus low and
-requiring both sides to be non-trivial. Report the distribution in `PARITY_REPORT.md`, not just pass/fail.
+requiring both sides to be non-trivial. Report the distribution in [`PARITY_REPORT.md`](PARITY_REPORT.md), not just pass/fail.
 
 Also assert that the check is **sharp**: within each scan the runner-up peak's m/z must be far enough
 from the base peak's that a wrong `argmax` could not hide inside the tolerance. Otherwise `basePeakMz`
 agreement is weaker evidence than it appears.
 
-**11** Ewing scans carry `peaksCount="3"` — measured, and more than Step 2's `CONVERSION_NOTES.md`
+**11** Ewing scans carry `peaksCount="3"` — measured, and more than Step 2's [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md)
 implies. Assert those by hand-written literal values, so at least a few assertions in the suite are
 readable without tooling.
 
 ### 4. The parity report
 
-`docs/PARITY_REPORT.md` is a review artifact, and [Step 13](Tech_Step13.md)'s `make verify` table builds on it.
+[`PARITY_REPORT.md`](PARITY_REPORT.md) is a review artifact, and [Step 13](Tech_Step13.md)'s `make verify` table builds on it.
 Per format, record:
 
 - scan counts, expected vs actual;
@@ -335,7 +335,7 @@ Per format, record:
   exception);
 - for the Ewing cross-check: the delta distribution for each of the three attributes.
 
-Answer `SPIKE.md` §11 question 1 here in one sentence — *"Do all three readers produce bit-identical decoded
+Answer [`SPIKE.md`](SPIKE.md) §11 question 1 here in one sentence — *"Do all three readers produce bit-identical decoded
 intensities vs. the Python loader? If not, what tolerance becomes the contract?"* — and carry that sentence into
 the README at [Step 13](Tech_Step13.md).
 
@@ -358,7 +358,7 @@ the README at [Step 13](Tech_Step13.md).
   impossible — `Fixtures.require` fails rather than skipping, and CI asserts zero skips (Correction C26) —
   but it is exactly the failure that went unnoticed for four steps, so do not reintroduce a conditional.
 - **Blaming the reader for a conversion artifact.** If `small.mzXML`'s scan ids differ from `small.mzML`'s, Step 2
-  recorded that; check `CONVERSION_NOTES.md` before touching reader code.
+  recorded that; check [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md) before touching reader code.
 - **Comparing `rt` at float precision.** Requires `scanRt` as double ([Step 5](Tech_Step5.md) §1); a float
   comparison here passes while the Step 12 differential fails.
 
@@ -403,13 +403,13 @@ untested while the table implied otherwise.
 - [x] The reader-only scan count is **asserted** per fixture, not tolerated: PlusRise **12,571**, micro
       **1** each, `small.*` and `DP00570_F02.*` **0**.
 - [x] MGF MS1 count asserted as **0** against dumps that report 1 (MassQL's fabricated row — C33b).
-- [x] The `i_sum_hex` exception documented in `PARITY_REPORT.md` at **1e-6**, with the corrected cause:
+- [x] The `i_sum_hex` exception documented in [`PARITY_REPORT.md`](PARITY_REPORT.md) at **1e-6**, with the corrected cause:
       **float32 accumulation dtype**, not ordering (C33c). Our float64 sum is exact; the tolerance absorbs
       the reference's error, not ours.
 - [x] `PeakOrderPreconditionTest` green — asserts the precondition from **both** sides (our arrays and
       MassQL's own file order via `mz_hex_first8`), since checking only ours would be circular.
 - [x] The Ewing cross-check still green at 1e-5, with delta distributions recorded and no systematic bias.
-- [x] `docs/PARITY_REPORT.md` written, with the per-format table and the §11 Q1 answer.
+- [x] [`PARITY_REPORT.md`](PARITY_REPORT.md) written, with the per-format table and the §11 Q1 answer.
 - [x] `ReaderParityHarnessTest` **demonstrated** to detect a single-ULP perturbation — proven by shifting one
       intensity with `Math.nextUp` and confirming `ReaderParityIT` fails on exactly the three mzML fixtures
       with an actionable message.
@@ -417,7 +417,7 @@ untested while the table implied otherwise.
 
 ## References
 
-- `SPIKE.md` §6b layer 1 (*"Assert intensities bit-identical, not 'close' — same binary blob, same decode. A
+- [`SPIKE.md`](SPIKE.md) §6b layer 1 (*"Assert intensities bit-identical, not 'close' — same binary blob, same decode. A
   mismatch here means the decoder is wrong, and this is the cheapest place to learn that."*), §7 Step 2 item 2,
   §11 Q1
 - [Step 2](Tech_Step2.md) §6 — the dump format

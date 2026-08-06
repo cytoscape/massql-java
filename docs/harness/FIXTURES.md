@@ -46,7 +46,7 @@ every expected value follows from arithmetic you can check by hand (`fixtures/mi
 ## Parity coverage — which fixtures have a dump, and which cannot
 
 All **16** fixtures with a dump are compared **bit-identically** against MassQL by the Step 8 gate
-(`docs/PARITY_REPORT.md`). **Four** fixtures deliberately have none:
+([`PARITY_REPORT.md`](PARITY_REPORT.md)). **Four** fixtures deliberately have none:
 
 | Fixture | Why no dump |
 |---|---|
@@ -74,7 +74,7 @@ micro_noprecursor.mzXML   KeyError: 'precursorMz'   (spectrum["precursorMz"][0] 
 ```
 
 So no golden can exist for either. Our reader gives `polarity = 0` and `precmz = 0`; a passing test there
-proves we behave sanely, **not** that we agree with MassQL. `docs/READER_RULES.md` labels both.
+proves we behave sanely, **not** that we agree with MassQL. [`READER_RULES.md`](READER_RULES.md) labels both.
 
 ## The rule: a missing fixture FAILS
 
@@ -106,11 +106,11 @@ metadata for matched scans only. Neither contains a peak array, so no spectra ar
 It is **the only fixture that can distinguish document-order `ms1scan` from `precursorScanNum`
 resolution.** It carries 916 scans (229 MS1 / 687 MS2), nests MS2 inside its parent MS1, and has **zero**
 `precursorScanNum` attributes. `small.mzXML` cannot make that distinction — for simple DDA the two
-coincide, so a `precursorScanNum`-resolving reader passes on it. See `docs/READER_RULES.md`.
+coincide, so a `precursorScanNum`-resolving reader passes on it. See [`READER_RULES.md`](READER_RULES.md).
 
 ## Regenerating goldens
 
 Goldens are produced by the pinned Python oracle in the sibling `../massql` working directory, which is
-**not** part of this deliverable. See `../massql/data/CONVERSION_NOTES.md` for per-fixture provenance and
-`../massql/oracle/PINNED.md` for the pin. Nothing in this repository's build depends on that directory
+**not** part of this deliverable. See [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md) for per-fixture provenance and
+[`PINNED.md`](oracle/PINNED.md) for the pin. Nothing in this repository's build depends on that directory
 being present.

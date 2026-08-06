@@ -73,7 +73,7 @@ for f in "$FIXTURES"/micro/*.mgf "$FIXTURES"/micro/*.mzML "$FIXTURES"/micro/*.mz
     name=$(basename "$f")
     names_fixture "$SPECS/Tech_Step2.md" "$name" \
         || fail "fixture '$name' exists but Tech_Step2.md never names it (add it to Deliverables)"
-    names_fixture docs/FIXTURES.md "$name" \
+    names_fixture docs/harness/FIXTURES.md "$name" \
         || fail "fixture '$name' exists but FIXTURES.md never names it (add it to the micro table)"
 done
 
@@ -117,7 +117,7 @@ done
 # 1b -- the reverse direction, restricted to fixture-shaped names so this stays a real check
 # rather than a spellcheck over English prose.
 for name in $(grep -ohE '\bmicro[A-Za-z0-9_]*\.(mgf|mzML|mzXML)\b' \
-                  "$SPECS"/Tech_Step2.md docs/FIXTURES.md | sort -u); do
+                  "$SPECS"/Tech_Step2.md docs/harness/FIXTURES.md | sort -u); do
     [ -e "$FIXTURES/micro/$name" ] \
         || fail "Tech_Step2.md or FIXTURES.md names fixture '$name', which does not exist on disk"
 done
@@ -161,7 +161,7 @@ fi
 # the first version matched only two of them -- so `**16 dumps.**` (punctuation INSIDE the bold)
 # slipped through and the check was silently vacuous on the very file whose contradictory counts
 # motivated it. Verified against every current claim; see DEMONSTRATING FAILURE.
-for doc in docs/FIXTURES.md docs/PARITY_REPORT.md "$SPECS/Tech_Step8.md"; do
+for doc in docs/harness/FIXTURES.md docs/harness/PARITY_REPORT.md "$SPECS/Tech_Step8.md"; do
     while read -r claim; do
         [ -n "$claim" ] || continue
         n=$(printf '%s' "$claim" | grep -oE '[0-9]+' | head -1)
@@ -176,7 +176,7 @@ for doc in docs/FIXTURES.md docs/PARITY_REPORT.md "$SPECS/Tech_Step8.md"; do
         -e '\*\*[0-9]+ of them\*\*' "$doc" || true)
 done
 
-PARITY_ROWS=$(sed -n '/^| Fixture | Format/,/^$/p' docs/PARITY_REPORT.md | grep -c '^| `' || true)
+PARITY_ROWS=$(sed -n '/^| Fixture | Format/,/^$/p' docs/harness/PARITY_REPORT.md | grep -c '^| `' || true)
 if [ "$PARITY_ROWS" != "$DUMPS_ON_DISK" ]; then
     fail "PARITY_REPORT.md's per-fixture table has $PARITY_ROWS rows but there are $DUMPS_ON_DISK
         dumps -- a fixture is in the gate without a row reporting its result"
@@ -458,10 +458,18 @@ echo
 # checkbox is a claim and nothing was comparing claims to the filesystem.
 #
 # Scoped to completed steps for the same reason as check 4: DIFFERENTIAL_REPORT.md (Step 12) and
-# RESULT_CONTRACT.md (Step 10) are SUPPOSED to be absent right now.
+# API.md (Step 11) are SUPPOSED to be absent right now.
+#
+# ⚠ The pattern is `docs/[A-Za-z_/]+\.md` -- note the SLASH. It was `[A-Za-z_]+` until Correction
+# C41 moved six docs into docs/harness/ and four artifacts into docs/harness/oracle/, at which
+# point a subdirectory path stopped matching and this check would have silently covered less than
+# before while still reporting green. The move would have looked like a fix and verified nothing.
+#
+# This check only sees references written as a repo-root path. Check 7 is what covers relative
+# links, which is how most references are actually written.
 # --------------------------------------------------------------------------------------------
 
-echo "5. every review document a completed step names exists"
+echo "5. every review document a completed step names by repo-root path exists"
 
 missing_docs=0
 checked_docs=0
@@ -482,11 +490,11 @@ for spec in "$SPECS"/Tech_Step[0-9]*.md; do
         pointed readers at it (C38)."
             missing_docs=$((missing_docs + 1))
         fi
-    done < <(grep -ohE '\bdocs/[A-Za-z_]+\.md' "$spec" | sort -u)
+    done < <(grep -ohE '\bdocs/[A-Za-z_/]+\.md' "$spec" | sort -u)
 done
 
 if [ "$missing_docs" -eq 0 ]; then
-    pass "$checked_docs document reference(s) in completed steps all resolve"
+    pass "$checked_docs repo-root document path(s) in completed steps all resolve"
 fi
 echo
 
@@ -553,6 +561,96 @@ fi
 echo
 
 # --------------------------------------------------------------------------------------------
+# Check 7 -- every markdown link resolves: file, anchor, and inside the repo.
+#
+# Added by Correction C41, which moved six docs into docs/harness/ and four artifacts into
+# docs/harness/oracle/. The question that prompted it was the right one to ask: "how will you
+# verify no dead or broken links are left over after the files are re-org'd?" -- and the honest
+# answer is that a promise is not verification, so this exists instead.
+#
+# Run on the tree BEFORE that move, it immediately found two defects that had nothing to do with
+# the move: a `[C22](#c22)` link written without ever adding the `<a id="c22">` anchor, and five
+# links pointing OUT of the repo at ../../../massql/. Both were invisible to every other check.
+#
+# Three dimensions, each resolved relative to the file containing the link -- which is what a
+# markdown link actually means, and why the docs/-prefix grep in check 5 can only ever see a
+# fraction of the references:
+#
+#   (a) the target file exists
+#   (b) an #anchor matches a heading slug or an explicit <a id="...">
+#   (c) the target is INSIDE the repo -- an escaping link is how CONVERSION_NOTES.md was cited
+#       for four steps while living somewhere CI could never see (C26's lesson, unlearned)
+#
+# Deliberately covers ALL markdown under docs/, not only completed steps: a dead link is dead
+# whether or not its step has run. Pending-step *deliverables* are a different matter and stay
+# with checks 4 and 5, which know about Done-when.
+# --------------------------------------------------------------------------------------------
+
+echo "7. every markdown link resolves -- file, anchor, and inside the repo (the C41 check)"
+
+link_report=$(python3 - <<'PY'
+import re, sys
+from pathlib import Path
+
+root = Path('.').resolve()
+mds = [p for p in Path('docs').rglob('*.md')] + [p for p in Path('.').glob('*.md')]
+link_re = re.compile(r'\[([^\]]*)\]\(([^)]+)\)')
+
+def anchors_of(p):
+    """Explicit <a id> plus GitHub-style heading slugs."""
+    t = p.read_text()
+    out = set(re.findall(r'<a\s+id="([^"]+)"', t))
+    for h in re.findall(r'(?m)^#{1,6}\s+(.*)$', t):
+        h = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', h)   # a link in a heading contributes its TEXT only
+        out.add(re.sub(r'[^\w\s-]', '', h.lower()).strip().replace(' ', '-'))
+    return out
+
+cache, problems, ok = {}, [], 0
+for md in sorted(mds):
+    for _, target in link_re.findall(md.read_text()):
+        t = target.strip()
+        if t.startswith(('http://', 'https://', 'mailto:')):
+            continue
+        frag = None
+        if '#' in t:
+            t, frag = t.split('#', 1)
+        dest = md.resolve() if t == '' else (md.parent / t).resolve()
+        if not dest.exists():
+            problems.append(f"{md} -> {target}   (no such file)"); continue
+        if dest != root and root not in dest.parents:
+            problems.append(f"{md} -> {target}   (ESCAPES the repo)"); continue
+        if frag and dest.suffix == '.md':
+            cache.setdefault(dest, anchors_of(dest))
+            if frag.lower() not in cache[dest]:
+                problems.append(f"{md} -> {target}   (no such anchor)"); continue
+        ok += 1
+
+print(ok)
+for p in problems:
+    print(p)
+PY
+)
+link_ok=$(printf '%s' "$link_report" | head -1)
+link_bad=$(printf '%s' "$link_report" | tail -n +2 | grep -c . || true)
+
+if [ "$link_bad" -ne 0 ]; then
+    # `|| [ -n "$line" ]` is load-bearing: `printf '%s'` emits no trailing newline, so plain
+    # `while read` returns non-zero on the final line and SKIPS ITS BODY. With exactly one broken
+    # link -- the common case -- this printed the count and named nothing, which is precisely the
+    # "a check that cannot name the specific thing that drifted is not worth having" failure this
+    # script's own header warns about. Found by probing with one bad link and getting silence.
+    while read -r line || [ -n "$line" ]; do
+        [ -n "$line" ] || continue
+        fail "broken link: $line"
+    done < <(printf '%s' "$link_report" | tail -n +2)
+    fail "$link_bad broken link(s). A moved or renamed document is the usual cause; an ESCAPES
+        result means a link points outside the repo, which CI cannot follow (C26)."
+else
+    pass "$link_ok markdown link(s) resolve -- file, anchor and in-repo"
+fi
+echo
+
+# --------------------------------------------------------------------------------------------
 
 if [ "$FAILURES" -ne 0 ]; then
     printf 'spec-audit: %d FAILURE(S).\n' "$FAILURES" >&2
@@ -578,13 +676,13 @@ printf 'spec-audit: GREEN (%d checks).\n' "$CHECKS"
 # the probe below and getting no failure. If you touch that regex, re-run ALL FIVE probes:
 # passing one phrasing proves nothing about the others.
 #
-#   1a. sed -i '' 's/micro_zeroint.mgf/micro_ZZZ.mgf/' docs/FIXTURES.md
+#   1a. sed -i '' 's/micro_zeroint.mgf/micro_ZZZ.mgf/' docs/harness/FIXTURES.md
 #       -> two failures: micro_zeroint.mgf undocumented, AND phantom micro_ZZZ.mgf on no disk
 #
 #   2.  Each of these must fail (verified, all five live phrasings):
-#         sed -i '' 's/\*\*16 dumps\.\*\*/**15 dumps.**/'        docs/FIXTURES.md
-#         sed -i '' 's/All \*\*16\*\* fixtures/All **14** fixtures/' docs/FIXTURES.md
-#         sed -i '' 's/\*\*16 fixtures\*\*/**15 fixtures**/'     docs/PARITY_REPORT.md
+#         sed -i '' 's/\*\*16 dumps\.\*\*/**15 dumps.**/'        docs/harness/FIXTURES.md
+#         sed -i '' 's/All \*\*16\*\* fixtures/All **14** fixtures/' docs/harness/FIXTURES.md
+#         sed -i '' 's/\*\*16 fixtures\*\*/**15 fixtures**/'     docs/harness/PARITY_REPORT.md
 #         sed -i '' 's/\*\*16 of them\*\*/**14 of them**/'       docs/harness/Tech_Step8.md
 #         sed -i '' 's/all \*\*16\*\* fixtures/all **14** fixtures/' docs/harness/Tech_Step8.md
 #
@@ -603,6 +701,16 @@ printf 'spec-audit: GREEN (%d checks).\n' "$CHECKS"
 #          classes and must NOT fail.
 #
 #   5.  mv docs/VENDORED.md /tmp/ -> fails from both Tech_Step6.md and Tech_Step7.md
+#
+#   7.  All three dimensions verified, and the check needed a fix to earn the third:
+#         mv docs/harness/oracle/PINNED.md /tmp/          -> "(no such file)"
+#         rename <a id="c40"> to something else           -> "(no such anchor)"
+#         add a link to ../../../massql/massql_query.py   -> "(ESCAPES the repo)"
+#
+#       ⚠ The single-broken-link case reported a COUNT and named nothing, because
+#       `while read` skips a final line with no trailing newline. One bad link is the common case,
+#       so the check was at its least useful exactly when it mattered most. Re-probe with ONE bad
+#       link, not two, after touching that loop.
 #
 # Revert with `git checkout` afterwards.
 # --------------------------------------------------------------------------------------------

@@ -1,8 +1,8 @@
 # Tech Step Index — `massql-java` spike
 
-Execution index for the spike defined in [`SPIKE.md`](SPIKE.md). `SPIKE.md` remains the source of record for
+Execution index for the spike defined in [`SPIKE.md`](SPIKE.md). [`SPIKE.md`](SPIKE.md) remains the source of record for
 **rationale**; these 13 specs are the source of record for **what to build**. Where they disagree, the specs
-win — they incorporate findings that post-date `SPIKE.md` (see [Corrections](#corrections-to-spikemd)).
+win — they incorporate findings that post-date [`SPIKE.md`](SPIKE.md) (see [Corrections](#corrections-to-spikemd)).
 
 Each `Tech_StepX.md` is written to be handed to one engineer and finished without reading the others, beyond
 the artifacts its **Prerequisites** section names.
@@ -11,18 +11,18 @@ the artifacts its **Prerequisites** section names.
 
 ## ⚠ Numbering: there is no Tech_Step0
 
-**`SPIKE.md` numbers its four steps 0–3. These specs are numbered 1–13.** The two numbering schemes are
+**[`SPIKE.md`](SPIKE.md) numbers its four steps 0–3. These specs are numbered 1–13.** The two numbering schemes are
 unrelated — do not read "Tech_Step1" as "SPIKE.md Step 1". Mapping:
 
-| `SPIKE.md` §7 step | Becomes | Note |
+| [`SPIKE.md`](SPIKE.md) §7 step | Becomes | Note |
 |---|---|---|
 | **Step 0** — Restore the Python oracle **and** build the fixture set | **[1](Tech_Step1.md) + [2](Tech_Step2.md)** | **Split in two.** The oracle is its own gate; the fixture work is substantial and depends on it |
 | *(not a SPIKE.md step — folded into §4/§6d)* | **[3](Tech_Step3.md)** | Scaffold + dependency policy, promoted to its own step because the dependency decisions are locked in here and are the hardest thing to change later |
 | **Step 1** — Parser + its unit tests | **[4](Tech_Step4.md)** | |
-| **Step 2** — Engine + the full test suite | **[5](Tech_Step5.md) – [12](Tech_Step12.md)** | The 6-day step, re-cut into eight. `SPIKE.md`'s own ordering within it (store → readers → parity → filters → collation → CLI → integration) is preserved |
+| **Step 2** — Engine + the full test suite | **[5](Tech_Step5.md) – [12](Tech_Step12.md)** | The 6-day step, re-cut into eight. [`SPIKE.md`](SPIKE.md)'s own ordering within it (store → readers → parity → filters → collation → CLI → integration) is preserved |
 | **Step 3** — Harden, document, hand off | **[13](Tech_Step13.md)** | |
 
-Also note **`SPIKE.md`'s 2a/2b condition split is Tech_Step9's 9a/9b** — same content, renumbered to match its
+Also note **[`SPIKE.md`](SPIKE.md)'s 2a/2b condition split is Tech_Step9's 9a/9b** — same content, renumbered to match its
 owning step.
 
 ## Status table
@@ -106,7 +106,7 @@ These are decided. Specs implement them; they are not open for re-litigation ins
 
 ## Corrections to `SPIKE.md`
 
-Verified after `SPIKE.md` was written. **These override it.**
+Verified after [`SPIKE.md`](SPIKE.md) was written. **These override it.**
 
 > ### Adding a Correction — read this first
 >
@@ -136,10 +136,10 @@ Verified after `SPIKE.md` was written. **These override it.**
 > that was correct with nothing able to prove it, which is the single most common shape of defect here.
 
 **C1 — `msdk-io-mzxml` is not usable as a dependency (§5 is wrong, by ~20 MB).**
-`SPIKE.md` §5 says taking mzXML transitively is "convenient" and instructs "exclude CDK + Guava and slf4j."
+[`SPIKE.md`](SPIKE.md) §5 says taking mzXML transitively is "convenient" and instructs "exclude CDK + Guava and slf4j."
 That is impossible: `MzXMLFileParser` **directly imports** `it.unimi.dsi.io.ByteBufferInputStream`,
 `com.google.common.collect.Range`, `org.slf4j.*`, and `SpectrumTypeDetectionAlgorithm`. dsiutils is not
-mentioned anywhere in `SPIKE.md`.
+mentioned anywhere in [`SPIKE.md`](SPIKE.md).
 
 | Path | Measured closure |
 |---|---|
@@ -164,7 +164,7 @@ The released `msdk-io-mzml-0.0.27.pom` has `org.javolution:javolution-core-java`
 authoritative**.
 
 **C4 — pin `slf4j-api` at 1.7.26 and forbid 2.x.**
-Not in `SPIKE.md`. slf4j **1.7 uses static binding; 2.x uses `ServiceLoader`**, which §9 forbids outright. A
+Not in [`SPIKE.md`](SPIKE.md). slf4j **1.7 uses static binding; 2.x uses `ServiceLoader`**, which §9 forbids outright. A
 routine dependency bump would silently break Phase 2 OSGi resolution with no obvious cause. This is a hard
 build constraint with the reason recorded, not a version preference (Step 3).
 
@@ -173,7 +173,7 @@ parser calls it, so excluding `msdk-io-mzxml` removes the need (Steps 3, 7).
 
 ### Corrections found while executing Step 1 (verified from the pinned source)
 
-**C6 — MGF `charge` defaults to `1`, not to null. `SPIKE.md` §3's population table is wrong.**
+**C6 — MGF `charge` defaults to `1`, not to null. [`SPIKE.md`](SPIKE.md) §3's population table is wrong.**
 `.mgf` dispatches to `_load_data_mgf` (`msql_fileloading.py:145`), which tries `_load_data_mgf_pyteomics` and
 falls back to the manual parser **only if pyteomics yields zero rows** — so the pyteomics loader is the live
 specification. Its charge handling (`:192-203`) is `params.get('charge', [1])` with `except: charge = 1`. Since
@@ -188,7 +188,7 @@ only `0` is null-converted, **MGF `charge` is never null**, and a genuine 1+ is 
 MGF ([Step 9](Tech_Step9.md)).
 
 **C9 — the reference-parse corpus is 46 files, not 47** (35 `scaninfo`, 11 non-`scaninfo`), and there are **2**
-unused mzML loaders, not 3. `msql.ebnf` is 165 lines and `msql_fileloading.py` is 892 lines, both as claimed.
+unused mzML loaders, not 3. [`msql.ebnf`](oracle/msql.ebnf) is 165 lines and `msql_fileloading.py` is 892 lines, both as claimed.
 
 ### Corrections found while implementing Step 6
 
@@ -372,6 +372,7 @@ loudly rather than breaking every mzML fixture in the gate.
 
 ### Corrections found while auditing spec-vs-code drift after Step 9
 
+<a id="c38"></a>
 **C38 — ten test classes named by [Step 9](Tech_Step9.md) were never written, and under that cover THREE
 conditions had no execution test while the exit criterion claiming otherwise sat ticked.**
 
@@ -400,7 +401,7 @@ coverage gap, which is worth recording because it is the reassuring half of the 
 | [Step 8](Tech_Step8.md) | `ParityCoverageTest` | deliberately dropped under C32 |
 
 **One genuinely missing deliverable surfaced too.** `VendoredProvenanceTest` ([Step 7](Tech_Step7.md)) was
-never written, and **`docs/VENDORED.md` did not exist at all** — a [Step 6](Tech_Step6.md) deliverable that
+never written, and **[`VENDORED.md`](../VENDORED.md) did not exist at all** — a [Step 6](Tech_Step6.md) deliverable that
 Step 7's exit criteria recorded as *"unchanged"* and [Step 13](Tech_Step13.md) lists as a review artifact,
 while **all eleven vendored files' headers point readers at it**. Every header was correct; the central record
 they defer to was absent, and the licence election (MSDK is dual-licensed, this project elects **EPL-1.0**) was
@@ -425,7 +426,7 @@ Two bugs in the guard itself, both found by using it rather than by reading it, 
 
 | Bug | Effect | Found by |
 |---|---|---|
-| Check 2's regex missed `**16 dumps.**` — punctuation *inside* the bold | **silently vacuous** on `FIXTURES.md`, the one file whose three contradictory counts (15 / 14 / 16) motivated writing it | injecting the drift and getting **no failure** |
+| Check 2's regex missed `**16 dumps.**` — punctuation *inside* the bold | **silently vacuous** on [`FIXTURES.md`](FIXTURES.md), the one file whose three contradictory counts (15 / 14 / 16) motivated writing it | injecting the drift and getting **no failure** |
 | Check 3's citation test was a **prefix match** (`\bC1[a-z(]?` matches the `C1` inside `C18`) | every single-digit correction counted as cited in specs that never mention it — C1 "cited" in 8 | an ad-hoc count returning an implausible 8 |
 
 Neither was concealing a real gap — verified both ways, and all four single-digit fallout claims (C6→Steps 6
@@ -450,7 +451,7 @@ that a discovery was declared.
 
 **Fallout:** Tech_Step2.md, Tech_Step10.md, Tech_Step11.md, Tech_Step12.md, Tech_Step13.md
 
-Found while reviewing [Step 10](Tech_Step10.md) before implementation. `SPIKE.md` §3 cites
+Found while reviewing [Step 10](Tech_Step10.md) before implementation. [`SPIKE.md`](SPIKE.md) §3 cites
 [cytoscape/cytoscape#26](https://github.com/cytoscape/cytoscape/issues/26) as its source at `:64` and then
 **narrows it** at `:124-127`: *"`scaninfo(MS1DATA)` → a different, smaller shape … `precmz`/`ms1scan`/`charge`
 and all `ms1_*` columns are **absent, not null**."* The issue says the opposite — the schema is
@@ -487,7 +488,7 @@ selects the base-peak source frame by the query's level and emits the full union
 `small_mzml_ms1_results.json` was regenerated (12 keys, real base peaks, the three `ms1_*` still null) — the
 **only** golden affected, the other 14 were already 12-key.
 
-**`docs/RESULT_SCHEMA.md` is now the single definition** and every other document links to it instead of
+**[`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) is now the single definition** and every other document links to it instead of
 restating the key set. That is what stops a fourth variant appearing: the contract was specified in four places
 precisely because it was *specifiable* in four places. Enforced by `spec-audit` **check 6** (every non-empty
 golden carries exactly the 12 keys in order) and by **`ResultSchemaContractTest`**, which parses the key table
@@ -497,6 +498,56 @@ decorative.
 **[C15](#c15) is retired into this entry**, and this is the first Correction recorded under the C38+ ratchet —
 the `Fallout:` line above is mandatory, and `spec-audit` check 3 fails the build until all five named specs
 cite `C40`.
+
+<a id="c41"></a>
+**C41 — harness documentation lived in a non-versioned directory outside the repo, and `SPIKE.md` had already
+forked there.**
+
+**Fallout:** Tech_Step1.md, Tech_Step2.md, Tech_Step4.md, Tech_Step5.md, Tech_Step6.md, Tech_Step8.md,
+Tech_Step9.md, Tech_Step12.md, Tech_Step13.md
+
+`../massql` held **1,229 lines** of our own markdown and **is not a git repo** — no history, no reviewable
+change, no way to notice a divergence. Four of those artifacts were cited by the specs as *design input*:
+
+| Artifact | Why it mattered |
+|---|---|
+| `data/CONVERSION_NOTES.md` | **26 citations**; the fallout protocol's designated home for fixture facts |
+| `oracle/NOTES_fileloading.md` | the verified loader facts behind [`READER_RULES.md`](READER_RULES.md); carries the **C6/C7/C8** text |
+| `oracle/PINNED.md` | the pin, the environment, golden provenance, the wrapper divergences |
+| `oracle/msql.ebnf` | **18 references** — [Step 4](Tech_Step4.md)'s declared prerequisite, [Step 1](Tech_Step1.md)'s exit checkbox, `Massql.g4`'s cited translation source, and the file **C19** was found by reading |
+
+**Two defects had already happened, and neither was luck.**
+
+1. **`SPIKE.md` forked.** The outside copy still read *"`scaninfo(MS1DATA)` → a different, smaller shape …
+   absent, not null"* — the text [C40](#c40) had corrected **hours earlier** in the in-repo copy. Two files, one
+   fixed, nothing able to see the difference.
+2. **`PINNED.md` lost a record it was the designated home for.** `massql_query.py` said *"the one deliberate
+   divergence … see oracle/PINNED.md"* and PINNED.md carried none until C40 added it — the same
+   defer-to-a-missing-document shape as [C38](#c38)'s `VENDORED.md`.
+
+The common cause: **`spec-audit` could not reach outside the repo**, so this was the only harness content with no
+verification at all. [C26](#c26) had already moved the *fixtures* in for exactly this reason; the documents were
+left behind.
+
+**Resolution.** Everything a spec cites is now in-repo. Six engineering-record documents moved from `docs/` into
+`docs/harness/` — they are read by someone *confirming the steps*, not by someone consuming the SDK — and the
+four artifacts above moved into `docs/harness/oracle/`. The redundant outside copies are deleted, not stubbed.
+
+**Two documents deliberately stayed in `docs/`**: [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md), the published
+contract the Phase-2 app consumes, and [`VENDORED.md`](../VENDORED.md), the EPL-1.0 election a redistributor
+needs. Both are also **read at runtime by tests**, so their paths are code rather than prose.
+
+**The boundary is now a rule, not a judgement call:**
+
+> `docs/harness/oracle/` holds the oracle **artifacts and records that harness design references**.
+> `../massql` keeps **only executable tooling** — nothing a spec cites as design input.
+
+**Enforced by `spec-audit` check 7**, which resolves every markdown link three ways: the file exists, an
+`#anchor` matches a real heading or `<a id>`, and the target is **inside the repo**. Run against the tree
+*before* the move it found two defects unrelated to it — a `[C22](#c22)` link with no matching anchor, and five
+links pointing out of the repo — which is why the move was verified by measurement rather than by inspection.
+Check 5's pattern also had to gain a `/`: it matched `docs/[A-Za-z_]+\.md`, so a subdirectory path would have
+stopped matching and the check would have covered *less* than before while still reporting green.
 
 ### Corrections found while reviewing Step 9 as its implementer
 
@@ -632,7 +683,7 @@ defending the bug — the golden was the only thing that could have known.
 > parse polarity. The defaulting happened somewhere else in the function. Reading a rule off the parse
 > path is not the same as reading it off the output — when they can disagree, only the output settles it.
 
-**C33(b) — the MGF fake MS1 row is not always an all-zero placeholder.** `READER_RULES.md` and C14/C24b
+**C33(b) — the MGF fake MS1 row is not always an all-zero placeholder.** [`READER_RULES.md`](READER_RULES.md) and C14/C24b
 said MassQL "synthesises a 1-row all-zero MS1 placeholder for MGF (mz=0, i=0, scan=1)". True for one of the
 two MGF loaders only. The pyteomics loader ends with:
 
@@ -788,6 +839,7 @@ Scan 5 is the only such scan and it is absent from `micro_mzxml_results.json`, s
 
 ### Corrections found while reviewing Step 7 as its implementer
 
+<a id="c26"></a>
 **C26 — CI verifies almost nothing; the fixtures are invisible to it.** `Fixtures.require` resolves to
 `../massql` (deliberately outside this repo) and gates on `Assumptions.assumeTrue`, so a missing
 fixture makes the test **skip**. `ci.yml` checks out only `massql-java`, so `../massql` never exists
@@ -800,7 +852,7 @@ the code compiles and the pure-unit tests pass.
 in-repo, and **fail instead of skip** on a missing fixture. CI additionally asserts the skipped-test
 count is **0**, so this regression cannot recur. Excluded: `oracle/.venv/` (contains an unrelated
 3.6 MB plotly JSON). One caveat carried from
-[`data/CONVERSION_NOTES.md`](../../../massql/data/CONVERSION_NOTES.md):13-14 — `DP00570_F02.mzxml` and
+[`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md):13-14 — `DP00570_F02.mzxml` and
 `DP00570_F02.mgf` are recorded there as *"gitignored, unstated licence"*, so redistribution must be
 confirmed before those two are committed; `PlusRise.mgf` is already cleared under settled decision 5.
 
@@ -814,7 +866,7 @@ failure. Verified on `fixtures/edge/empty_msLevel_tag.mzXML`: 8 of its 10 scans 
 **(b) A zero-peak scan must NOT update the `ms1scan` chain — `MzmlReader` gets this wrong today.** Both
 loaders `continue` on `len(spectrum["intensity array"]) == 0` (`:421` mzXML, `:559` mzML) **before**
 `previous_ms1_scan` is ever assigned, so a zero-peak MS1 cannot become a link — a following MS2 links
-to the MS1 *before* it. [`READER_RULES.md`](../READER_RULES.md) states the document-order rule
+to the MS1 *before* it. [`READER_RULES.md`](READER_RULES.md) states the document-order rule
 unconditionally and `MzmlReader` has no such guard. **Latent, not benign:** there are zero zero-peak
 scans in either mzXML fixture, so nothing in the suite can catch it. Readers still **yield** the scan
 (consistent with MGF, where all 34,513 blocks including the 12,571 empty ones are yielded per C24(b)) —
@@ -909,7 +961,7 @@ except our own `MassqlException`:
 | `LittleEndianDataInput` | **not vendored — written for this project**, only the 4 methods the decoder calls |
 
 Upstream commit `da2927a15c178b8ba9492d1e62571018bc70eecc`. Provenance headers and the EPL-1.0
-election on every file; full list in `docs/VENDORED.md`.
+election on every file; full list in [`VENDORED.md`](../VENDORED.md).
 
 Three findings for whoever writes the XML walk:
 - **`MzMLCV` does NOT define the bit-length or compression accessions** — those live on the
@@ -934,6 +986,7 @@ a handful of JDK calls. Step 6 §5's own warning — *"a shared, pre-configured 
 → [Step 7](Tech_Step7.md) decodes inline; `ByteBufferInputStream` is already vendored here so Step 7
 reuses it.
 
+<a id="c22"></a>
 **C22 — execution is STREAMING, not whole-file. The store is never materialised for a whole file.**
 Prompted by a direct question about 500 MB inputs. Calibrating from the fixtures (10.7–20.0 bytes of
 file per loaded peak) against the store's 41 bytes/peak, a **500 MB input projects to 1.0–1.9 GB of
@@ -1019,7 +1072,7 @@ Affected specs, **edited only in the C35 round rather than here**: [Step 4](Tech
 > fails at the AST rather than downstream.
 
 **C19 — three constructs the specs never mentioned, all now rejected by name.** Found by
-reading `msql.ebnf`: **`ANY`** (`wildcard: "ANY"`, so `MS2PROD=ANY` is legal MassQL);
+reading [`msql.ebnf`](oracle/msql.ebnf): **`ANY`** (`wildcard: "ANY"`, so `MS2PROD=ANY` is legal MassQL);
 **`MATCHCOUNT`** (a second spelling of `CARDINALITY`); and the **bare `MS1DATA`/`MS2DATA`
 querytype with no function at all** (3 reference parses use it), rejected as
 `<no function>`. Also **`MASSDEFECT` is a qualifier, not a condition** — [Step 9](Tech_Step9.md)
@@ -1067,7 +1120,7 @@ build fails rather than the bundle.
 size. `docker run` still exits 0 after the core dump. `oracle/mzml_to_mzxml.py` generates the fixture;
 validated Java-independently by the oracle reading both formats. **11 of 12 columns bit-identical**; the
 twelfth (`ms1_precmz`) differs by exactly a float32 truncation, inherent to mzXML's single `precision`
-attribute. Full analysis in [`data/CONVERSION_NOTES.md`](../../../massql/data/CONVERSION_NOTES.md).
+attribute. Full analysis in [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md).
 → [Step 12](Tech_Step12.md) Pair A must allow ~1e-7 relative on `ms1_precmz` for 32-bit mzXML.
 
 **C12 — MassQL's mzXML loader emitted `ms1scan` as a `str`, nulling all three `ms1_*` columns for every
@@ -1108,7 +1161,7 @@ SPIKE.md's 4, or 9 with real base peaks.
 [cytoscape/cytoscape#26](https://github.com/cytoscape/cytoscape/issues/26) — which SPIKE.md §3 cites as its own
 source — defines a **uniform 12-key union** discriminated by `mslevel`, so none of the three candidates was
 right. C15's measurement was accurate; what it measured was two separate defects in the wrapper. See
-[C40](#c40) for the resolution, and `docs/RESULT_SCHEMA.md` for the contract.
+[C40](#c40) for the resolution, and [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) for the contract.
 
 Every existing citation of C15 still resolves by landing here and following the link; no inbound reference was
 rewritten (the [C35(a) → C18](#c18) precedent).
@@ -1197,8 +1250,8 @@ in whoever's head found them. **Three destinations, and a finding usually needs 
 | Kind of finding | Goes to | Example |
 |---|---|---|
 | **A spec is wrong, or a later step's assumption breaks** | A numbered **Correction in this file**, *and* an edit to every affected step spec at the point of use | C13: Pair B cannot join on `scan` → INDEX + Tech_Step12 §2 rewritten |
-| **A fact about a fixture** — provenance, what was verified, measured counts | [`data/CONVERSION_NOTES.md`](../../../massql/data/CONVERSION_NOTES.md) | the Ewing file's 11 `peaksCount="3"` scans and their instrument attributes |
-| **A fact about the oracle** — pin, environment, golden provenance, reader-source verification | `oracle/PINNED.md` and `oracle/NOTES_fileloading.md` | the corpus is 46 files, not 47 |
+| **A fact about a fixture** — provenance, what was verified, measured counts | [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md) | the Ewing file's 11 `peaksCount="3"` scans and their instrument attributes |
+| **A fact about the oracle** — pin, environment, golden provenance, reader-source verification | [`PINNED.md`](oracle/PINNED.md) and [`NOTES_fileloading.md`](oracle/NOTES_fileloading.md) | the corpus is 46 files, not 47 |
 
 Rules:
 
@@ -1242,7 +1295,7 @@ Rules:
    *"Not vendored"* instead of the test keeping a filename allowlist: put the claim where a reviewer reads it.
 3. **When a step completes, audit the propagation** rather than trusting recall: list the Corrections that
    step produced and confirm each is referenced by every spec it affects. Note that
-   `data/CONVERSION_NOTES.md` scope grew during Step 2 — it is now fixture provenance for the whole spike, not
+   [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md) scope grew during Step 2 — it is now fixture provenance for the whole spike, not
    just the msconvert record its Step 2 deliverable row described.
 4. **Do not silently fix a spec.** If an implementation deviates from what the spec says, either the spec was
    wrong (Correction) or the implementation is (fix it). Quietly diverging leaves the spec lying to the next
@@ -1256,11 +1309,11 @@ Rules:
 
    | Check | Fails when | The case it was written for |
    |---|---|---|
-   | 1 | a fixture, golden, query or dump on disk is named by no spec — or a spec names one that no longer exists | `micro_zeroint.mgf` and `micro_ms1var.mzML` were created, dumped and used by passing tests while Step 2 and `FIXTURES.md` said nothing about either |
+   | 1 | a fixture, golden, query or dump on disk is named by no spec — or a spec names one that no longer exists | `micro_zeroint.mgf` and `micro_ms1var.mzML` were created, dumped and used by passing tests while Step 2 and [`FIXTURES.md`](FIXTURES.md) said nothing about either |
    | 2 | a **stated count** disagrees with the filesystem or with `ReaderParityIT.FIXTURES_WITH_DUMPS` | three documents held **15**, **14** and the true **16** simultaneously |
    | 3 | a C38+ correction has no `Fallout:` line, or any declared/linked spec never cites the correction | **C18 → C35(a)**: the same finding recorded twice, five steps apart, because the named spec was never edited |
    | 4 | a **completed** step names a test class that neither exists nor carries a `→` redirect | **C38**: Step 9's table named 10 classes that were never written, and under that cover `MS2PREC`, `CHARGE` and `MS2NL` had no execution test while the exit criterion claimed all ten conditions did |
-   | 5 | a **completed** step names a `docs/*.md` review artifact that does not exist | **C38**: `docs/VENDORED.md` was a ticked Step 6 deliverable, a Step 13 review input, and the target of eleven vendored source headers — and was absent for three steps |
+   | 5 | a **completed** step names a `docs/*.md` review artifact that does not exist | **C38**: [`VENDORED.md`](../VENDORED.md) was a ticked Step 6 deliverable, a Step 13 review input, and the target of eleven vendored source headers — and was absent for three steps |
 
    Checks 4 and 5 read completion from each spec's own **Done-when checkboxes**, so Steps 10–13 are exempt
    until they land and the scope widens by itself rather than needing a hardcoded list maintained by hand.

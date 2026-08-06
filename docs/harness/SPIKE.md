@@ -61,7 +61,7 @@ monoisotopic mass tables.
 ## 3. The contract — what `scaninfo` must produce
 
 This is the definition of done. From [cytoscape/cytoscape#26](https://github.com/cytoscape/cytoscape/issues/26)
-+ `RESULT_SCHEMA.md` + `massql_query.py`.
++ [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) + `massql_query.py`.
 
 ### `scaninfo(MS2DATA)` → one JSON object per matching scan, 12 keys
 
@@ -139,7 +139,7 @@ part of the contract:
 > *"Can be null? **No**"*. Their nulls in the old golden were a left-join artifact in `massql_query.py`, proven
 > by the `micro.mgf` phantom-id collision producing a *wrong non-null*.
 >
-> **[`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) is the single definition.** Correction **C40** has the
+> **[`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) is the single definition.** Correction **C40** has the
 > analysis.
 
 Still true: nearly free once the store exists, since it is the same collation path.
@@ -276,7 +276,7 @@ real files in all three formats and diff against the Python goldens.
 | Store reductions | Per-scan sum / max / first / argmax; mask AND; mz-sorted binary-search window edges; empty-scan and single-peak cases |
 | Precursor lookup | Picks the **closest** peak to `precmz`, not the most intense — construct a window where those differ. **This is the test that catches the most likely misreading of the whole contract.** Also: `ms1_base_peak_i` populated even when the tolerance match fails |
 | Null / sentinel rules | `0`→null for `precmz`/`ms1scan`/`charge`; `rt=0.0` **preserved**; NaN/inf→null |
-| Result JSON | ⛔ **Corrected by C40** — this read *"the 4-key MS1DATA shape with precursor keys absent, not null"*. There is **one** shape: the exact 12 keys in the frozen order for **both** MS1DATA and MS2DATA, `mslevel` discriminating, inapplicable fields present as `null`; null renders as JSON `null`. Definition: [`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) |
+| Result JSON | ⛔ **Corrected by C40** — this read *"the 4-key MS1DATA shape with precursor keys absent, not null"*. There is **one** shape: the exact 12 keys in the frozen order for **both** MS1DATA and MS2DATA, `mslevel` discriminating, inapplicable fields present as `null`; null renders as JSON `null`. Definition: [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) |
 | Scan/RT/charge filters | `RTMIN`/`RTMAX` strict; `SCANMIN`/`SCANMAX` inclusive; polarity 1=pos / 2=neg |
 | **RT units, per format** | mzXML `PT90S` → `1.5` minutes; mzML converts **only if** the declared unit is seconds (`small.mzML` says `minute` → unchanged); MGF `RTINSECONDS`÷60, absent → `0.0`. Three different rules — see the §6c table |
 | **`ms1scan` document order** | `ms1scan` = id of the most recent **preceding** MS1 spectrum, **not** the file's `spectrumRef`/`precursorScanNum`; `0` when no MS1 precedes it; MGF always `0`. Assert on a fixture with no declared linkage — see §3 |
@@ -423,7 +423,7 @@ everything downstream unmeasurable.
 
 ### Step 1 — Parser + its unit tests · ~3 days
 
-MassQL's entire formal language is **one 165-line Lark EBNF file** (`massql/msql.ebnf`). Translate to an
+MassQL's entire formal language is **one 165-line Lark EBNF file** ([`msql.ebnf`](oracle/msql.ebnf)). Translate to an
 ANTLR4 `.g4`; ~90% mechanical — rules are already `lowercase: alt | alt`, keywords are inline literals, and
 ANTLR auto-rewrites the direct left recursion. Two gotchas worth a day if you hit them cold:
 
@@ -586,9 +586,9 @@ typing `scan` as String while results carry Integer — the most likely real bug
 ## 12. Reference
 
 - Behavioral contract: `massql_query.py` (esp. `add_precursor_intensity`, lines 62-116),
-  `RESULT_SCHEMA.md`, `output/*_results.json` — all in this directory
+  [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md), `output/*_results.json` — all in this directory
 - App spec: [cytoscape/cytoscape#26](https://github.com/cytoscape/cytoscape/issues/26)
-- Grammar + goldens: `massql/msql.ebnf` (165 lines), `tests/reference_parses/` (47 files),
+- Grammar + goldens: [`msql.ebnf`](oracle/msql.ebnf) (165 lines), `tests/reference_parses/` (47 files),
   `tests/test_query.py` (the intensity property tests worth porting) in
   `github.com/mwang87/MassQueryLanguage` @ pinned SHA
 - **`massql/msql_fileloading.py` (892 lines) is the authoritative reader spec** — read it before writing

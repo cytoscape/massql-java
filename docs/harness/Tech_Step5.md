@@ -22,7 +22,7 @@ don't control. **So we write the dataframe.** It is ordinary Java, and it is whe
 Building this before the readers means the readers have somewhere to write, and the reductions get unit-tested
 against hand-computable data before any file parsing is in the picture.
 
-Governing sections: `SPIKE.md` §2 (why no dataframe library), §4 (the `spectra/` package), §6a (store-reduction
+Governing sections: [`SPIKE.md`](SPIKE.md) §2 (why no dataframe library), §4 (the `spectra/` package), §6a (store-reduction
 row).
 
 ## Scope
@@ -53,7 +53,7 @@ row).
 | `src/main/java/…/massql/spectra/RowMask.java` | Bitset-backed mask with AND/OR/NOT |
 | `src/main/java/…/massql/spectra/Reductions.java` | Per-scan reductions |
 | `src/test/java/…/spectra/*Test.java` | The test set below |
-| `docs/STORE_DESIGN.md` | Layout rationale, the invariants, and the `OTHERSCAN` seam |
+| [`STORE_DESIGN.md`](STORE_DESIGN.md) | Layout rationale, the invariants, and the `OTHERSCAN` seam. ⚠ **Moved to `docs/harness/` by Correction C41** — it is an engineering record, read by someone confirming the steps rather than by an SDK consumer. |
 
 ## Specification
 
@@ -82,8 +82,8 @@ public final class SpectrumTable {
 > pandas is a flat frame) and they live on `ScanIndex` alongside the exact `rt`. They carry
 > MassQL's raw **0 sentinel**; the 0-to-null conversion stays in Step 10.
 
-`rt` is `float` and `polarity`/`msLevel` are `byte` per `SPIKE.md` §4. Note the consequence and record it in
-`STORE_DESIGN.md`: **`rt` is stored at float precision but the result contract reports it as a double.** The
+`rt` is `float` and `polarity`/`msLevel` are `byte` per [`SPIKE.md`](SPIKE.md) §4. Note the consequence and record it in
+[`STORE_DESIGN.md`](STORE_DESIGN.md): **`rt` is stored at float precision but the result contract reports it as a double.** The
 mzML golden carries `rt` = `0.011218333333333334`, which does not survive a float round-trip. Therefore:
 
 > **`rt` must be carried per *scan* at full double precision, not per *peak* at float precision.**
@@ -91,7 +91,7 @@ mzML golden carries `rt` = `0.011218333333333334`, which does not survive a floa
 Keep the `float[] rt` peak column for cheap row-level RT filtering, and additionally store an exact
 `double[] scanRt` on the scan index (§3), which is what [Step 10](Tech_Step10.md) reports. Any RT value that
 reaches the result JSON comes from `scanRt`. This is a real, easily-missed divergence from a literal reading of
-`SPIKE.md` §4 — flag it in `STORE_DESIGN.md`.
+[`SPIKE.md`](SPIKE.md) §4 — flag it in [`STORE_DESIGN.md`](STORE_DESIGN.md).
 
 > ✅ **Correction C22 — lifetime, not layout.** Execution is streaming: a table normally holds **one
 > scan**, built per scan as the cursor advances, and the whole-file table is never materialised. **No
@@ -106,7 +106,7 @@ collating MS2 rows.
 
 ### 2. Invariants
 
-State these in `STORE_DESIGN.md` and assert them in `SpectrumTableBuilder.build()`:
+State these in [`STORE_DESIGN.md`](STORE_DESIGN.md) and assert them in `SpectrumTableBuilder.build()`:
 
 1. All parallel arrays have identical length.
 2. `scan` is **non-decreasing** — rows are grouped by scan, in the order encountered while streaming the file.
@@ -176,7 +176,7 @@ the same two searches with the roles swapped (`upperBound(lo)` skips every row e
 here would silently widen every tolerance in the system. Edge behaviour is exact in both: a peak whose m/z
 equals `hi` to the bit **is** in the inclusive window and **is not** in the exclusive one.
 
-`SPIKE.md` §7 Step 2's performance note applies to this method specifically: if the MGF fixture is slower than
+[`SPIKE.md`](SPIKE.md) §7 Step 2's performance note applies to this method specifically: if the MGF fixture is slower than
 pandas, the likely cause is a linear scan where this binary search belongs.
 
 ### 5. Derived columns
@@ -192,7 +192,7 @@ Edge cases, and each needs a test:
   [Step 10](Tech_Step10.md) needs its `rt`/`tic`.
 - **Scan whose max intensity is 0** (all-zero peaks): division by zero. Produce `Double.NaN`, do **not** throw
   and do **not** substitute 0. [Step 10](Tech_Step10.md) converts NaN → null on output, so NaN is the correct
-  in-band representation of "undefined". Record this in `STORE_DESIGN.md`.
+  in-band representation of "undefined". Record this in [`STORE_DESIGN.md`](STORE_DESIGN.md).
 - **Single-peak scan:** `iNorm` is exactly `1.0` and `iTicNorm` is exactly `1.0`. Assert exact equality, not
   approximate — this is why `i_norm` is "structurally always 1.0" for base-peak queries.
 
@@ -256,7 +256,7 @@ data. Practically that means:
 - filtering produces a `RowMask`, never a new pruned `SpectrumTable`;
 - the store has no "current filter" state.
 
-Document this in `STORE_DESIGN.md` as an explicit design constraint with the reason, so a future contributor
+Document this in [`STORE_DESIGN.md`](STORE_DESIGN.md) as an explicit design constraint with the reason, so a future contributor
 doesn't "optimize" filtering into destructive pruning.
 
 ## Known traps
@@ -287,26 +287,26 @@ can run before the readers exist.
 | `ReductionsTest` | sum/max/min/first/count/argmax on multi-peak, single-peak and **empty** scans; **argmax tie → lowest row index**; `argmax` used to read a different column; masked variants. |
 | `DerivedColumnsTest` | `iNorm`/`iTicNorm` on a known scan computed by hand; single-peak scan gives **exactly** `1.0` for both; all-zero scan gives `NaN`, no throw. |
 | `RowMaskTest` | and/or/not; immutability of operands; length-mismatch throws; `cardinality`; `scansWithAnyRow`. |
-| `StoreScaleTest` | Build ~1M rows across ~30k scans; assert **both** window methods are not doing linear work — e.g. total time for 100k random windows stays within a generous bound. Guards the `SPIKE.md` §7 performance criterion at the unit level, where the cause is obvious. |
+| `StoreScaleTest` | Build ~1M rows across ~30k scans; assert **both** window methods are not doing linear work — e.g. total time for 100k random windows stays within a generous bound. Guards the [`SPIKE.md`](SPIKE.md) §7 performance criterion at the unit level, where the cause is obvious. |
 
 ## Done when
 
 - [x] `mvn test` green — **44 store tests** (7 window, 8 reductions, 5 derived, 6 index, 7 builder, 7 mask,
       4 scale), 227 in the suite overall.
-- [x] `docs/STORE_DESIGN.md` documents the layout, all five invariants, the **`rt` double-precision
+- [x] [`STORE_DESIGN.md`](STORE_DESIGN.md) documents the layout, all five invariants, the **`rt` double-precision
       decision**, the NaN-on-zero-max decision, the argmax tie rule, the no-epsilon/no-`Arrays.binarySearch`
       window rules, and the `OTHERSCAN` seam stated as a constraint.
 - [x] No public method exposes a mutable internal array — `ScanIndex.scanIds()` returns a clone, asserted by
       `ScanIndexTest.internalArraysDoNotEscape`.
-- [x] `StoreScaleTest` passes; measured baselines recorded in `STORE_DESIGN.md`. Window cost is **flat** as the
+- [x] `StoreScaleTest` passes; measured baselines recorded in [`STORE_DESIGN.md`](STORE_DESIGN.md). Window cost is **flat** as the
       table grows 100x (10 ms over 30k scans vs 18 ms over 300), which is what a binary search looks like.
 
 **✅ STEP 5 COMPLETE — 2026-07-30.** See Correction **C20** in
-[`Tech_Step_INDEX.md`](Tech_Step_INDEX.md) and `docs/STORE_DESIGN.md`.
+[`Tech_Step_INDEX.md`](Tech_Step_INDEX.md) and [`STORE_DESIGN.md`](STORE_DESIGN.md).
 
 ## References
 
-- `SPIKE.md` §2 (why the dataframe is written, not imported), §4 (`spectra/` sketch), §6a (store reductions),
+- [`SPIKE.md`](SPIKE.md) §2 (why the dataframe is written, not imported), §4 (`spectra/` sketch), §6a (store reductions),
   §7 Step 2 item 1 (order and the `OTHERSCAN` seam), §8 (`OTHERSCAN` out of scope)
 - `massql_query.py:163` — `ms2_df.groupby("scan")["i"].idxmax()`, the pandas behaviour `argmax` must match
 - `msql_engine_filters.py:253` — the strict `>`/`<` bounds behind `mzWindowExclusive` (Correction C37)

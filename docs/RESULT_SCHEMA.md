@@ -31,7 +31,7 @@ scan, precmz, ms1scan, rt, charge, tic, mslevel, base_peak_i, base_peak_mz, ms1_
 > as the discriminator: `2` for `MS2DATA`, `1` for `MS1DATA`. **There is no second, smaller shape, and no key
 > is ever absent.** A field that does not apply to a row is present with the value `null`.
 >
-> This corrects three documents that specified otherwise — `SPIKE.md` §3 (*"a different, smaller shape …
+> This corrects three documents that specified otherwise — [`SPIKE.md`](harness/SPIKE.md) §3 (*"a different, smaller shape …
 > absent, not null"*), the oracle's own `RESULT_SCHEMA.md`, and the `small_mzml_ms1_results.json` golden, which
 > shipped 9 keys. All are now aligned; **Correction C40** has the analysis.
 >

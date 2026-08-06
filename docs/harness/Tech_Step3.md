@@ -16,12 +16,12 @@ The library's dependency choices get locked in during this spike and are the har
 `massql-java` never sees OSGi, but `massql-app` will embed it as a nested jar on `Bundle-ClassPath`, and the
 failure modes there (thread-context classloader can't see `ServiceLoader` providers inside a bundle; Felix
 rejects multi-release jars and split packages) are expensive to diagnose and cheap to prevent. This step
-converts `SPIKE.md` §9's constraint list from prose into build configuration and a measured number.
+converts [`SPIKE.md`](SPIKE.md) §9's constraint list from prose into build configuration and a measured number.
 
 It also settles the finding that reshaped the plan: **`msdk-io-mzxml` cannot be used as a dependency** — see
 Correction C1 in [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md).
 
-Governing sections: `SPIKE.md` §4 (layout), §5 (readers), §6d (build wiring), §9 (constraints).
+Governing sections: [`SPIKE.md`](SPIKE.md) §4 (layout), §5 (readers), §6d (build wiring), §9 (constraints).
 
 ## Scope
 
@@ -60,7 +60,7 @@ Governing sections: `SPIKE.md` §4 (layout), §5 (readers), §6d (build wiring),
 ### 1. Coordinates and layout
 
 Group/artifact: `edu.ucsd.idekerlab:massql-java`. Base package
-`edu.ucsd.idekerlab.massql`. Layout per `SPIKE.md` §4:
+`edu.ucsd.idekerlab.massql`. Layout per [`SPIKE.md`](SPIKE.md) §4:
 
 ```
 massql-java/                                    packaging=jar, <release>17</release>
@@ -198,7 +198,7 @@ tr ':' '\n' < /tmp/cp.txt | xargs -I{} stat -f '%z {}' | awk '{s+=$1} END {print
 ```
 
 Append the total and the exclusion rationale to `dependency-audit.txt` and commit it. This file is the artifact
-that answers `SPIKE.md` §11 question 3 and "did dependency complexity stay bounded?" at the review gate.
+that answers [`SPIKE.md`](SPIKE.md) §11 question 3 and "did dependency complexity stay bounded?" at the review gate.
 
 ### 8. CI and release workflows
 
@@ -213,7 +213,7 @@ matters:
 |---|---|---|---|
 | 1 | `mvn test` | **`mvn verify`** | `mvn test` runs surefire only. **All three gates of this spike live in `*IT.java`** (reader parity, differential, CLI contract), so `mvn test` would report green while skipping every one of them. |
 | 2 | JDK 11 | **JDK 17** | Constraint 7 — matches Cytoscape 3.10.4's parent pom. |
-| 3 | `xvfb-run` | *(none)* | cy-ndex-2 needs a virtual display because Cytoscape touches AWT. Nothing here does (`SPIKE.md` §6d: "No display needed"). |
+| 3 | `xvfb-run` | *(none)* | cy-ndex-2 needs a virtual display because Cytoscape touches AWT. Nothing here does ([`SPIKE.md`](SPIKE.md) §6d: "No display needed"). |
 | 4 | release uses `-DskipTests` | **runs the full suite** | For an SDK whose entire value is bug-for-bug agreement with one pinned MassQL commit, publishing an unverified jar defeats the purpose. `verify` also packages, so it is one build, not two. |
 
 **`ci.yml`** — push to `master` + PRs against `master`: checkout, JDK 17 with maven cache, **`make fixtures`**
@@ -276,7 +276,7 @@ See Correction **C16** in [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md).
 
 ## References
 
-- `SPIKE.md` §4 (layout and public API), §5 (reader dependency analysis — **see Correction C1**), §6d (build
+- [`SPIKE.md`](SPIKE.md) §4 (layout and public API), §5 (reader dependency analysis — **see Correction C1**), §6d (build
   wiring), §9 (constraints), §10 (how Phase 2 embeds this)
 - Corrections C1, C2, C4, C5 in [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md)
 - `../open-cyweb/pom.xml:116-132` (bundle config), `../cytoscape-mcp/build.gradle:143-200` (OSGi exclusion list)

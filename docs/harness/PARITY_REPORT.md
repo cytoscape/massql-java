@@ -3,7 +3,7 @@
 **Verdict: GREEN.** All three readers decode **bit-identically** to MassQL's own Python loader across
 **16 fixtures**, with no tolerance on any individual `mz`, `i` or `rt` value.
 
-> **`SPIKE.md` §11 Q1 — "Do all three readers produce bit-identical decoded intensities vs. the Python
+> **[`SPIKE.md`](SPIKE.md) §11 Q1 — "Do all three readers produce bit-identical decoded intensities vs. the Python
 > loader? If not, what tolerance becomes the contract?"**
 >
 > **Yes — all three formats are bit-identical on every peak, verified by SHA-256 over each scan's m/z and
@@ -12,7 +12,7 @@
 > dump records `pandas.sum()` over a `float32` column, while our float64 accumulation reproduces the true
 > sum exactly.**
 
-Carry that paragraph into the README at [Step 13](harness/Tech_Step13.md).
+Carry that paragraph into the README at [Step 13](Tech_Step13.md).
 
 ---
 

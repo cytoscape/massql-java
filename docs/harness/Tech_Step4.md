@@ -11,11 +11,11 @@ reference parse corpus.
 | Step | Why |
 |---|---|
 | [Step 3](Tech_Step3.md) | Provides the Maven build with the ANTLR plugin wired, `src/main/antlr4/` in place, and `MassqlParseException` with its `construct()` contract. |
-| [Step 1](Tech_Step1.md) | Provides `oracle/msql.ebnf` (the translation source, **165 lines** — confirmed) and `oracle/reference_parses/` (the conformance corpus: **46 files — 35 `scaninfo`, 11 non-`scaninfo`**. Note `SPIKE.md` says 47; 46 is the measured count at the pinned SHA and is authoritative). |
+| [Step 1](Tech_Step1.md) | Provides [`msql.ebnf`](oracle/msql.ebnf) — now in-repo at `docs/harness/oracle/` (Correction **C41**), previously the oracle working directory — (the translation source, **165 lines** — confirmed) and `oracle/reference_parses/` (the conformance corpus: **46 files — 35 `scaninfo`, 11 non-`scaninfo`**. Note [`SPIKE.md`](SPIKE.md) says 47; 46 is the measured count at the pinned SHA and is authoritative). |
 
 ## Context
 
-MassQL's entire formal language is one Lark EBNF file — `massql/msql.ebnf`, ~165 lines. Translation to ANTLR4 is
+MassQL's entire formal language is one Lark EBNF file — [`msql.ebnf`](oracle/msql.ebnf), ~165 lines. Translation to ANTLR4 is
 ~90% mechanical: rules are already `lowercase: alt | alt`, keywords are inline literals, and ANTLR auto-rewrites
 the direct left recursion that Lark expresses explicitly. The 10% that isn't mechanical is where the day goes,
 and both parts of it are known in advance (see Known traps).
@@ -24,12 +24,12 @@ The AST — not the generated parse tree — is the tested surface and the input
 ANTLR types out of the AST means the parser can be swapped (hand-written, or the remote `/parse` escape hatch)
 without touching the engine.
 
-Governing sections: `SPIKE.md` §6a (parser rows), §7 Step 1, §8 (what must reject).
+Governing sections: [`SPIKE.md`](SPIKE.md) §6a (parser rows), §7 Step 1, §8 (what must reject).
 
 ## Scope
 
 **In scope**
-- `Massql.g4` covering the full grammar as it exists in the pinned `msql.ebnf`.
+- `Massql.g4` covering the full grammar as it exists in the pinned [`msql.ebnf`](oracle/msql.ebnf).
 - A typed AST and an ANTLR-visitor facade that builds it.
 - `Massql.parse(String) → MassqlQuery`.
 - Clean, named rejection of everything out of scope for v1.
@@ -55,15 +55,15 @@ Governing sections: `SPIKE.md` §6a (parser rows), §7 Step 1, §8 (what must re
 | `src/main/java/…/massql/Massql.java` | `parse` only at this stage |
 | `src/test/resources/reference_parses/` | The corpus, copied from `oracle/reference_parses/` |
 | `src/test/java/…/lang/*Test.java` | The test set below |
-| `docs/GRAMMAR_NOTES.md` | Every place the ANTLR grammar deliberately diverges from the Lark source, and why |
+| [`GRAMMAR_NOTES.md`](GRAMMAR_NOTES.md) | Every place the ANTLR grammar deliberately diverges from the Lark source, and why. ⚠ **Moved to `docs/harness/` by Correction C41** — it is an engineering record, read by someone confirming the steps rather than by an SDK consumer. |
 | **`docs/harness/`** | **All 14 harness spec files relocated into the massql-java repo — see §7** |
 
 ## Specification
 
 ### 1. Translate the grammar
 
-Work from `oracle/msql.ebnf` at the pinned SHA — **not** from documentation or from the online grammar, which
-may not correspond. Record the actual line count (Step 1 recorded it; `SPIKE.md` says 165).
+Work from [`msql.ebnf`](oracle/msql.ebnf) at the pinned SHA — **not** from documentation or from the online grammar, which
+may not correspond. Record the actual line count (Step 1 recorded it; [`SPIKE.md`](SPIKE.md) says 165).
 
 Mechanical parts:
 - Lark `rule: alt1 | alt2` → ANTLR `rule : alt1 | alt2 ;` directly.
@@ -73,13 +73,13 @@ Mechanical parts:
 - Lark `?rule` (inline-if-single-child) has no ANTLR equivalent and needs none — collapse it in the AST builder
   instead, not in the grammar.
 
-Every divergence goes in `docs/GRAMMAR_NOTES.md` with the reason. That file is what makes a future grammar
+Every divergence goes in [`GRAMMAR_NOTES.md`](GRAMMAR_NOTES.md) with the reason. That file is what makes a future grammar
 re-sync tractable.
 
 ### 2. Keyword casing — enumerate literally
 
 Casing is **inconsistent in the source language**, and guessing symmetry breaks real queries users paste from
-GNPS. From `SPIKE.md` §6a and §7 Step 1:
+GNPS. From [`SPIKE.md`](SPIKE.md) §6a and §7 Step 1:
 
 | Token | Accepted forms |
 |---|---|
@@ -99,8 +99,8 @@ Write these as explicit lexer alternatives (~20 lines). **Do not** use a case-in
 `toUpperCase()` pre-pass — either one would accept `filter` and `or`, which must be rejected, and the case
 matrix test exists precisely to catch that shortcut.
 
-Verify the table against the pinned `msql.ebnf` before coding. If the source disagrees with this table, **the
-source wins** — correct the table here and note it in `GRAMMAR_NOTES.md`.
+Verify the table against the pinned [`msql.ebnf`](oracle/msql.ebnf) before coding. If the source disagrees with this table, **the
+source wins** — correct the table here and note it in [`GRAMMAR_NOTES.md`](GRAMMAR_NOTES.md).
 
 ### 3. The typed AST
 
@@ -164,14 +164,14 @@ Three requirements on the AST that later steps depend on:
   not to a comparator-less qualifier. `Comparator` is `{EQ, GT, LT}`. `=` still means `>=` for intensity in
   Step 9; that rule is untouched.
 - **`MS2MZ` is an alias for `MS2PROD`.** Resolve the alias in the AST builder — one `ConditionType` value, not
-  two — and note it in `GRAMMAR_NOTES.md`.
+  two — and note it in [`GRAMMAR_NOTES.md`](GRAMMAR_NOTES.md).
 - **Arithmetic stays a tree.** Do not evaluate `Expr.Literal` arithmetic here; [Step 9](Tech_Step9.md) folds it —
   including `Expr.Unary`, which is the part C35(e) found missing from that spec.
 
 **Canonical equality.** Give the AST value-based `equals`/`hashCode` (records do this) plus a `canonical()`
 string form used by the conformance test. Ordering matters: if the grammar treats `AND` conditions as an
 unordered set, sort them in `canonical()` so an equivalent parse compares equal; if order is semantically
-significant, preserve it and say so in `GRAMMAR_NOTES.md`. Decide this from the source, and write down which.
+significant, preserve it and say so in [`GRAMMAR_NOTES.md`](GRAMMAR_NOTES.md). Decide this from the source, and write down which.
 
 ### 4. Rejection — the reject list in one place
 
@@ -220,7 +220,7 @@ so a token-level rejection is sufficient and avoids lexer modes entirely. Add `F
 `PEPTIDE : 'peptide'` (plus `aminoaciddelta`) as tokens that the parser accepts *only* in order to produce a
 named rejection.
 
-Record in `GRAMMAR_NOTES.md` that **lexer modes pushed by those literals are the documented fallback** if these
+Record in [`GRAMMAR_NOTES.md`](GRAMMAR_NOTES.md) that **lexer modes pushed by those literals are the documented fallback** if these
 functions are ever brought in scope. Do not build the modes speculatively.
 
 ### 6. `Massql.parse`
@@ -238,7 +238,7 @@ Move `Tech_Step_INDEX.md` and `Tech_Step1.md`–`Tech_Step13.md` from the oracle
 `massql-java/docs/harness/`, so the specs travel with the code they describe and a reviewer cloning the repo
 gets the execution record with it.
 
-**Also copy `SPIKE.md`** alongside them. It is not a spec, but every spec cites it by section as the source of
+**Also copy [`SPIKE.md`](SPIKE.md)** alongside them. It is not a spec, but every spec cites it by section as the source of
 record for rationale, and a `docs/harness/` that cannot resolve its own primary reference is broken.
 
 **Fix the outbound links** — there are only five, all pointing at artifacts that stay behind in the oracle
@@ -246,8 +246,8 @@ working directory:
 
 | Link | Occurrences | Fix |
 |---|---|---|
-| `SPIKE.md` | 1 | resolves locally once copied |
-| `data/CONVERSION_NOTES.md` | 4 | rewrite to name the oracle directory explicitly |
+| [`SPIKE.md`](SPIKE.md) | 1 | resolves locally once copied |
+| [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md) | 4 | rewrite to name the oracle directory explicitly |
 
 **Add `docs/harness/README.md`** orienting a reader to the two-location split, because it is not obvious and
 the specs reference both sides constantly:
@@ -313,14 +313,14 @@ An empty or unreadable `reference_parses/` directory must **fail** `ParseConform
 - [x] No third-party type appears in any public signature — `AstEncapsulationTest` reflects over the API and
       bans `org.antlr.*`, `io.github.msdk.*`, `io.vendor.*`, `com.google.common.*`, `org.slf4j.*`,
       `org.cytoscape.*`. This is what keeps the parser swappable.
-- [x] `docs/GRAMMAR_NOTES.md` (196 lines) records: the line count (**165**, confirmed), **all 5** deliberate
+- [x] [`GRAMMAR_NOTES.md`](GRAMMAR_NOTES.md) (196 lines) records: the line count (**165**, confirmed), **all 5** deliberate
       divergences, the `MS2MZ` alias resolution, the canonical-order-preserving decision, and the lexer-modes
       fallback for `formula()`/`peptide()`/`aminoaciddelta()` if they are ever brought in scope.
-- [x] `docs/harness/` contains all 14 spec files plus `SPIKE.md` and a `README.md` explaining the two-location
+- [x] `docs/harness/` contains all 14 spec files plus [`SPIKE.md`](SPIKE.md) and a `README.md` explaining the two-location
       split; the inter-spec link audit passes and the outbound links were rewritten (§7).
 
 **✅ STEP 4 COMPLETE — 2026-07-30.** See Corrections **C17–C19** in
-[`Tech_Step_INDEX.md`](Tech_Step_INDEX.md) and `docs/GRAMMAR_NOTES.md` for every divergence
+[`Tech_Step_INDEX.md`](Tech_Step_INDEX.md) and [`GRAMMAR_NOTES.md`](GRAMMAR_NOTES.md) for every divergence
 from the Lark source.
 
 ## Escape hatch — documented, not implemented
@@ -333,7 +333,7 @@ back** — and if it is ever taken, it is a change to this spec, not a quiet imp
 
 ## References
 
-- `SPIKE.md` §6a (parser conformance / rejection / case-matrix rows), §7 Step 1, §8 (out of scope)
-- `oracle/msql.ebnf` and `oracle/reference_parses/` @ pinned SHA `dad2a28c…`
+- [`SPIKE.md`](SPIKE.md) §6a (parser conformance / rejection / case-matrix rows), §7 Step 1, §8 (out of scope)
+- [`msql.ebnf`](oracle/msql.ebnf) and `oracle/reference_parses/` @ pinned SHA `dad2a28c…`
 - [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md) — Out of scope list, spec conventions
 - Consumer: [Step 9](Tech_Step9.md) evaluates this AST

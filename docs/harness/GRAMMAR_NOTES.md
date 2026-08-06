@@ -7,7 +7,7 @@ translated from, plus the facts a future re-sync will need.
 
 | | |
 |---|---|
-| File | `massql/msql.ebnf` |
+| File | [`msql.ebnf`](oracle/msql.ebnf) |
 | Commit | `dad2a28c01e6e5132240270fc6700fbae29f1652` (tag `2026.03.14`) |
 | Length | **165 lines** — as SPIKE.md claims, confirmed |
 | Parser | Lark, Earley algorithm with **contextual lexing** |
@@ -185,7 +185,7 @@ pinning which would pin traversal order, which carries no user-visible meaning.
 
 ## Re-syncing against a newer MassQL
 
-1. Diff the new `msql.ebnf` against commit `dad2a28c…`.
+1. Diff the new [`msql.ebnf`](oracle/msql.ebnf) against commit `dad2a28c…`.
 2. For each changed rule, check this file first — several rules here are deliberately not
    literal translations.
 3. Regenerate `corpus-manifest.tsv` (the generator lives in the oracle working directory)

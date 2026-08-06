@@ -21,7 +21,7 @@ This step exists because of Correction C1 in [`Tech_Step_INDEX.md`](Tech_Step_IN
 be used as a dependency. `MzXMLFileParser` directly imports `it.unimi.dsi.io.ByteBufferInputStream`
 (→ dsiutils → **fastutil 7.1.0, 17,655,579 B**), `com.google.common.collect.Range` (→ Guava 21, 2,521,113 B),
 `org.slf4j.*`, and `SpectrumTypeDetectionAlgorithm` — over **20.6 MB against a ~1.5 MB budget**, plus logback at
-runtime, which `SPIKE.md` §9 bans outright.
+runtime, which [`SPIKE.md`](SPIKE.md) §9 bans outright.
 
 > ⚠ **This paragraph used to argue that vendoring beats hand-writing, on the grounds that swapping the
 > dsiutils `ByteBufferInputStream` import "removes the entire tail". That was wrong** — it accounted for
@@ -38,7 +38,7 @@ This remains a separate spec from Step 6 because it is a distinct format with it
 big-endian, interleaved pairs, unconditional RT conversion — and because it carries **the decisive
 `ms1scan` document-order assertion** that no other fixture can make.
 
-Governing sections: `SPIKE.md` §5, §6c (the Ewing fixture's four justifications, RT-units table), §9.
+Governing sections: [`SPIKE.md`](SPIKE.md) §5, §6c (the Ewing fixture's four justifications, RT-units table), §9.
 
 ## Scope
 
@@ -62,7 +62,7 @@ Governing sections: `SPIKE.md` §5, §6c (the Ewing fixture's four justification
 |---|---|
 | `src/main/java/…/massql/io/MzxmlReader.java` | **Hand-written** streaming reader (~250–350 LOC) |
 | *(nothing new under `io/vendor/`)* | C23 — reuse Step 6's `ByteBufferInputStream` / `FileMemoryMapper` |
-| `docs/VENDORED.md` | Already written by Step 6; **no new entries from this step** |
+| [`VENDORED.md`](../VENDORED.md) | Already written by Step 6; **no new entries from this step** |
 | `src/test/java/…/io/Mzxml*Test.java` | The test set below |
 
 ## Specification
@@ -102,7 +102,7 @@ case.
 
 ### 2. Provenance — nothing to do here (Correction C23)
 
-This step vendors nothing, so it adds no provenance headers and no `docs/VENDORED.md` entries.
+This step vendors nothing, so it adds no provenance headers and no [`VENDORED.md`](../VENDORED.md) entries.
 [Step 6](Tech_Step6.md) already carries both for the 13 decode-layer files, including the **EPL-1.0
 election** (Correction C3: MSDK's parent pom declares LGPL-2.1 **or** EPL-1.0 with
 `<distribution>repo</distribution>`, so the consumer elects; cite the pom, not the 368-byte root
@@ -153,7 +153,7 @@ Store `rt` into `scanRt` at **double** precision ([Step 5](Tech_Step5.md) §1).
 Correction C27(c), §4.
 
 **Three fields this spec never stated** (Correction C27d) — see the full table in
-`docs/READER_RULES.md`:
+[`READER_RULES.md`](READER_RULES.md):
 
 | Field | Rule |
 |---|---|
@@ -207,12 +207,12 @@ reads the element text and is immune — but it must not assume attributes are p
   so `None` matches neither branch and **the scan is silently dropped, contributing zero rows**. Not a
   default of 1, not a diagnostic, not a failure. Measured on `fixtures/edge/empty_msLevel_tag.mzXML`: 8
   of its 10 scans are `msLevel=""`; only scans 4 (MS2) and 8 (MS1) survive. Already recorded in
-  `docs/READER_RULES.md`.
+  [`READER_RULES.md`](READER_RULES.md).
 - **`polarity` absent, and MS2 with no `<precursorMz>` — MassQL raises `KeyError` for both**
   (Correction C27c). `_determine_scan_polarity_mzXML` reads `spec["polarity"]` unguarded (`:519`) and
   `:450` reads `spectrum["precursorMz"][0]["precursorMz"]` unguarded, so **no golden can exist** for
   either. Ours: absent `polarity` → **0**, absent `<precursorMz>` on an MS2 → **`precmz = 0`**. Both are
-  **our contract, not parity** — the rule table in `docs/READER_RULES.md` labels them, and the tests must
+  **our contract, not parity** — the rule table in [`READER_RULES.md`](READER_RULES.md) labels them, and the tests must
   assert the parity case (`polarity` present but neither `+` nor `-` → 0) **separately** from the
   non-parity one. Do not let a passing test imply MassQL agreement here.
 - **mzXML schema 2.0 vs MSDK's 3.2 target.** The Ewing file is 2.0. Confirm the vendored parser handles it; its
@@ -231,7 +231,7 @@ reads the element text and is immune — but it must not assume attributes are p
   `mz_sha256` on every mzML and mzXML fixture at once; one that retained them in MGF breaks the MGF digests.
   C36 was found in Step 9 because **no fixture contained a zero-intensity peak in a format where the two rules
   differ** — `micro_zeroint.mgf` exists solely to close that hole, and it is an MGF file precisely because the
-  mzXML side was already covered by `small.mzML`'s eight leading zeros. `docs/READER_RULES.md` records the
+  mzXML side was already covered by `small.mzML`'s eight leading zeros. [`READER_RULES.md`](READER_RULES.md) records the
   contrast per format.
 
 ### 5. Wire into `SpectraFile`
@@ -273,7 +273,7 @@ spec previously called it `SpectraFileCloseTest`) must now be re-run against an 
 | `MzxmlReaderTest` | unit | The Step 6-style oracle cross-check for `small.mzXML`, plus the **flat-vs-nested row-for-row equivalence** on the micro pair, `precursorScanNum` ignored (with the 34 occurrences asserted present first), and mzXML `charge` absent → 0 contrasted against MGF's 1. |
 | `StreamingMemoryTest` (extended) | unit | Step 7 §5: the Ewing file streams inside a **48 MB heap** and retains ~87 KB. mzXML holds a mapped region plus one scan's base64, which is a different retention shape from MGF's reader, so it needs its own proof. |
 | `InstrumentAttributeCrossCheckIT` | IT | A free check with **no Python in the loop**: the Ewing file's own `basePeakMz`, `basePeakIntensity` and `totIonCurrent` scan attributes vs our computed values. Hand-check the `peaksCount="3"` scans noted in Step 2. Expect minor float drift on `tic`; a **systematic** mismatch is a bug. (Full form in [Step 8](Tech_Step8.md).) |
-| `VendoredProvenanceTest` | unit | Every **upstream** file under `io/vendor/` carries its provenance header, a 40-character pinned commit, its stated modifications, and the string `EPL-1.0` — makes the licence obligation a build-enforced fact rather than a convention. Also asserts **`docs/VENDORED.md` exists and names every vendored file**, since all eleven headers defer to it. ⛔ **Written only at Correction C38** — this row sat unimplemented, and `docs/VENDORED.md` (a [Step 6](Tech_Step6.md) deliverable that this spec's exit criteria recorded as "unchanged") **did not exist at all** while every vendored header pointed readers at it. The headers themselves were correct throughout; nothing existed to notice the missing document. Non-vendored files in the package — `LittleEndianDataInput` (the C16 Guava replacement) and `package-info` — are skipped via a **"Not vendored" marker in the file itself**, not a filename list in the test, so a genuinely vendored file cannot be exempted from the licence assertions quietly. |
+| `VendoredProvenanceTest` | unit | Every **upstream** file under `io/vendor/` carries its provenance header, a 40-character pinned commit, its stated modifications, and the string `EPL-1.0` — makes the licence obligation a build-enforced fact rather than a convention. Also asserts **[`VENDORED.md`](../VENDORED.md) exists and names every vendored file**, since all eleven headers defer to it. ⛔ **Written only at Correction C38** — this row sat unimplemented, and [`VENDORED.md`](../VENDORED.md) (a [Step 6](Tech_Step6.md) deliverable that this spec's exit criteria recorded as "unchanged") **did not exist at all** while every vendored header pointed readers at it. The headers themselves were correct throughout; nothing existed to notice the missing document. Non-vendored files in the package — `LittleEndianDataInput` (the C16 Guava replacement) and `package-info` — are skipped via a **"Not vendored" marker in the file itself**, not a filename list in the test, so a genuinely vendored file cannot be exempted from the licence assertions quietly. |
 
 ### Renamed and folded test classes
 
@@ -289,7 +289,7 @@ spec previously called it `SpectraFileCloseTest`) must now be re-run against an 
       (`DP00570_F02.mzxml`, `micro_nested.mzXML`). The flat/nested pair is asserted as a **row-for-row
       equivalence**, which is stronger than either alone, and the walk never treats `</scan>` as a
       spectrum boundary — it emits at `<peaks>`, so both layouts take one code path.
-- [x] **Nothing new under `io/vendor/`** (C23) — still **13** files. `docs/VENDORED.md` unchanged.
+- [x] **Nothing new under `io/vendor/`** (C23) — still **13** files. [`VENDORED.md`](../VENDORED.md) unchanged.
 - [x] `VendoredProvenanceTest` still passes over the files Step 6 vendored (this step adds none).
 - [x] **`Ms1ScanDocumentOrderIT` passes on the Ewing mzXML** — all **687** MS2 links match document
       order re-derived from the raw XML, including the non-trivial scan 100 → **97**. Zero
@@ -301,7 +301,7 @@ spec previously called it `SpectraFileCloseTest`) must now be re-run against an 
 - [x] `SpectraFile.open` handles `.mzXML` and `.mzxml` by **content**; close/leak tests extended to
       mzXML (200 open/close cycles), and the constrained-heap proof extended to the Ewing file —
       **916 scans / 308,425 peaks in a 48 MB heap, 87 KB retained**.
-- [x] `docs/READER_RULES.md` extended: the mzXML rules now include `scan`, `precmz` and `charge`
+- [x] [`READER_RULES.md`](READER_RULES.md) extended: the mzXML rules now include `scan`, `precmz` and `charge`
       (absent → **0**, unlike MGF's 1), the resolved `msLevel`-absent rule, and the two non-parity cases.
 - [x] **The instrument cross-check reconciles with no Python in the loop** — worst relative delta
       4.72e-06 / 4.90e-06 / 4.85e-06 on `totIonCurrent` / `basePeakIntensity` / `basePeakMz` across all
@@ -310,7 +310,7 @@ spec previously called it `SpectraFileCloseTest`) must now be re-run against an 
 
 ## References
 
-- `SPIKE.md` §5 (**superseded on the mzXML dependency question by Correction C1**), §6c (the Ewing fixture's four
+- [`SPIKE.md`](SPIKE.md) §5 (**superseded on the mzXML dependency question by Correction C1**), §6c (the Ewing fixture's four
   justifications; the RT-units table), §9
 - Corrections **C1** and **C3** in [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md)
 - `pyteomics/mzxml.py` — `_determine_dtype`, `_decode_peaks`; `pyteomics/xml.py:118-143` —

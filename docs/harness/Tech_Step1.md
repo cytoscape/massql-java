@@ -16,13 +16,13 @@ and may run in parallel.
 
 ## Context
 
-`massql_query.py`, `RESULT_SCHEMA.md` and `output/*_results.json` are checked in, but nothing on this machine
+`massql_query.py`, [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) and `output/*_results.json` are checked in, but nothing on this machine
 can currently regenerate them — there is no `MassQueryLanguage` clone and `massql`/`lark`/`pandas` are not
 importable from any interpreter present. Those two JSON files (6 and 664 records) are the behavioural contract
 for the entire spike, and right now they are orphaned artifacts of unknown provenance. Until they reproduce, no
 Java output can be called correct or incorrect.
 
-Governing sections: `SPIKE.md` §7 Step 0, §12.
+Governing sections: [`SPIKE.md`](SPIKE.md) §7 Step 0, §12.
 
 ## Scope
 
@@ -44,13 +44,13 @@ Governing sections: `SPIKE.md` §7 Step 0, §12.
 | Path | Content |
 |---|---|
 | `oracle/MassQueryLanguage/` | The pinned clone. Add to `.gitignore`; the SHA is what gets recorded, not the source. |
-| `oracle/PINNED.md` | The commit SHA, the tag it came from, clone URL, and the date pinned. |
+| [`PINNED.md`](oracle/PINNED.md) | The commit SHA, the tag it came from, clone URL, and the date pinned. |
 | `oracle/requirements.freeze.txt` | `pip freeze` output, verbatim and unedited. |
 | `oracle/venv-setup.sh` | Reproducible re-creation of the venv from scratch. |
 | `oracle/reproduce-goldens.sh` | Re-runs both queries and diffs against the checked-in goldens; non-zero exit on any difference. |
 | `oracle/reference_parses/` | The 46 golden parse files (35 scaninfo, 11 non-scaninfo), copied out of the clone. |
 | `oracle/test_query_py_reference.py` | Copy of the clone's `tests/test_query.py`, for porting in [Step 9](Tech_Step9.md). |
-| `oracle/NOTES_fileloading.md` | Your findings from reading `msql_fileloading.py` (see Specification §5). |
+| [`NOTES_fileloading.md`](oracle/NOTES_fileloading.md) | Your findings from reading `msql_fileloading.py` (see Specification §5). |
 
 ## Specification
 
@@ -67,7 +67,7 @@ git rev-parse HEAD          # must echo dad2a28c01e6e5132240270fc6700fbae29f1652
 default HEAD is `17e8c74`, already past this tag, and tags are mutable. That SHA is the definition of
 "MassQL-compliant" for this spike and gets published in the README ([Step 13](Tech_Step13.md)).
 
-Record all of it in `oracle/PINNED.md`.
+Record all of it in [`PINNED.md`](oracle/PINNED.md).
 
 ### 2. Virtual environment
 
@@ -181,23 +181,25 @@ cp -R oracle/MassQueryLanguage/tests/reference_parses/ oracle/reference_parses/
 cp    oracle/MassQueryLanguage/tests/test_query.py     oracle/test_query_py_reference.py
 ```
 
-**Count the reference parse files and record the number.** `SPIKE.md` asserts 47; if the pinned commit has a
+**Count the reference parse files and record the number.** [`SPIKE.md`](SPIKE.md) asserts 47; if the pinned commit has a
 different count, the real number is authoritative and [Step 4](Tech_Step4.md)'s conformance count must be
 updated to match. Report the discrepancy rather than silently accepting either figure.
 
 > **✅ RESOLVED (2026-07-29): the corpus is 46 files, not 47** — 35 `scaninfo` queries and 11 non-`scaninfo`.
-> [Step 4](Tech_Step4.md) asserts 46. `oracle/PINNED.md` carries the counts.
+> [Step 4](Tech_Step4.md) asserts 46. [`PINNED.md`](oracle/PINNED.md) carries the counts.
 
-Also copy `massql/msql.ebnf` to `oracle/msql.ebnf` — it is [Step 4](Tech_Step4.md)'s translation source.
-`SPIKE.md` describes it as 165 lines; verify and record the actual length.
+Also copy `massql/msql.ebnf` out of the pinned clone — it is [Step 4](Tech_Step4.md)'s translation source. It
+now lives in-repo at [`docs/harness/oracle/msql.ebnf`](oracle/msql.ebnf); Correction **C41** moved it there from
+the oracle working directory. [`SPIKE.md`](SPIKE.md) describes it as 165 lines; verify and record the actual
+length.
 
-> **✅ RESOLVED: `msql.ebnf` is 165 lines**, as claimed. `msql_fileloading.py` is 892 lines, as claimed.
+> **✅ RESOLVED: [`msql.ebnf`](oracle/msql.ebnf) is 165 lines**, as claimed. `msql_fileloading.py` is 892 lines, as claimed.
 
 ### 5. Read `msql_fileloading.py` and write up the findings
 
 892 lines, and it is **the authoritative reader specification** for Steps 6 and 7. Read it before either of
-those steps starts, and record answers to these questions in `oracle/NOTES_fileloading.md`. Each is a claim
-`SPIKE.md` makes that the specs depend on — confirm or correct it from source:
+those steps starts, and record answers to these questions in [`NOTES_fileloading.md`](oracle/NOTES_fileloading.md). Each is a claim
+[`SPIKE.md`](SPIKE.md) makes that the specs depend on — confirm or correct it from source:
 
 | Claim to verify | Where |
 |---|---|
@@ -249,9 +251,9 @@ This step predates the Java test suite; its "tests" are scripts:
 - [x] `oracle/.venv/bin/python -V` prints 3.12.x (3.12.0).
 - [x] `oracle/requirements.freeze.txt` exists and is unedited (28 packages).
 - [x] `bash oracle/reproduce-goldens.sh` exits **0** — all three diffs empty: 664, 6 and 6 records.
-- [x] `oracle/reference_parses/` populated; the actual count (**46**, not 47) recorded in `oracle/PINNED.md`.
-- [x] `oracle/msql.ebnf` copied; line count recorded (**165**, as claimed).
-- [x] `oracle/NOTES_fileloading.md` answers all seven verification rows, including the pasted grep output
+- [x] `oracle/reference_parses/` populated; the actual count (**46**, not 47) recorded in [`PINNED.md`](oracle/PINNED.md).
+- [x] [`msql.ebnf`](oracle/msql.ebnf) copied; line count recorded (**165**, as claimed).
+- [x] [`NOTES_fileloading.md`](oracle/NOTES_fileloading.md) answers all seven verification rows, including the pasted grep output
       proving `spectrumRef`/`precursorScanNum` are absent.
 - [x] `bash oracle/venv-setup.sh` re-runs clean and idempotent, asserting interpreter, SHA and both counts.
 
@@ -259,11 +261,11 @@ This step predates the Java test suite; its "tests" are scripts:
 
 ## References
 
-- `SPIKE.md` §7 Step 0 (this step's origin), §12 (reference material)
+- [`SPIKE.md`](SPIKE.md) §7 Step 0 (this step's origin), §12 (reference material)
 - `massql_query.py` — the reference implementation; `add_precursor_intensity` at lines 62–116 is the contract
   for [Step 10](Tech_Step10.md)
-- **[`docs/RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) — the 12-key result contract, and the single definition of it.**
-  The oracle's own `RESULT_SCHEMA.md` is superseded in place and points here; its "smaller MS1DATA schema" note was
+- **[`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) — the 12-key result contract, and the single definition of it.**
+  The oracle's own [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) is superseded in place and points here; its "smaller MS1DATA schema" note was
   wrong (Correction **C40**)
 - `github.com/mwang87/MassQueryLanguage` @ `dad2a28c01e6e5132240270fc6700fbae29f1652`
 - Corrections C1–C5 and Established facts in [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md)

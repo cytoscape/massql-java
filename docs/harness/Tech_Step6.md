@@ -11,7 +11,7 @@ bit-identical to what MassQL's Python loader produces — for MGF and mzML.
 |---|---|
 | [Step 3](Tech_Step3.md) | Provides the build, the two-artifact dependency policy (javolution + antlr — **no MSDK**, see Correction C16), and `MassqlException`. |
 | [Step 5](Tech_Step5.md) | Provides `SpectrumTable` / `SpectrumTableBuilder` — the target this step fills, including the `scanRt` double-precision requirement. |
-| [Step 1](Tech_Step1.md) | Provides `oracle/NOTES_fileloading.md`. **Read it before writing any code here.** |
+| [Step 1](Tech_Step1.md) | Provides [`NOTES_fileloading.md`](oracle/NOTES_fileloading.md) — in-repo at `docs/harness/oracle/` since Correction **C41**. **Read it before writing any code here.** |
 | [Step 2](Tech_Step2.md) | Provides `micro.mgf`, `micro.mzML` and the goldens these tests assert against. |
 
 ## Context
@@ -24,7 +24,7 @@ Java readers produce must match what that file produces, because [Step 8](Tech_S
 Only `_load_data_mzML_pyteomics` is live (dispatched at `:103`); three other mzML loaders remain in the file as
 dead code. Read the right one.
 
-Governing sections: `SPIKE.md` §3 (population by format), §5 (reader dependencies — **see Correction C1**), §6a
+Governing sections: [`SPIKE.md`](SPIKE.md) §3 (population by format), §5 (reader dependencies — **see Correction C1**), §6a
 (RT units, `ms1scan` document order), §6c (RT units table), §12.
 
 ## Scope
@@ -56,7 +56,7 @@ Governing sections: `SPIKE.md` §3 (population by format), §5 (reader dependenc
 | `src/main/java/…/massql/io/vendor/*` | 13 vendored decode-layer files (C21) |
 | ~~`BinaryDecoder.java`~~ | **Dropped — Correction C21a.** Nothing left to share: mzML decode is the vendored `MzMLPeaksDecoder`; mzXML differs in byte order, layout, and has no Numpress |
 | `src/test/java/…/io/*Test.java` | The test set below |
-| `docs/READER_RULES.md` | The per-format rule table, as the single reference for Steps 6 and 7 |
+| [`READER_RULES.md`](READER_RULES.md) | The per-format rule table, as the single reference for Steps 6 and 7. ⚠ **Moved to `docs/harness/` by Correction C41** — it is an engineering record, read by someone confirming the steps rather than by an SDK consumer. |
 
 ## Specification
 
@@ -113,7 +113,7 @@ Phase 2's `shutDown()` depends on release and [Step 12](Tech_Step12.md) tests 20
 space, not heap.
 
 **Format sniffing** — by content, with the extension only as a tiebreak, because the fixtures disagree on case
-(`small.mzXML` from msconvert vs `DP00570_F02.mzxml` from Ewing) and `SPIKE.md` uses both spellings:
+(`small.mzXML` from msconvert vs `DP00570_F02.mzxml` from Ewing) and [`SPIKE.md`](SPIKE.md) uses both spellings:
 - First non-blank line begins with `BEGIN IONS`, or the file contains no `<`, → **MGF**.
 - XML whose root element (or first `<mzML`/`<indexedmzML`) is mzML → **MZML**.
 - XML whose root contains `<mzXML` or `<msRun` → **MZXML**.
@@ -134,7 +134,7 @@ keeps [Step 10](Tech_Step10.md) free of null checks.
 > shape (`i=0, mz=0, scan=1, rt=0, polarity=1`) is the pyteomics loader's `except` branch, reached only when
 > its peak loop never ran — `PlusRise.mgf`'s case. On the normal path `peak_dict` **leaks from the loop**, so
 > the row is a byte-for-byte **duplicate of the last MS2 peak**, carrying that scan's id (`micro.mgf` → 3,
-> `DP00570_F02.mgf` → 625). See `docs/READER_RULES.md` for the table.
+> `DP00570_F02.mgf` → 625). See [`READER_RULES.md`](READER_RULES.md) for the table.
 >
 > 📌 **The `polarity=1` in the all-zero shape above was the clue that C8 was wrong** — the loader defaults
 > polarity to 1, and it is written right here. C33 found it three steps later via the Step 8 gate instead.
@@ -153,7 +153,7 @@ Structure: `BEGIN IONS` … `END IONS` blocks, each with `TITLE=`, `PEPMASS=`, `
 |---|---|
 | **All peaks are MS2** | MGF is an MS2-only peak-list format. `mslevel` = 2, and the MS1 table is empty. |
 | `precmz` | First token of `PEPMASS=` (a second token, if present, is precursor intensity — ignore it). |
-| **`charge`** | From `CHARGE=`; strip a trailing `+`/`-`. **Absent → `1`, NOT 0 and not null.** ⚠ See Correction C6 — `SPIKE.md` §3 is wrong here. The live loader is `_load_data_mgf_pyteomics`, whose charge handling is `params.get('charge', [1])` with `except: charge = 1` (`msql_fileloading.py:192-203`). Since only `0` is null-converted ([Step 10](Tech_Step10.md) §4), **MGF `charge` is never null** — a genuine 1+ and an absent `CHARGE=` are indistinguishable. Confirmed against the golden: `plusrise_results.json` charge counts are `{1: 653, 2: 10, 3: 1}`, zero nulls. |
+| **`charge`** | From `CHARGE=`; strip a trailing `+`/`-`. **Absent → `1`, NOT 0 and not null.** ⚠ See Correction C6 — [`SPIKE.md`](SPIKE.md) §3 is wrong here. The live loader is `_load_data_mgf_pyteomics`, whose charge handling is `params.get('charge', [1])` with `except: charge = 1` (`msql_fileloading.py:192-203`). Since only `0` is null-converted ([Step 10](Tech_Step10.md) §4), **MGF `charge` is never null** — a genuine 1+ and an absent `CHARGE=` are indistinguishable. Confirmed against the golden: `plusrise_results.json` charge counts are `{1: 653, 2: 10, 3: 1}`, zero nulls. |
 | **`polarity`** | **Hardcoded `1`** (positive). ⚠ **Correction C33 fixes C8**, which said "not read at all → 0". Not read from any *header* is true; but both loaders write `"polarity": 1  # Default` into every peak dict (`msql_fileloading.py:67`, `:86`), so MassQL emits **1** for every MGF row — measured `{1: all}` across 866k rows. A `POLARITY` condition still cannot meaningfully filter an MGF, since the value is a constant rather than data. **This row already said "verify the value MassQL actually emits rather than assuming", and the implementation assumed anyway** — the note below records why that was easy to miss. |
 | **`rt`** | `float(RTINSECONDS)/60.0`. **Absent → `0.0`, not null** (`msql_fileloading.py:179-181, :327-328`). |
 | **`ms1scan`** | **Hardcoded `0`** for every scan (`msql_fileloading.py:394`). Not derived, not looked up. |
@@ -204,7 +204,7 @@ whitespace- or tab-separated; a malformed peak line is an error, not a skip (see
 
 **Already vendored to `io/vendor/` — 13 files, 112 KB, zero non-JDK imports.** `MSNumpress` (44 KB)
 is byte-identical to upstream; only `MzMLPeaksDecoder` (3 swaps) and `MzMLBinaryDataInfo` (one
-annotation) were modified. Full list and provenance in `docs/VENDORED.md`.
+annotation) were modified. Full list and provenance in [`VENDORED.md`](../VENDORED.md).
 
 **The decoder already implements the 32-bit widening rule** — `Float.intBitsToFloat(readInt())` into
 a `double[]`, i.e. `(double)(float)raw`. Verified on raw bits. **Do not re-implement it and do not
@@ -244,7 +244,7 @@ big-endian; never share a configured buffer between the readers.
 **This is the highest-risk rule in the spike.** The obvious implementation reads the explicit precursor → survey
 link: `spectrumRef` on `<precursor>` in mzML. **MassQL does neither that nor the mzXML equivalent** — those two
 attribute names appear **zero times** in all 892 lines of `msql_fileloading.py`
-(`oracle/NOTES_fileloading.md` records the grep proving it).
+([`NOTES_fileloading.md`](oracle/NOTES_fileloading.md) records the grep proving it).
 
 Every MassQL loader instead tracks `previous_ms1_scan`: the id of the most recent MS1 spectrum seen while
 streaming in **document order**, initialized to `0`.
@@ -379,7 +379,7 @@ step names a test class that neither exists nor redirects.
 - [x] Both mzML RT directions verified with separate fixtures (`micro.mzML` minute → unchanged,
       `micro_rtseconds.mzML` second → ÷60), plus a third test asserting they agree after conversion.
 - [x] The 32-bit widening is asserted **on raw bits** — already done by `MzMLPeaksDecoderTest` against the vendored decoder (8 tests green), including a companion assertion that the 32- and 64-bit decodes genuinely differ so it cannot pass vacuously. (This spec previously asked for "a 32-bit array whose float32 and float64 decodes differ visibly", which is incoherent — 4 bytes have no float64 decode.)
-- [x] `docs/READER_RULES.md` written: the three-format table, the shared `ms1scan` document-order rule, the
+- [x] [`READER_RULES.md`](READER_RULES.md) written: the three-format table, the shared `ms1scan` document-order rule, the
       MGF scan-numbering rule, all three RT rules side by side, and the vendored-API gotchas.
 - [x] Closure unchanged: **two artifacts, 785,599 B**.
 - [x] **Oracle cross-check inside this step**, not deferred: `small.mzML` matches the parity dump on scan
@@ -389,14 +389,14 @@ step names a test class that neither exists nor redirects.
       retained after settling.
 
 **✅ STEP 6 COMPLETE — 2026-07-31.** See Correction **C24** in
-[`Tech_Step_INDEX.md`](Tech_Step_INDEX.md) and `docs/READER_RULES.md`.
+[`Tech_Step_INDEX.md`](Tech_Step_INDEX.md) and [`READER_RULES.md`](READER_RULES.md).
 
 ## References
 
 - **`massql/msql_fileloading.py` is the authoritative spec.** Key lines: `:103` (live loader dispatch),
   `:525-650` (`_load_data_mzML_pyteomics`), `:564-571` (mzML RT conditional), `:179-181`/`:327-328` (MGF RT),
   `:394` (MGF `ms1scan = 0`)
-- `oracle/NOTES_fileloading.md` from [Step 1](Tech_Step1.md)
-- `SPIKE.md` §3 (population by format, the `ms1scan` derivation note), §5, §6a, §6c (RT-units table)
+- [`NOTES_fileloading.md`](oracle/NOTES_fileloading.md) from [Step 1](Tech_Step1.md)
+- [`SPIKE.md`](SPIKE.md) §3 (population by format, the `ms1scan` derivation note), §5, §6a, §6c (RT-units table)
 - MSDK source: `github.com/msdk/msdk/blob/master/msdk-io-mzml/src/main/java/io/github/msdk/io/mzml/data/MzMLParser.java`
 - Consumers: [Step 7](Tech_Step7.md) reuses `SpectraReader`; [Step 8](Tech_Step8.md) asserts parity
