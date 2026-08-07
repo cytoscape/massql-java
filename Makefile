@@ -12,7 +12,7 @@ JAR := target/massql-java-0.1.0-SNAPSHOT.jar
 
 # Minimum tests expected to execute. A run below this means suites are not being discovered,
 # which is how a green build can prove nothing (Correction C26).
-MIN_TESTS := 519
+MIN_TESTS := 539
 
 .DEFAULT_GOAL := help
 .PHONY: help all build test it verify skipcheck audit spec-audit fixtures report clean \

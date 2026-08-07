@@ -12,7 +12,7 @@ rule.
 |---|---|
 | [Step 3](Tech_Step3.md) | `msdk-io-mzxml` is **excluded** there; this step supplies mzXML support in its place. Also provides `DEPENDENCY_POLICY.md`, which this step must not violate. |
 | [Step 5](Tech_Step5.md) | `SpectrumTable` — the fill target. |
-| [Step 6](Tech_Step6.md) | Defines the `SpectraStream` / `ScanView` cursor (C22) this reader plugs into, owns the `ms1scan` document-order rule this step asserts, and has **already vendored `ByteBufferInputStream`** plus the rest of the decode layer to `io/vendor/` (C21). |
+| [Step 6](Tech_Step6.md) | Defines the `SpectraStream` / `ScanView` cursor (C22) this reader plugs into, owns the `ms1scan` document-order rule this step asserts, and has **already vendored `ByteBufferInputStream`** plus the rest of the decode layer to `io/vendor/` (C21). ⚠ **The cursor is `hasNext()`/`next()` as of Correction C42** — `current()` and `format()` are gone, `next()` throws `NoSuchElementException` past the end, and `MzxmlReader` carries the same `NOT_STARTED`/`PEEKED`/`EXHAUSTED` peek machine as the other two readers so `hasNext()` is repeatable. |
 | [Step 2](Tech_Step2.md) | Provides `micro.mzXML`, `data/small.mzXML`, `data/DP00570_F02.mzxml`, `empty_msLevel_tag.mzXML`. |
 
 ## Context

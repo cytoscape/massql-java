@@ -29,8 +29,8 @@ class MzxmlSchema20IT {
         long peaks = 0;
         int previousId = 0;
         try (SpectraStream s = SpectraFile.open(mzxml)) {
-            while (s.next()) {
-                ScanView v = s.current();
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 scans++;
                 if (v.msLevel() == 1) ms1++; else ms2++;
 
@@ -87,10 +87,11 @@ class MzxmlSchema20IT {
         Path mzxml = Fixtures.require("data/DP00570_F02.mzxml");
         int threePeak = 0;
         try (SpectraStream s = SpectraFile.open(mzxml)) {
-            while (s.next()) {
-                if (s.current().peakCount() != 3) continue;
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                if (v.peakCount() != 3) continue;
                 threePeak++;
-                SpectrumTable t = s.current().materialize();
+                SpectrumTable t = v.materialize();
                 assertEquals(3, t.rowCount());
                 for (int i = 0; i < 3; i++) {
                     assertTrue(t.mz(i) > 0.0, "m/z must be positive");
@@ -109,7 +110,7 @@ class MzxmlSchema20IT {
         // produce NO diagnostics. If any appear, the walk is discarding scans it should not.
         Path mzxml = Fixtures.require("data/DP00570_F02.mzxml");
         try (SpectraStream s = SpectraFile.open(mzxml)) {
-            while (s.next()) { /* drain */ }
+            while (s.hasNext()) { ScanView v = s.next(); /* drain */ }
             assertEquals(java.util.List.of(), s.diagnostics(),
                     "unexpected diagnostics on a clean file: " + s.diagnostics());
         }

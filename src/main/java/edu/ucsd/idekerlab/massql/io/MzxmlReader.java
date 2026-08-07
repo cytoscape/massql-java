@@ -50,15 +50,12 @@ import javolution.xml.stream.XMLStreamException;
  * precedes any nested child — and never consults {@code </scan>} at all. Flat and nested files then take
  * an identical path, which is why both produce the same {@code ms1scan} links.
  */
-final class MzxmlReader implements SpectraStream {
+final class MzxmlReader extends AbstractSpectraStream {
 
-    private final Path path;
     private final ByteBufferInputStream mapped;
     private final XMLStreamReaderImpl xml;
     private final List<String> diagnostics = new ArrayList<>();
 
-    private boolean closed = false;
-    private boolean valid = false;
     private int skippedHighMsLevel = 0;
     private int skippedNoMsLevel = 0;
     private int skippedNotASpectrum = 0;
@@ -73,8 +70,10 @@ final class MzxmlReader implements SpectraStream {
     private final Scan scan = new Scan();
 
     MzxmlReader(Path path) {
-        JavolutionQuiet.ensure();   // javolution logs buffer growth to STDOUT; see that class
-        this.path = path;
+        super(path);
+        // Must precede `new XMLStreamReaderImpl()` below: javolution logs buffer growth to STDOUT,
+        // which would corrupt the CLI's JSON payload. See that class.
+        JavolutionQuiet.ensure();
         try {
             this.mapped = FileMemoryMapper.mapToMemory(path.toFile());
         } catch (IOException e) {
@@ -88,8 +87,6 @@ final class MzxmlReader implements SpectraStream {
             throw new MassqlException("cannot parse " + path + ": " + e.getMessage(), e);
         }
     }
-
-    @Override public Format format() { return Format.MZXML; }
 
     @Override
     public List<String> diagnostics() {
@@ -111,16 +108,10 @@ final class MzxmlReader implements SpectraStream {
         return Collections.unmodifiableList(out);
     }
 
-    @Override
-    public ScanView current() {
-        if (!valid) throw new MassqlException("no current scan; call next() first");
-        return scan;
-    }
+    @Override protected ScanView view() { return scan; }
 
     @Override
-    public boolean next() {
-        if (closed) throw new MassqlException("stream is closed");
-        valid = false;
+    protected boolean advance() {
         try {
             while (xml.hasNext()) {
                 int ev = xml.next();
@@ -146,7 +137,6 @@ final class MzxmlReader implements SpectraStream {
                     readPeaks();
                     scanStarted = false;
                     if (admit()) {                  // false = dropped (bad/absent/high ms level)
-                        valid = true;
                         return true;
                     }
                 }
@@ -208,7 +198,6 @@ final class MzxmlReader implements SpectraStream {
                     + " ends without closing </msRun>; refusing to return a partial result");
         }
         dropUnfinishedScan();
-        valid = false;
     }
 
     private void startScan() {
@@ -386,9 +375,7 @@ final class MzxmlReader implements SpectraStream {
     }
 
     @Override
-    public void close() {
-        if (closed) return;        // idempotent
-        closed = true;
+    protected void releaseResources() {
         try { xml.close(); } catch (XMLStreamException ignored) { }
         closeQuietly();
     }

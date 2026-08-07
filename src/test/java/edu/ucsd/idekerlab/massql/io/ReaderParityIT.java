@@ -137,8 +137,8 @@ class ReaderParityIT {
         long peaks = 0;
 
         try (SpectraStream s = SpectraFile.open(fixturePath(fixture))) {
-            while (s.next()) {
-                ScanView v = s.current();
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 if (v.msLevel() == 1) ms1++; else ms2++;
 
                 SpectrumTable t = v.materialize();

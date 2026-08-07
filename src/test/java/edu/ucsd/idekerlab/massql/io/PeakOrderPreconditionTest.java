@@ -69,11 +69,12 @@ class PeakOrderPreconditionTest {
         // binary search in Step 5 as well as the digests.
         try (SpectraStream s = SpectraFile.open(
                 Fixtures.require(fixture.startsWith("micro") ? "fixtures/micro/" + fixture : "data/" + fixture))) {
-            while (s.next()) {
-                SpectrumTable t = s.current().materialize();
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                SpectrumTable t = v.materialize();
                 for (int i = 1; i < t.rowCount(); i++) {
                     assertTrue(t.mz(i) >= t.mz(i - 1),
-                            fixture + " scan " + s.current().scanId() + ": m/z descends at row " + i
+                            fixture + " scan " + v.scanId() + ": m/z descends at row " + i
                                     + " (" + t.mz(i - 1) + " -> " + t.mz(i) + "); the mz-window binary "
                                     + "search requires ascending order");
                 }

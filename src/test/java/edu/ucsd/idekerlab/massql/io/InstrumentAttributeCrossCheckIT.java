@@ -98,8 +98,8 @@ class InstrumentAttributeCrossCheckIT {
         int compared = 0;
 
         try (SpectraStream s = SpectraFile.open(mzxml)) {
-            while (s.next()) {
-                ScanView v = s.current();
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 Declared d = byNum.get(v.scanId());
                 assertNotNull(d, "scan " + v.scanId() + " has no declared attributes");
 
@@ -150,8 +150,8 @@ class InstrumentAttributeCrossCheckIT {
         int checked = 0;
         double smallestGap = Double.POSITIVE_INFINITY;
         try (SpectraStream s = SpectraFile.open(mzxml)) {
-            while (s.next() && checked < 50) {
-                SpectrumTable t = s.current().materialize();
+            while (s.hasNext() && checked < 50) { ScanView v = s.next();
+                SpectrumTable t = v.materialize();
                 if (t.rowCount() < 2) continue;
                 int best = 0, second = -1;
                 for (int i = 1; i < t.rowCount(); i++) if (t.intensity(i) > t.intensity(best)) best = i;

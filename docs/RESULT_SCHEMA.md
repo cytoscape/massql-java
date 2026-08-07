@@ -135,7 +135,7 @@ lookup needs the **raw `0`** to detect "no linked MS1 scan", so converting senti
 
 **`i` is renamed to `tic`**, and the rename is only valid because we support **`scaninfo` alone**. Other MassQL
 functions put a different quantity in `i` — `scanmaxint` puts the *base peak* there — which is why the
-reference guards the rename to `scaninfo` queries (`massql_query.py:154`). If another function is ever added,
+reference guards the rename to `scaninfo` queries (`massql_query.py`'s `rename(columns={"i": "tic"})`). If another function is ever added,
 the rename must become conditional. Recorded here so it is not generalized incorrectly.
 
 ## The 7 / 5 split — what the SDK must compute itself

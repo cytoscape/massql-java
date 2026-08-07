@@ -61,9 +61,10 @@ class MzxmlPolarityTest {
             // to 0, that failure would otherwise be invisible.
             int scans = 0;
             try (SpectraStream s = SpectraFile.open(Fixtures.require("data/small.mzXML"))) {
-                while (s.next()) {
-                    assertEquals(1, s.current().polarity(),
-                            "scan " + s.current().scanId() + ": small.mzXML is polarity=\"+\" throughout");
+                while (s.hasNext()) {
+                    ScanView v = s.next();
+                    assertEquals(1, v.polarity(),
+                            "scan " + v.scanId() + ": small.mzXML is polarity=\"+\" throughout");
                     scans++;
                 }
             }
@@ -90,8 +91,9 @@ class MzxmlPolarityTest {
             // scan. The reader must produce all five scans with polarity 0 rather than throwing.
             int scans = 0;
             try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro_nopolarity.mzXML"))) {
-                while (s.next()) {
-                    assertEquals(0, s.current().polarity());
+                while (s.hasNext()) {
+                    ScanView v = s.next();
+                    assertEquals(0, v.polarity());
                     scans++;
                 }
             }
@@ -107,8 +109,8 @@ class MzxmlPolarityTest {
             java.util.function.Function<String, java.util.List<Row>> read = name -> {
                 java.util.List<Row> out = new java.util.ArrayList<>();
                 try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/" + name))) {
-                    while (s.next()) {
-                        ScanView v = s.current();
+                    while (s.hasNext()) {
+                        ScanView v = s.next();
                         out.add(new Row(v.scanId(), v.msLevel(), v.ms1scan(), v.rt(), v.precmz(),
                                 v.charge(), v.materialize().rowCount()));
                     }

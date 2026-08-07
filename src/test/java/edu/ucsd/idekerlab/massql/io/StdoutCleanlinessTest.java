@@ -54,7 +54,7 @@ class StdoutCleanlinessTest {
         Path mzml = Fixtures.require("data/small.mzML");
         Captured c = capture(() -> {
             try (SpectraStream s = SpectraFile.open(mzml)) {
-                while (s.next()) s.current().materialize();
+                while (s.hasNext()) { ScanView v = s.next(); v.materialize(); }
             }
         });
         assertEquals("", c.out(),
@@ -71,7 +71,7 @@ class StdoutCleanlinessTest {
         Path mzml = Fixtures.require("data/small.mzML");
         Captured c = capture(() -> {
             try (SpectraStream s = SpectraFile.open(mzml)) {
-                while (s.next()) s.current().materialize();
+                while (s.hasNext()) { ScanView v = s.next(); v.materialize(); }
             }
         });
         assertEquals("", c.err(), "the SDK wrote to stderr:\n" + c.err());
@@ -82,7 +82,7 @@ class StdoutCleanlinessTest {
         Path mgf = Fixtures.require("fixtures/micro/micro.mgf");
         Captured c = capture(() -> {
             try (SpectraStream s = SpectraFile.open(mgf)) {
-                while (s.next()) s.current().materialize();
+                while (s.hasNext()) { ScanView v = s.next(); v.materialize(); }
             }
         });
         assertEquals("", c.out());

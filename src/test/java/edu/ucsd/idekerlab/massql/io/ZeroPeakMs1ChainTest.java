@@ -39,8 +39,8 @@ class ZeroPeakMs1ChainTest {
     private static Map<Integer, Integer> ms2Links(Path p) {
         Map<Integer, Integer> out = new LinkedHashMap<>();
         try (SpectraStream s = SpectraFile.open(p)) {
-            while (s.next()) {
-                ScanView v = s.current();
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 if (v.msLevel() == 2) out.put(v.scanId(), v.ms1scan());
             }
         }
@@ -72,13 +72,14 @@ class ZeroPeakMs1ChainTest {
         int scans = 0;
         boolean sawEmptyMs1 = false;
         try (SpectraStream s = SpectraFile.open(mzml)) {
-            while (s.next()) {
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 scans++;
-                if (s.current().scanId() == 4) {
+                if (v.scanId() == 4) {
                     sawEmptyMs1 = true;
-                    assertEquals(1, s.current().msLevel());
-                    assertEquals(0, s.current().peakCount(), "scan 4 is the zero-peak MS1");
-                    assertEquals(0, s.current().materialize().rowCount(),
+                    assertEquals(1, v.msLevel());
+                    assertEquals(0, v.peakCount(), "scan 4 is the zero-peak MS1");
+                    assertEquals(0, v.materialize().rowCount(),
                             "materialising an empty scan yields an empty table, not an error");
                 }
             }

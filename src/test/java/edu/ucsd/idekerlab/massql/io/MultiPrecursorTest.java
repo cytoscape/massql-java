@@ -45,8 +45,8 @@ class MultiPrecursorTest {
         Map<Integer, double[]> out = new LinkedHashMap<>();
         Path p = Fixtures.require("fixtures/micro/" + fixture);
         try (SpectraStream s = SpectraFile.open(p)) {
-            while (s.next()) {
-                ScanView v = s.current();
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 if (v.msLevel() == 2) out.put(v.scanId(), new double[]{v.precmz(), v.charge()});
             }
         }
@@ -119,8 +119,8 @@ class MultiPrecursorTest {
         java.util.function.Function<String, java.util.List<Row>> read = name -> {
             java.util.List<Row> out = new java.util.ArrayList<>();
             try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/" + name))) {
-                while (s.next()) {
-                    ScanView v = s.current();
+                while (s.hasNext()) {
+                    ScanView v = s.next();
                     out.add(new Row(v.scanId(), v.msLevel(), v.ms1scan(), v.rt(), v.polarity(),
                             v.materialize().rowCount()));
                 }

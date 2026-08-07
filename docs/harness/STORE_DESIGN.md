@@ -63,7 +63,7 @@ table while collating MS2 rows.
 For MGF, the MS1 side is an **empty table, not null** (`SpectrumTable.empty(1)`), which keeps
 Tech_Step10 free of null checks. Note the *reason* differs from what Tech_Step6 originally
 said — see Correction C14: MassQL's own MGF `ms1_df` is a synthetic 1-row placeholder, not
-empty, so `massql_query.py:170`'s `len(ms1_df) == 0` branch never fires for MGF. An empty Java
+empty, so `massql_query.py`'s `len(ms1_df) == 0`'s `len(ms1_df) == 0` branch never fires for MGF. An empty Java
 table produces identical results regardless.
 
 ## Invariants
@@ -120,7 +120,7 @@ backwards. The split, both halves verified by running the reference implementati
 | Caller | Bound | Method | Source |
 |---|---|---|---|
 | Tech_Step9 condition windows (`MS2PROD`, `MS2PREC`, `MS1MZ`, `MS2NL`) | **STRICT** | `mzWindowExclusive` | `msql_engine_filters.py:253` + three siblings, `>`/`<` |
-| Tech_Step10 precursor lookup | **INCLUSIVE** | `mzWindow` | `massql_query.py:101-103`, `>=`/`<=` |
+| Tech_Step10 precursor lookup | **INCLUSIVE** | `mzWindow` | `massql_query.py`'s `ms1_df["mz"] >= precmz - tol`, `>=`/`<=` |
 
 **Do not unify them to remove the apparent duplication.** Each caller's parity depends on
 getting its own bound, so collapsing to one rule trades one silent divergence for another. The
@@ -153,7 +153,7 @@ that row. That is exactly what `base_peak_mz` needs: argmax over intensity, then
 (Tech_Step10 §3). A value-returning `max` cannot express it.
 
 **Ties in `argmax` resolve to the lowest row index** — i.e. the lowest m/z, given invariant 3.
-This matches pandas `idxmax`, which returns the first occurrence, and `massql_query.py:163`
+This matches pandas `idxmax`, which returns the first occurrence, and `massql_query.py`'s `groupby("scan")["i"].idxmax()`
 uses `idxmax`. A last-wins implementation would disagree with the goldens on any spectrum
 containing two equal-intensity peaks. Implemented with a strict `>` comparison; `>=` would
 break it.

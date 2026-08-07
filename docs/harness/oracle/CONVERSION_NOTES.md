@@ -179,7 +179,7 @@ not chased — the golden reproduces byte-identically, so this is the yardstick.
 21,942, not 34,513.**
 
 **MGF `ms1_df` is a synthetic 1-row placeholder, not empty.** For `PlusRise.mgf` it is a single all-zero row
-(`i=0, mz=0, scan=1, rt=0, polarity=1`). So `massql_query.py:170`'s `len(ms1_df) == 0` branch is **never
+(`i=0, mz=0, scan=1, rt=0, polarity=1`). So `massql_query.py`'s `len(ms1_df) == 0`'s `len(ms1_df) == 0` branch is **never
 taken for MGF** — the precursor lookup runs and returns nulls because `ms1scan` is 0 and no MS1 scan 0
 exists. Tech_Step6 §1's conclusion (Java should expose an empty MS1 table for MGF) still holds and gives
 identical results; only its stated rationale was wrong.

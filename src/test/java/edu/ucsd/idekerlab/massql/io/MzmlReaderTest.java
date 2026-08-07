@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
@@ -96,8 +97,8 @@ class MzmlReaderTest {
         long peaks = 0;
         Map<Integer, Integer> ms1scanOf = new LinkedHashMap<>();   // MS2 scan id -> its ms1scan
         try (SpectraStream s = SpectraFile.open(mzml)) {
-            while (s.next()) {
-                ScanView v = s.current();
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 if (v.msLevel() == 1) ms1++; else { ms2++; ms1scanOf.put(v.scanId(), v.ms1scan()); }
                 SpectrumTable t = v.materialize();
                 peaks += t.rowCount();
@@ -139,8 +140,8 @@ class MzmlReaderTest {
         // survive a float round-trip, which is why ScanIndex carries rt as a double (Step 5 §1).
         Path mzml = Fixtures.require("data/small.mzML");
         try (SpectraStream s = SpectraFile.open(mzml)) {
-            while (s.next()) {
-                ScanView v = s.current();
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 if (v.scanId() != 3) continue;
                 assertEquals(2, v.msLevel());
                 assertEquals(810.79, v.precmz());
@@ -167,9 +168,10 @@ class MzmlReaderTest {
     void materializeIsRepeatableAndIndependent() {
         Path mzml = Fixtures.require("data/small.mzML");
         try (SpectraStream s = SpectraFile.open(mzml)) {
-            assertTrue(s.next());
-            SpectrumTable a = s.current().materialize();
-            SpectrumTable b = s.current().materialize();
+            assertTrue(s.hasNext());
+            ScanView v = s.next();
+            SpectrumTable a = v.materialize();
+            SpectrumTable b = v.materialize();
             assertNotSame(a, b);
             assertEquals(a.rowCount(), b.rowCount());
             assertEquals(a.mz(0), b.mz(0));
@@ -177,9 +179,13 @@ class MzmlReaderTest {
     }
 
     @Test
-    void currentBeforeNextIsAnError() {
+    void nextPastTheEndThrowsRatherThanReturningStaleData() {
+        // Replaces `currentBeforeNextIsAnError`, whose subject -- current() -- no longer exists.
+        // Under hasNext()/next() the equivalent hazard is reading past the end, and the equivalent
+        // guarantee is that it fails loudly instead of handing back the last scan a second time.
         try (SpectraStream s = SpectraFile.open(Fixtures.require("data/small.mzML"))) {
-            assertThrows(MassqlException.class, s::current);
+            while (s.hasNext()) s.next();
+            assertThrows(NoSuchElementException.class, s::next);
         }
     }
 
@@ -200,7 +206,7 @@ class MzmlReaderTest {
 
         assertThrows(MassqlException.class, () -> {
             try (SpectraStream s = SpectraFile.open(cut)) {
-                while (s.next()) s.current().materialize();
+                while (s.hasNext()) { ScanView v = s.next(); v.materialize(); }
             }
         });
     }

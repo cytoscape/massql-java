@@ -23,7 +23,7 @@ a dumb loop.
 | Source | Columns |
 |---|---|
 | MassQL `scaninfo` native | `scan`, `precmz`, `ms1scan`, `rt`, `charge`, `tic` (MassQL's `i`, renamed), `mslevel` |
-| **Computed here** (`massql_query.py:62-116`, `:163-167`) | `base_peak_i`, `base_peak_mz` — per-scan argmax over MS2 peaks |
+| **Computed here** (`massql_query.py`'s `add_precursor_intensity`, `:163-167`) | `base_peak_i`, `base_peak_mz` — per-scan argmax over MS2 peaks |
 | **Computed here** | `ms1_i`, `ms1_precmz`, `ms1_base_peak_i` — precursor lookup in the linked MS1 scan |
 | **Dropped** from MassQL's raw output | `i_norm` (structurally always 1.0), `i_norm_ms1` (only null or 1.0) |
 
@@ -110,7 +110,7 @@ All the sentinel and NaN rules live **in the SDK**, not in the consuming app —
 
 - **`tic`** = **sum** of all fragment intensities in the scan. This is MassQL's `i` renamed. Note it is a *sum*
   for `scaninfo` specifically; other MassQL functions put a different quantity in `i` (`scanmaxint` puts the base
-  peak there), which is why `massql_query.py:154` guards the rename to `scaninfo` queries only. We only support
+  peak there), which is why `massql_query.py`'s `rename(columns={"i": "tic"})` guards the rename to `scaninfo` queries only. We only support
   `scaninfo`, so the rename is unconditional — the reason is recorded in
   [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) so it isn't generalized incorrectly if another function is ever
   added.
@@ -127,7 +127,7 @@ base_peak_i  = i[row]
 base_peak_mz = mz[row]
 ```
 
-Mirrors `massql_query.py:163-167` (`ms2_df.groupby("scan")["i"].idxmax()`). Computed from the **loaded table**,
+Mirrors `massql_query.py`'s `groupby("scan")["i"].idxmax()` (`ms2_df.groupby("scan")["i"].idxmax()`). Computed from the **loaded table**,
 not by re-parsing the file, so scan ids line up exactly.
 
 **`ms1_i` / `ms1_precmz` / `ms1_base_peak_i`** — the precursor lookup, and the single most likely misreading of the
@@ -155,18 +155,18 @@ if ms1scan is present (non-zero) and the MS1 table has that scan:
 
 Four rules inside that, each independently testable:
 
-1. **Closest, not most intense.** `massql_query.py:104` — `cand.iloc[(cand["mz"] - precmz).abs().argmin()]`.
+1. **Closest, not most intense.** `massql_query.py`'s `.abs().argmin()` — `cand.iloc[(cand["mz"] - precmz).abs().argmin()]`.
    Picking the most intense peak in the window is the intuitive reading and it is wrong. [`SPIKE.md`](SPIKE.md) §6a calls the
    test for this *"the test that catches the most likely misreading of the whole contract."* The
    [Step 2](Tech_Step2.md) micro-fixtures were built with a window where those two differ.
 2. **`ms1_base_peak_i` does not depend on the match.** It is populated whenever the linked MS1 scan exists, so a
-   tolerance miss nulls **only** `ms1_i` and `ms1_precmz`. `massql_query.py:88-93` computes it before, and
+   tolerance miss nulls **only** `ms1_i` and `ms1_precmz`. `massql_query.py`'s `ms1_base = ms1_df.groupby("scan")["i"].max()` computes it before, and
    independently of, the window search.
 3. **Ties in "closest".** If two candidates are equidistant from `precmz`, pandas' `argmin` returns the **first**
    occurrence — the lower m/z, given ascending sort. Match that.
 4. ⛔ **Use the INCLUSIVE `mzWindow` here. Do not carry [Step 9](Tech_Step9.md)'s choice over.** Added by
    **Correction C37**, which was discovered while implementing Step 9 and split
-   [Step 5](Tech_Step5.md) §4's single method in two. `massql_query.py:101-103` builds this window with
+   [Step 5](Tech_Step5.md) §4's single method in two. `massql_query.py`'s `ms1_df["mz"] >= precmz - tol` builds this window with
    `>=`/`<=`:
 
    ```python
@@ -212,9 +212,9 @@ selects scans; this one matches the precursor peak within an already-selected sc
 
 **Never convert `rt`.** `0.0` is a genuine retention time — direct-infusion data, and every MGF row without
 `RTINSECONDS`. `plusrise_results.json` has `rt: 0.0` on all 664 records, so an over-eager null conversion fails
-664 rows at once. `massql_query.py:189-191` converts exactly three columns and its comment says so explicitly.
+664 rows at once. `massql_query.py`'s `for col in ("precmz", "ms1scan", "charge")` converts exactly three columns and its comment says so explicitly.
 
-**NaN / ±infinity → null**, so the output is valid JSON. `massql_query.py:51-59` (`clean_nan`) applies this
+**NaN / ±infinity → null**, so the output is valid JSON. `massql_query.py`'s `clean_nan` (`clean_nan`) applies this
 recursively to every float. This is also where [Step 5](Tech_Step5.md)'s `NaN` for an all-zero-intensity scan's
 `iNorm` gets normalized away.
 
@@ -285,7 +285,7 @@ ever disagree, that file wins (Correction **C40**).
 | `ms1_base_peak_i` | **null** | ✔ whenever the linked MS1 scan exists — **a tolerance miss does not null it** |
 
 When the MS1 table is empty (MGF), all three `ms1_*` are null without any lookup —
-`massql_query.py:170` branches on exactly that.
+`massql_query.py`'s `len(ms1_df) == 0` branches on exactly that.
 
 ## Known traps
 
@@ -320,7 +320,7 @@ All unit (`*Test.java`), on the [Step 2](Tech_Step2.md) micro-fixtures and hand-
 | `ResultJsonShapeTest` | ⚠ **Rewritten by C40.** **Both** MS2DATA and MS1DATA emit **exactly the same 12 keys in the same order** — assert the key *list*, not a set, so order is pinned. For an MS1 row assert `precmz`/`ms1scan`/`charge`/`ms1_*` are **present with JSON `null`** — i.e. `json.has("precmz") && json.get("precmz").isNull()`, the **opposite** of what this row used to require (`!json.has("precmz")`). Also: `base_peak_i`/`base_peak_mz` **non-null on an MS1 row**; null renders as JSON `null`; empty result → `[]`. |
 | **`ResultSchemaContractTest`** | **Makes [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) executable.** Parses the key table out of that document and asserts `ResultJson` emits **exactly** those keys in **exactly** that order. This is what makes "defined once" real rather than aspirational — reordering a row in the doc fails the build. Same spirit as `VendoredProvenanceTest`. |
 | `ResultJsonRoundTripTest` | Every emitted float parses back to the **identical bits** — guards against a formatter that rounds. |
-| `TicIsSumTest` | `tic` is the sum of fragment intensities, not the base peak — the distinction `massql_query.py:154` guards. |
+| `TicIsSumTest` | `tic` is the sum of fragment intensities, not the base peak — the distinction `massql_query.py`'s `rename(columns={"i": "tic"})` guards. |
 | `CollationAnchorTest` | Build a table reproducing `small.mzML`'s scan 3 and assert the full first golden record field by field. **At the default 20 ppm** (`output/small_mzml_results.json`): `scan` 3, `precmz` 810.79, `ms1scan` 2, `rt` 0.011218333333333334, `charge` null, **`tic` 586278.875 compared at relative 1e-6** (our float64 sum gives 586278.8533592224 -- the golden is a float32 accumulation, C34), `mslevel` 2, `base_peak_i` 161140.859375, `base_peak_mz` 736.6370849609375, **`ms1_i` null, `ms1_precmz` null**, `ms1_base_peak_i` **183838.71875**. That row is itself the tolerance-miss case — the nearest MS1 peak is 34.8 ppm away, so the match fails while `ms1_base_peak_i` survives. **At 60 ppm** (`output/small_mzml_tol60_results.json`) the same row has `ms1_i` 131528.0625 and `ms1_precmz` 810.8182000219822. Assert both; together they are the cleanest possible anchor for §3.2. |
 | `MgfPopulationTest` | With an empty MS1 table: `ms1scan` and all three `ms1_*` null, `rt` present as `0.0`, and **`charge` = `1` when absent — never null** (Correction C6). The `plusrise_results.json` row shape: charge counts across its 664 rows are `{1: 653, 2: 10, 3: 1}` with **zero nulls**. |
 | `OperationOrderTest` | Sentinel conversion happens **after** the lookup: a row with `ms1scan == 0` gets null `ms1scan` **and** null `ms1_*`, and does not throw. |

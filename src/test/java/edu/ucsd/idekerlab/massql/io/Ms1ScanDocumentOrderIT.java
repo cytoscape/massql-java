@@ -95,8 +95,8 @@ class Ms1ScanDocumentOrderIT {
         Map<Integer, Integer> actual = new LinkedHashMap<>();
         int ms1 = 0;
         try (SpectraStream s = SpectraFile.open(mzxml)) {
-            while (s.next()) {
-                ScanView v = s.current();
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 if (v.msLevel() == 1) ms1++;
                 else actual.put(v.scanId(), v.ms1scan());
             }
@@ -121,8 +121,8 @@ class Ms1ScanDocumentOrderIT {
         Path mzxml = Fixtures.require("data/DP00570_F02.mzxml");
         Map<Integer, Integer> links = new LinkedHashMap<>();
         try (SpectraStream s = SpectraFile.open(mzxml)) {
-            while (s.next()) {
-                ScanView v = s.current();
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 if (v.msLevel() == 2) links.put(v.scanId(), v.ms1scan());
             }
         }

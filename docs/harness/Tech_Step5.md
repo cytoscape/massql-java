@@ -160,7 +160,7 @@ public IntRange mzWindowExclusive(int scanOrdinal, double lo, double hi);
 > | Caller | Bound | Method | Evidence |
 > |---|---|---|---|
 > | [Step 9](Tech_Step9.md) condition windows | **STRICT** | `mzWindowExclusive` | `msql_engine_filters.py:253` and three siblings use `>`/`<`. `micro.mzML` scan 3 has a peak at exactly `201.0`; `MS2PROD=201.5:TOLERANCEMZ=0.5` gives the window `[201.0, 202.0]` and MassQL returns **0 rows** |
-> | [Step 10](Tech_Step10.md) precursor lookup | **INCLUSIVE** | `mzWindow` | `massql_query.py:101-103` uses `>=`/`<=`. At `--precursor-tol-ppm 7.8125` an exactly-on-bound peak **does** populate `ms1_i` (`1000.0`) |
+> | [Step 10](Tech_Step10.md) precursor lookup | **INCLUSIVE** | `mzWindow` | `massql_query.py`'s `ms1_df["mz"] >= precmz - tol` uses `>=`/`<=`. At `--precursor-tol-ppm 7.8125` an exactly-on-bound peak **does** populate `ms1_i` (`1000.0`) |
 >
 > **Do not unify them.** Collapsing to one rule would fix one divergence by creating another in
 > `ms1_i`/`ms1_precmz` — the columns [Step 12](Tech_Step12.md) compares at **1e-9**. `MzWindowTest` asserts both
@@ -215,7 +215,7 @@ Rules that matter downstream:
 - **`argmax` returns a row index, not a value**, so the caller can read a *different* column at that row. That
   is exactly what `base_peak_mz` needs ([Step 10](Tech_Step10.md)): argmax over intensity, then read m/z.
 - **Ties in `argmax` resolve to the lowest row index** (i.e. lowest m/z, given invariant 3). Pandas'
-  `idxmax` does the same — it returns the first occurrence — and `massql_query.py:163` uses `idxmax`. Pin this
+  `idxmax` does the same — it returns the first occurrence — and `massql_query.py`'s `groupby("scan")["i"].idxmax()` uses `idxmax`. Pin this
   with a test on a deliberate tie; a last-wins implementation would disagree with the goldens on any spectrum
   with two equal-intensity peaks.
 - **Empty scan:** `sum` = `0.0`; `max`/`min`/`first` = `Double.NaN`; `argmax` = `-1`; `count` = `0`. Never throw.
@@ -308,7 +308,7 @@ can run before the readers exist.
 
 - [`SPIKE.md`](SPIKE.md) §2 (why the dataframe is written, not imported), §4 (`spectra/` sketch), §6a (store reductions),
   §7 Step 2 item 1 (order and the `OTHERSCAN` seam), §8 (`OTHERSCAN` out of scope)
-- `massql_query.py:163` — `ms2_df.groupby("scan")["i"].idxmax()`, the pandas behaviour `argmax` must match
+- `massql_query.py`'s `groupby("scan")["i"].idxmax()` — `ms2_df.groupby("scan")["i"].idxmax()`, the pandas behaviour `argmax` must match
 - `msql_engine_filters.py:253` — the strict `>`/`<` bounds behind `mzWindowExclusive` (Correction C37)
 - Consumers: [Step 6](Tech_Step6.md) and [Step 7](Tech_Step7.md) populate it; [Step 9](Tech_Step9.md) masks and
   reduces via **`mzWindowExclusive`**; [Step 10](Tech_Step10.md) uses `argmax` and the **inclusive** `mzWindow`

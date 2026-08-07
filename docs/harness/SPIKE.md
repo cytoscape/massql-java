@@ -79,7 +79,7 @@ part of the contract:
 | Source | Columns |
 |---|---|
 | MassQL `scaninfo` native | `scan`, `precmz`, `ms1scan`, `rt`, `charge`, `tic` (MassQL's `i`, renamed), `mslevel` |
-| **Computed on top** (`massql_query.py:62-116`) | `base_peak_i`, `base_peak_mz` — per-scan argmax over MS2 peaks |
+| **Computed on top** (`massql_query.py`'s `add_precursor_intensity`) | `base_peak_i`, `base_peak_mz` — per-scan argmax over MS2 peaks |
 | **Computed on top** | `ms1_i`, `ms1_precmz`, `ms1_base_peak_i` — precursor lookup in the linked MS1 scan |
 | **Dropped** from MassQL's raw output | `i_norm` (structurally always 1.0), `i_norm_ms1` (only null or 1.0) |
 
@@ -177,7 +177,7 @@ massql-java/                          packaging=jar, <release>17</release>
     MassqlParseException.java, MassqlException.java
     lang/                    generated parser + facade, typed AST
     spectra/                 SpectrumTable (double[] mz,i,iNorm,iTicNorm; int[] scan; float[] rt; byte[] polarity)
-    io/                      SpectraReader iface → MzmlReader, MzxmlReader, MgfReader
+    io/                      SpectraStream iface → MzmlReader, MzxmlReader, MgfReader   (was "SpectraReader": C22/C42)
     exec/                    QueryExecutor, ConditionFilters, ScaninfoCollation
     result/                  ScanInfoResult, ResultJson
     cli/Main.java            ← the standalone CLI wrapper
@@ -189,11 +189,23 @@ Sketch of the surface `massql-app` will code against:
 
 ```java
 MassqlQuery q = Massql.parse(queryText);                    // throws MassqlParseException
-try (SpectraFile f = SpectraFile.open(path)) {              // format sniffed; MGF | mzML | mzXML
-    List<ScanInfoResult> rows = Massql.execute(q, f, opts);
+try (SpectraStream s = SpectraFile.open(path)) {            // format sniffed; MGF | mzML | mzXML
+    List<ScanInfoResult> rows = Massql.execute(q, s, opts);
 }
 List<ScanInfoResult> rows = Massql.run(queryText, path, opts);   // one-shot convenience
 ```
+
+> ⛔ **Corrections C22 and C42 — this sketch said `SpectraFile f`, and [Step 11](Tech_Step11.md) was told to
+> copy it "exactly".** `SpectraFile` is a **factory** with a single static `open`; the value you hold is a
+> **`SpectraStream`** cursor. Step 11 §1 ended up carrying a C22 note saying so directly above a code block that
+> still declared `SpectraFile` as a parameter — and its Done-when demanded an exact match, which made that box
+> unsatisfiable.
+>
+> The tree above has the same error one line up: `io/  SpectraReader iface` — the interface is `SpectraStream`.
+>
+> Two further points the sketch cannot show. **A stream is single-pass**: `execute` consumes it, so several
+> queries over one file means reopening per query (`next()` throws `NoSuchElementException` once drained, so
+> reuse fails loudly). And the real surface has **four** entry points — `executeWithDiagnostics` is the fourth.
 
 Two API rules that matter downstream:
 - **`ScanInfoResult` uses boxed `Double`/`Integer`** so null is a real, testable value. All the sentinel and
@@ -203,12 +215,22 @@ Two API rules that matter downstream:
   verbatim and `MASSQL_PARSE` reads it back — so key names and float formatting are a published contract,
   not an implementation detail.
 
-**CLI — mirror `massql_query.py`'s interface exactly** so the differential test is a literal diff:
+**CLI — mirror `massql_query.py`'s *interface***: same positional order, same flag names and defaults, same
+stdout/stderr split, so one harness can drive both.
 
 ```
-java -cp massql-java.jar …cli.Main <spectra-file> <query-file> [--precursor-tol-ppm 20]
+java -cp massql-java.jar …cli.Main <spectra-file> <query-file> [--precursor-tol-ppm 20] [--output FILE]
   → the JSON array on stdout, progress/diagnostics on stderr
 ```
+
+> ⛔ **Correction C42 — this said "mirror … exactly **so the differential test is a literal diff**", and a
+> literal diff is impossible.** `ResultJson` emits **compact** JSON ([`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md),
+> Correction C40) while the reference uses `json.dump(…, indent=2)`; and Java and Python format floats
+> differently regardless (`1.0E-5` vs `1e-05`, the trailing `.0` on integral values). [Step 12](Tech_Step12.md)
+> §1 therefore compares **parsed values, never text** — which is the stronger check anyway, since it cannot
+> fail on a formatting difference that means nothing.
+>
+> `--output FILE` was added by Correction C25b and is shown above; the original signature had stdout only.
 
 ---
 

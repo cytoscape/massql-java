@@ -39,7 +39,7 @@ differ, both verified:
 | Caller | Bound | Evidence |
 |---|---|---|
 | Step 9 condition windows | **strict** | the empty golden above |
-| Step 10 precursor lookup | **inclusive** | `massql_query.py:101-103` uses `>=`/`<=`; at `--precursor-tol-ppm 7.8125` an exactly-on-bound peak **does** populate `ms1_i` |
+| Step 10 precursor lookup | **inclusive** | `massql_query.py`'s `ms1_df["mz"] >= precmz - tol` uses `>=`/`<=`; at `--precursor-tol-ppm 7.8125` an exactly-on-bound peak **does** populate `ms1_i` |
 
 Unifying them would introduce a fresh divergence in `ms1_i`/`ms1_precmz` — the columns Step 12 compares at
 1e-9 — while fixing this one. Tech_Step9 §3 originally said "both bounds inclusive… a peak exactly at an edge

@@ -100,7 +100,7 @@ Also compare **row count** and **row order** (ascending scan id) before comparin
 >
 > **The cause is dtype.** MassQL's intensity column is `float32`, and `tic` is
 > `ms2_df.groupby("scan").sum()["i"]` over it (`msql_engine.py:638,660`, renamed at
-> `massql_query.py:158`) — a **float32 accumulation**. Our float64 sum is *exact*; the golden's is not.
+> `massql_query.py`'s `rename(columns={"i": "tic"})`) — a **float32 accumulation**. Our float64 sum is *exact*; the golden's is not.
 >
 > **Measured on `output/small_mzml_results.json` — all six rows differ, worst 3.691e-08:**
 >
@@ -234,7 +234,7 @@ real file descriptors keeps the two streams apart (see the trap in §*Known trap
 |---|---|
 | stdout is a valid JSON array | Default mode, no `--output`. Parse it; assert nothing but JSON |
 | Diagnostics on **stderr only** | Assert stdout has no diagnostic text and no stack frame |
-| Trailing newline | Matches `massql_query.py:195` |
+| Trailing newline | Matches `massql_query.py`'s `sys.stdout.write("\n")` |
 | `--output` leaves stdout empty | The complement: with `--output FILE`, stdout is **empty** and the file holds the array |
 | Both modes agree byte-for-byte | Same run twice, once piped and once to `--output`; the bytes must be identical. This is what makes (a)'s file-based comparison a valid proxy for the piped payload |
 

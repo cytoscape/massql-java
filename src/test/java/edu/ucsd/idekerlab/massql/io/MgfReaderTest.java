@@ -33,8 +33,8 @@ class MgfReaderTest {
     private static List<Row> readAll(Path p) {
         List<Row> out = new ArrayList<>();
         try (SpectraStream s = SpectraFile.open(p)) {
-            while (s.next()) {
-                ScanView v = s.current();
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 out.add(new Row(v.scanId(), v.rt(), v.precmz(), v.charge(), v.ms1scan(),
                                 v.msLevel(), v.polarity(), v.materialize().rowCount()));
             }
@@ -249,8 +249,9 @@ class MgfReaderTest {
                 END IONS
                 """);
         try (SpectraStream s = SpectraFile.open(p)) {
-            assertTrue(s.next());
-            SpectrumTable t = s.current().materialize();
+            assertTrue(s.hasNext());
+            ScanView v = s.next();
+            SpectrumTable t = v.materialize();
             assertEquals(1, t.index().scanCount(), "exactly one scan -- this is the streaming unit");
             assertEquals(7, t.index().scanIdAt(0));
             assertEquals(1.5, t.index().rtOf(0));

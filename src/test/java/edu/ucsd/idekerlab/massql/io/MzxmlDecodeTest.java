@@ -27,8 +27,9 @@ class MzxmlDecodeTest {
         List<double[]> out = new ArrayList<>();
         Path p = Fixtures.require("fixtures/micro/" + fixture);
         try (SpectraStream s = SpectraFile.open(p)) {
-            while (s.next()) {
-                SpectrumTable t = s.current().materialize();
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                SpectrumTable t = v.materialize();
                 for (int i = 0; i < t.rowCount(); i++) out.add(new double[]{t.mz(i), t.intensity(i)});
             }
         }
@@ -102,9 +103,10 @@ class MzxmlDecodeTest {
         // Scan 2 of the micro table is the discriminating case: 3 peaks whose m/z are ~500-600 and
         // whose intensities are 1000/5000/9000, so a halved split is unmistakable.
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mzXML"))) {
-            while (s.next()) {
-                if (s.current().scanId() != 2) continue;
-                SpectrumTable t = s.current().materialize();
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                if (v.scanId() != 2) continue;
+                SpectrumTable t = v.materialize();
                 assertEquals(3, t.rowCount());
                 // m/z all in the 400-700 band, intensities all >= 1000: only correct de-interleaving
                 // gives that shape.
@@ -128,8 +130,9 @@ class MzxmlDecodeTest {
         // produces, assert positively that the big-endian read gives sane values -- a byte-swapped
         // 32-bit float of 500.0 is ~1.1e-38, so "in a plausible m/z range" is a real discriminator.
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mzXML"))) {
-            while (s.next()) {
-                SpectrumTable t = s.current().materialize();
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                SpectrumTable t = v.materialize();
                 for (int i = 0; i < t.rowCount(); i++) {
                     assertTrue(t.mz(i) > 1.0 && t.mz(i) < 100_000.0,
                             "m/z " + t.mz(i) + " is not a plausible mass -- byte order is wrong");

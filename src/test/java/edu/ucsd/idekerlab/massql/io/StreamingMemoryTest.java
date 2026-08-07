@@ -48,8 +48,9 @@ class StreamingMemoryTest {
         long peaks = 0;
 
         try (SpectraStream s = SpectraFile.open(mgf)) {
-            while (s.next()) {
-                SpectrumTable t = s.current().materialize();
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                SpectrumTable t = v.materialize();
                 peaks += t.rowCount();
                 scans++;
                 // t goes out of scope each iteration -- nothing here holds a reference.
@@ -117,8 +118,9 @@ class StreamingMemoryTest {
             int scans = 0;
             long peaks = 0;
             try (SpectraStream s = SpectraFile.open(Path.of(args[0]))) {
-                while (s.next()) {
-                    peaks += s.current().materialize().rowCount();
+                while (s.hasNext()) {
+                    ScanView v = s.next();
+                    peaks += v.materialize().rowCount();
                     scans++;
                 }
             }
@@ -167,8 +169,9 @@ class StreamingMemoryTest {
         int scans = 0;
         long peaks = 0;
         try (SpectraStream s = SpectraFile.open(mzxml)) {
-            while (s.next()) {
-                peaks += s.current().materialize().rowCount();
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                peaks += v.materialize().rowCount();
                 scans++;
             }
         }
@@ -192,7 +195,7 @@ class StreamingMemoryTest {
         long t0 = System.nanoTime();
         int metaOnly = 0;
         try (SpectraStream s = SpectraFile.open(mzml)) {
-            while (s.next()) { s.current().precmz(); metaOnly++; }
+            while (s.hasNext()) { ScanView v = s.next(); v.precmz(); metaOnly++; }
         }
         long metaMs = (System.nanoTime() - t0) / 1_000_000;
 
@@ -200,7 +203,7 @@ class StreamingMemoryTest {
         int withPeaks = 0;
         long peaks = 0;
         try (SpectraStream s = SpectraFile.open(mzml)) {
-            while (s.next()) { peaks += s.current().materialize().rowCount(); withPeaks++; }
+            while (s.hasNext()) { ScanView v = s.next(); peaks += v.materialize().rowCount(); withPeaks++; }
         }
         long fullMs = (System.nanoTime() - t1) / 1_000_000;
 

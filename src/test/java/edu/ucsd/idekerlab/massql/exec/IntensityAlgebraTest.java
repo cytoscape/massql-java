@@ -3,6 +3,7 @@ package edu.ucsd.idekerlab.massql.exec;
 import static org.junit.jupiter.api.Assertions.*;
 
 import edu.ucsd.idekerlab.massql.Massql;
+import edu.ucsd.idekerlab.massql.io.ScanView;
 import edu.ucsd.idekerlab.massql.io.SpectraFile;
 import edu.ucsd.idekerlab.massql.io.SpectraStream;
 
@@ -75,12 +76,13 @@ class IntensityAlgebraTest {
         // pass or fail for reasons unrelated to the algebra. micro scans 1 and 3 each have exactly one peak
         // at 200.5, and the 0.01 window admits nothing else.
         try (SpectraStream s = SpectraFile.open(resource(FIXTURE))) {
-            while (s.next()) {
-                if (s.current().msLevel() != 2 || s.current().peakCount() == 0) continue;
-                var t = s.current().materialize();
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                if (v.msLevel() != 2 || v.peakCount() == 0) continue;
+                var t = v.materialize();
                 int inWindow = t.mzWindowExclusive(0, 200.5 - 0.01, 200.5 + 0.01).size();
                 assertTrue(inWindow <= 1,
-                        "scan " + s.current().scanId() + " has " + inWindow + " peaks in the 0.01 window; "
+                        "scan " + v.scanId() + " has " + inWindow + " peaks in the 0.01 window; "
                                 + "disjointness of > and < requires at most one, because a scan with peaks "
                                 + "on both sides of the threshold legitimately belongs to BOTH sets");
             }

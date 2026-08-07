@@ -80,8 +80,8 @@ public final class QueryExecutor {
         int skippedEmpty = 0;
         int missingMs1 = 0;
 
-        while (stream.next()) {
-            ScanView v = stream.current();
+        while (stream.hasNext()) {
+            ScanView v = stream.next();
             examined++;
 
             // (1) Zero-peak scans are invisible to MassQL -- see the class note. Before the MS1

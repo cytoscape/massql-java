@@ -67,8 +67,8 @@ class MzxmlReaderTest {
         long peaks = 0;
         Map<Integer, Integer> ms1scanOf = new LinkedHashMap<>();
         try (SpectraStream s = SpectraFile.open(mzxml)) {
-            while (s.next()) {
-                ScanView v = s.current();
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 if (v.msLevel() == 1) ms1++; else { ms2++; ms1scanOf.put(v.scanId(), v.ms1scan()); }
                 SpectrumTable t = v.materialize();
                 peaks += t.rowCount();
@@ -106,8 +106,8 @@ class MzxmlReaderTest {
         java.util.function.Function<String, List<Row>> read = name -> {
             List<Row> out = new ArrayList<>();
             try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/" + name))) {
-                while (s.next()) {
-                    ScanView v = s.current();
+                while (s.hasNext()) {
+                    ScanView v = s.next();
                     SpectrumTable t = v.materialize();
                     out.add(new Row(v.scanId(), v.msLevel(), v.ms1scan(), v.rt(), v.precmz(),
                             v.charge(), v.polarity(), t.rowCount(),
@@ -149,8 +149,8 @@ class MzxmlReaderTest {
 
         int previousMs1 = 0;
         try (SpectraStream s = SpectraFile.open(mzxml)) {
-            while (s.next()) {
-                ScanView v = s.current();
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 if (v.msLevel() == 1) {
                     if (v.peakCount() > 0) previousMs1 = v.scanId();
                 } else {
@@ -167,8 +167,9 @@ class MzxmlReaderTest {
         // MGF's absent CHARGE is 1 (Correction C6). micro scans 1 and 3 omit it; scan 5 has charge 2.
         Map<Integer, Integer> charges = new LinkedHashMap<>();
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mzXML"))) {
-            while (s.next()) {
-                if (s.current().msLevel() == 2) charges.put(s.current().scanId(), s.current().charge());
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                if (v.msLevel() == 2) charges.put(v.scanId(), v.charge());
             }
         }
         assertEquals(0, charges.get(1), "absent precursorCharge -> 0 in mzXML, unlike MGF's 1");
@@ -179,7 +180,7 @@ class MzxmlReaderTest {
         // attribute is absent. If this ever matches mzXML, one of the two rules has been broken.
         Map<Integer, Integer> mgfCharges = new LinkedHashMap<>();
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mgf"))) {
-            while (s.next()) mgfCharges.put(s.current().scanId(), s.current().charge());
+            while (s.hasNext()) { ScanView v = s.next(); mgfCharges.put(v.scanId(), v.charge()); }
         }
         assertEquals(1, mgfCharges.get(1), "MGF's absent CHARGE is 1 (C6) -- deliberately NOT 0");
     }
@@ -191,12 +192,13 @@ class MzxmlReaderTest {
         boolean saw = false;
         int scans = 0;
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mzXML"))) {
-            while (s.next()) {
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 scans++;
-                if (s.current().scanId() == 4) {
+                if (v.scanId() == 4) {
                     saw = true;
-                    assertEquals(0, s.current().peakCount());
-                    assertEquals(0, s.current().materialize().rowCount(),
+                    assertEquals(0, v.peakCount());
+                    assertEquals(0, v.materialize().rowCount(),
                             "an empty scan materialises to an empty table, not an error");
                 }
             }

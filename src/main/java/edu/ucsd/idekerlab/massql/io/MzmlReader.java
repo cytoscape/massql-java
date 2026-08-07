@@ -3,7 +3,6 @@ package edu.ucsd.idekerlab.massql.io;
 import edu.ucsd.idekerlab.massql.MassqlException;
 import edu.ucsd.idekerlab.massql.io.vendor.ByteBufferInputStream;
 import edu.ucsd.idekerlab.massql.io.vendor.FileMemoryMapper;
-import edu.ucsd.idekerlab.massql.io.vendor.MzMLArrayType;
 import edu.ucsd.idekerlab.massql.io.vendor.MzMLBinaryDataInfo;
 import edu.ucsd.idekerlab.massql.io.vendor.MzMLBitLength;
 import edu.ucsd.idekerlab.massql.io.vendor.MzMLCompressionType;
@@ -19,9 +18,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import javolution.text.CharArray;
 import javolution.xml.internal.stream.XMLStreamReaderImpl;
@@ -53,15 +49,12 @@ import javolution.xml.stream.XMLStreamException;
  * base64 text defers the same expensive work, and retained memory is still bounded by one scan —
  * roughly 1.35x the binary size for the two arrays.)
  */
-final class MzmlReader implements SpectraStream {
+final class MzmlReader extends AbstractSpectraStream {
 
-    private final Path path;
     private final ByteBufferInputStream mapped;
     private final XMLStreamReaderImpl xml;
     private final List<String> diagnostics = new ArrayList<>();
 
-    private boolean closed = false;
-    private boolean valid = false;
     private int skippedHighMsLevel = 0;
 
     /** Document-order tracking: the id of the most recent MS1 spectrum. Init 0 -- see the sentinel note. */
@@ -70,8 +63,10 @@ final class MzmlReader implements SpectraStream {
     private final Scan scan = new Scan();
 
     MzmlReader(Path path) {
-        JavolutionQuiet.ensure();   // javolution logs buffer growth to STDOUT; see that class
-        this.path = path;
+        super(path);
+        // Must precede `new XMLStreamReaderImpl()` below: javolution logs buffer growth to STDOUT,
+        // which would corrupt the CLI's JSON payload. See that class.
+        JavolutionQuiet.ensure();
         try {
             this.mapped = FileMemoryMapper.mapToMemory(path.toFile());
         } catch (IOException e) {
@@ -86,8 +81,6 @@ final class MzmlReader implements SpectraStream {
         }
     }
 
-    @Override public Format format() { return Format.MZML; }
-
     @Override
     public List<String> diagnostics() {
         List<String> out = new ArrayList<>(diagnostics);
@@ -97,15 +90,10 @@ final class MzmlReader implements SpectraStream {
         return Collections.unmodifiableList(out);
     }
 
-    @Override
-    public ScanView current() {
-        if (!valid) throw new MassqlException("no current scan; call next() first");
-        return scan;
-    }
+    @Override protected ScanView view() { return scan; }
 
     @Override
-    public boolean next() {
-        if (closed) throw new MassqlException("stream is closed");
+    protected boolean advance() {
         try {
             while (readSpectrum()) {
                 if (scan.msLevel > 2) {          // levels above 2 are out of scope
@@ -129,10 +117,8 @@ final class MzmlReader implements SpectraStream {
                 } else {
                     scan.ms1scan = previousMs1Scan;
                 }
-                valid = true;
                 return true;
             }
-            valid = false;
             return false;
         } catch (XMLStreamException e) {
             throw new MassqlException("malformed mzML in " + path + ": " + e.getMessage(), e);
@@ -317,9 +303,7 @@ final class MzmlReader implements SpectraStream {
     }
 
     @Override
-    public void close() {
-        if (closed) return;        // idempotent
-        closed = true;
+    protected void releaseResources() {
         try { xml.close(); } catch (XMLStreamException ignored) { }
         closeQuietly();
     }

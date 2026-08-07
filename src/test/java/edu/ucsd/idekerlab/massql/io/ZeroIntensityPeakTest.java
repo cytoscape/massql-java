@@ -33,12 +33,13 @@ class ZeroIntensityPeakTest {
     private static Map<Integer, double[][]> peaksByScan(String fixture) {
         Map<Integer, double[][]> out = new LinkedHashMap<>();
         try (SpectraStream s = SpectraFile.open(Fixtures.require(fixture))) {
-            while (s.next()) {
-                SpectrumTable t = s.current().materialize();
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                SpectrumTable t = v.materialize();
                 double[] mz = new double[t.rowCount()];
                 double[] in = new double[t.rowCount()];
                 for (int i = 0; i < t.rowCount(); i++) { mz[i] = t.mz(i); in[i] = t.intensity(i); }
-                out.put(s.current().scanId(), new double[][]{mz, in});
+                out.put(v.scanId(), new double[][]{mz, in});
             }
         }
         return out;
@@ -88,7 +89,7 @@ class ZeroIntensityPeakTest {
         // which 4 have non-zero intensity. The parity dump agrees at 4.
         long peaks = 0;
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro_zeroint.mgf"))) {
-            while (s.next()) peaks += s.current().materialize().rowCount();
+            while (s.hasNext()) { ScanView v = s.next(); peaks += v.materialize().rowCount(); }
         }
         assertEquals(4L, peaks,
                 "6 peak lines minus 2 zero-intensity ones. Before C36 this was 6 and the parity gate "
@@ -101,9 +102,10 @@ class ZeroIntensityPeakTest {
         // max nor a sum -- so the denominators are identical either way and no Step 5 change was needed.
         // Assert that rather than trusting the arithmetic: block 1's sum is 250+1500+750 = 2500, max 1500.
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro_zeroint.mgf"))) {
-            while (s.next()) {
-                if (s.current().scanId() != 1) continue;
-                SpectrumTable t = s.current().materialize();
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                if (v.scanId() != 1) continue;
+                SpectrumTable t = v.materialize();
                 assertEquals(1500.0 / 1500.0, t.iNorm(1), 0.0, "the base peak's iNorm is exactly 1.0");
                 assertEquals(250.0 / 2500.0, t.iTicNorm(0), 1e-15, "iTicNorm uses the sum of NON-zero peaks");
                 assertEquals(750.0 / 2500.0, t.iTicNorm(2), 1e-15);
@@ -132,9 +134,10 @@ class ZeroIntensityPeakTest {
                         + "contrast below is no longer being tested. Got: " + dumpFirst8);
 
         try (SpectraStream s = SpectraFile.open(Fixtures.require("data/small.mzML"))) {
-            while (s.next()) {
-                if (s.current().scanId() != 1) continue;
-                SpectrumTable t = s.current().materialize();
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                if (v.scanId() != 1) continue;
+                SpectrumTable t = v.materialize();
                 for (int i = 0; i < 8; i++) {
                     assertEquals(0.0, t.intensity(i), 0.0,
                             "mzML must RETAIN zero-intensity peaks; row " + i + " should be 0.0. The MGF "
@@ -156,12 +159,13 @@ class ZeroIntensityPeakTest {
             ParityDump dump = ParityDump.of(f);
             String path = f.startsWith("micro") ? "fixtures/micro/" + f : "data/" + f;
             try (SpectraStream s = SpectraFile.open(Fixtures.require(path))) {
-                while (s.next()) {
+                while (s.hasNext()) {
+                    ScanView v = s.next();
                     ParityDump.Scan want = dump.scans()
-                            .get(new ParityDump.Key(s.current().msLevel(), s.current().scanId()));
+                            .get(new ParityDump.Key(v.msLevel(), v.scanId()));
                     if (want == null) continue;          // zero-peak scan, absent from the dump
-                    assertEquals(want.peakCount(), s.current().materialize().rowCount(),
-                            f + " scan " + s.current().scanId() + ": mzXML applies no intensity filter");
+                    assertEquals(want.peakCount(), v.materialize().rowCount(),
+                            f + " scan " + v.scanId() + ": mzXML applies no intensity filter");
                 }
             }
         }

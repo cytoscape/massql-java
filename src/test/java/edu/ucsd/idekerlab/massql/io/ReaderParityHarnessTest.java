@@ -118,9 +118,10 @@ class ReaderParityHarnessTest {
         assertNotNull(want, "micro.mzXML should have an MS1 scan 2 entry");
 
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mzXML"))) {
-            while (s.next()) {
-                if (s.current().scanId() != 2) continue;
-                var t = s.current().materialize();
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                if (v.scanId() != 2) continue;
+                var t = v.materialize();
                 double[] mz = new double[t.rowCount()];
                 double[] in = new double[t.rowCount()];
                 for (int i = 0; i < t.rowCount(); i++) { mz[i] = t.mz(i); in[i] = t.intensity(i); }

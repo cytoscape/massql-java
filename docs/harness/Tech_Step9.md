@@ -220,7 +220,7 @@ pinned Python source disagree, **the source wins** — correct the spec and note
 > no prior query isolated that peak, which is why the error survived.
 >
 > **Use `SpectrumTable.mzWindowExclusive`, NOT `mzWindow`.** The two differ deliberately, because the two
-> callers differ: [Step 10](Tech_Step10.md)'s precursor lookup is **inclusive** (`massql_query.py:101-103`
+> callers differ: [Step 10](Tech_Step10.md)'s precursor lookup is **inclusive** (`massql_query.py`'s `ms1_df["mz"] >= precmz - tol`
 > uses `>=`/`<=`, also verified by execution — at `--precursor-tol-ppm 7.8125` an exactly-on-the-bound peak
 > **does** populate `ms1_i`). Unifying them would introduce a fresh divergence in the columns Step 12 checks
 > at 1e-9 while fixing this one.

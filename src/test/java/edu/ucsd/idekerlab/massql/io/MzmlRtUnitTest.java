@@ -23,7 +23,7 @@ class MzmlRtUnitTest {
     private static double[] rtsOf(Path p) {
         java.util.List<Double> out = new java.util.ArrayList<>();
         try (SpectraStream s = SpectraFile.open(p)) {
-            while (s.next()) out.add(s.current().rt());
+            while (s.hasNext()) { ScanView v = s.next(); out.add(v.rt()); }
         }
         return out.stream().mapToDouble(Double::doubleValue).toArray();
     }
@@ -62,10 +62,11 @@ class MzmlRtUnitTest {
         // The real fixture. Its golden rt for scan 3 is 0.011218333333333334; ÷60 would give
         // 0.000186972... and the Step 12 differential would fail on every mzML row.
         try (SpectraStream s = SpectraFile.open(Fixtures.require("data/small.mzML"))) {
-            while (s.next()) {
-                if (s.current().scanId() == 3) {
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                if (v.scanId() == 3) {
                     assertEquals(Double.doubleToLongBits(0.011218333333333334),
-                                 Double.doubleToLongBits(s.current().rt()));
+                                 Double.doubleToLongBits(v.rt()));
                     return;
                 }
             }

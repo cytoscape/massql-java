@@ -69,16 +69,16 @@ Governing sections: [`SPIKE.md`](SPIKE.md) §3 (population by format), §5 (read
 
 ```java
 public interface SpectraStream extends AutoCloseable {
-    /** Advance to the next spectrum in DOCUMENT ORDER. False at EOF. */
-    boolean next();
-    /** Valid ONLY until the next next() call -- copy via materialize() to retain it. */
-    ScanView current();
-    Format format();
+    /** Another spectrum available? Repeatable; false PERMANENTLY once drained. */
+    boolean hasNext();
+    /** Advance and return it. Throws NoSuchElementException past the end.
+     *  The SAME object every call -- valid only until the following next(). */
+    ScanView next();
     List<String> diagnostics();
     @Override void close();
 }
 
-public interface ScanView {
+public interface ScanView {   // NB: what next() returns -- one reused instance, never a fresh object
     int scanId();  int msLevel();  double rt();  int polarity();
     double precmz();  int ms1scan();  int charge();     // raw 0 sentinels; Step 10 converts
     int peakCount();
@@ -90,6 +90,25 @@ public final class SpectraFile {
     public static SpectraStream open(Path path) throws MassqlException;   // format sniffed
 }
 ```
+
+> ⚠ **Correction C42 reshaped this interface.** It was `boolean next()` plus `ScanView current()`, with an
+> undocumented `Format format()`. Three changes, all made while reviewing [Step 11](Tech_Step11.md):
+>
+> - **`hasNext()`/`next()`** — idiomatic Java, and one call per iteration instead of two. The canonical loop is
+>   `while (s.hasNext()) { ScanView v = s.next(); … }`.
+> - **`next()` throws `NoSuchElementException` past the end**, and `hasNext()` stays `false` once drained. This
+>   is what makes [Step 11](Tech_Step11.md) §1's single-pass rule enforceable: a spent stream handed to a second
+>   query now fails loudly instead of returning an empty list that reads as "matched nothing".
+> - **`format()` removed** — no production code ever called it; only `FormatSniffTest` did, and it can call the
+>   package-private `SpectraFile.sniff` directly. `Format` is therefore package-private now, appearing in no
+>   public signature.
+>
+> Each reader carries a `NOT_STARTED`/`PEEKED`/`EXHAUSTED` peek machine so `hasNext()` is **repeatable** —
+> calling it twice must not consume a scan, which is the classic way this shape breaks.
+> `SpectraStreamContractTest` asserts all of it across all three readers.
+>
+> **The type is deliberately not an `Iterator`.** `next()` returns the same mutable object each call, so
+> `Iterator` would make `StreamSupport.stream(…).toList()` legal and silently collect N aliases of one view.
 
 `materialize()` returning a **single-scan** `SpectrumTable` is the hinge of the design: every Step 5
 primitive — `Reductions.sum(t, 0, I)`, `t.mzWindow(0, lo, hi)`, `argmax`, the derived columns — works
@@ -125,7 +144,7 @@ Extension matching must be case-insensitive everywhere.
 keeps [Step 10](Tech_Step10.md) free of null checks.
 
 > ⚠ Correction C14: the original rationale here was wrong. MassQL's MGF `ms1_df` is **not** empty — it is a
-> fabricated 1-row table, so `massql_query.py:170`'s `len(ms1_df) == 0` branch **never fires for MGF**. The
+> fabricated 1-row table, so `massql_query.py`'s `len(ms1_df) == 0`'s `len(ms1_df) == 0` branch **never fires for MGF**. The
 > precursor lookup runs anyway and yields nulls because `ms1scan` is 0 and no MS1 scan 0 exists. An empty
 > Java table produces identical results, so the conclusion stands — but do not expect that branch to be the
 > mechanism.

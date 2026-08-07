@@ -87,8 +87,8 @@ class FormatSniffTest {
         Path p = write(dir, "a.mzXML", "<mzXML><msRun scanCount=\"0\"></msRun></mzXML>");
         assertEquals(Format.MZXML, SpectraFile.sniff(p));
         try (SpectraStream s = SpectraFile.open(p)) {
-            assertEquals(Format.MZXML, s.format());
-            assertFalse(s.next(), "an empty msRun yields no scans");
+            assertEquals(Format.MZXML, formatOf(s));
+            assertFalse(s.hasNext(), "an empty msRun yields no scans");
         }
     }
 
@@ -103,10 +103,31 @@ class FormatSniffTest {
                 case MZXML -> Fixtures.require("fixtures/micro/micro.mzXML");
             };
             try (SpectraStream s = SpectraFile.open(p)) {
-                assertEquals(f, s.format());
-                assertTrue(s.next(), f + " reader yielded no scans");
+                assertEquals(f, formatOf(s), "open() chose the wrong reader for " + f);
+                assertTrue(s.hasNext(), f + " reader yielded no scans");
             }
         }
+    }
+
+    /**
+     * Which reader did {@code open} choose?
+     *
+     * <p><b>A test-space concern, deliberately.</b> {@code SpectraStream} used to carry a
+     * {@code format()} accessor and this test was its only caller — nothing in production ever read
+     * it. Rather than keep a method on the SDK's interface for the benefit of one assertion, the
+     * mapping lives here. That also let {@link Format} become package-private, so it now appears in
+     * no public signature at all.
+     *
+     * <p>Reading the concrete class is legitimate here: this test sits in the same package as the
+     * package-private readers, and the thing under test <i>is</i> the wiring from sniffed format to
+     * chosen reader.
+     */
+    private static Format formatOf(SpectraStream s) {
+        if (s instanceof MgfReader) return Format.MGF;
+        if (s instanceof MzmlReader) return Format.MZML;
+        if (s instanceof MzxmlReader) return Format.MZXML;
+        throw new AssertionError("unrecognised reader " + s.getClass().getName()
+                + " -- a fourth Format was added without extending this mapping");
     }
 
     @Test

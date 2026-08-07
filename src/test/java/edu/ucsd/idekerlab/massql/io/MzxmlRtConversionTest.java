@@ -113,9 +113,10 @@ class MzxmlRtConversionTest {
         double[] want = {0.0, 0.5, 1.0, 1.5, 2.0};
         int i = 0;
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mzXML"))) {
-            while (s.next()) {
-                assertEquals(want[i], s.current().rt(), 1e-12,
-                        "scan " + s.current().scanId() + " rt");
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                assertEquals(want[i], v.rt(), 1e-12,
+                        "scan " + v.scanId() + " rt");
                 i++;
             }
         }
@@ -138,7 +139,7 @@ class MzxmlRtConversionTest {
     private static double[] rtsOf(String fixture) {
         java.util.List<Double> out = new java.util.ArrayList<>();
         try (SpectraStream s = SpectraFile.open(Fixtures.require(fixture))) {
-            while (s.next()) out.add(s.current().rt());
+            while (s.hasNext()) { ScanView v = s.next(); out.add(v.rt()); }
         }
         return out.stream().mapToDouble(Double::doubleValue).toArray();
     }

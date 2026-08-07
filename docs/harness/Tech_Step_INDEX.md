@@ -236,9 +236,11 @@ reader is `DEPENDENCY_POLICY.md` constraint 2: **a library writes to no stream a
 argument and should never have been the leading one. See **Terminology** under *Spec conventions*; the
 three labels are now binding on every spec.
 
-**(b) There is no `--output FILE`.** stdout-as-data stays the **default** — it is the Unix filter
-convention, it is what the reference implementation deliberately does, and it keeps the Step 12
-differential a literal diff. But offering *only* stdout is a real gap for a batch tool, so
+**(b) There is no `--output FILE`.** stdout-as-data stays the **default** — it is the Unix filter convention
+and it is what the reference implementation deliberately does. (This also claimed it *"keeps the Step 12
+differential a literal diff"*; [C42](#c42) retires that — the differential compares **parsed values**, since
+our JSON is compact and the reference's is `indent=2`.) But offering *only* stdout is a real gap for a batch
+tool, so
 [Step 11](Tech_Step11.md) gains `--output FILE`, written as `FILE.tmp` then `Files.move(…,
 ATOMIC_MOVE)` so a downstream consumer never observes a partial file.
 
@@ -267,7 +269,7 @@ matches"*. All four condition functions use `>` and `<` — `:253` (MS2PROD), `:
 bound. **MassQL returns 0 rows.**
 
 **(b) …but Step 10's precursor lookup is INCLUSIVE, so the two callers genuinely differ.**
-`massql_query.py:101-103` uses `>=` / `<=`. Also proven: at `--precursor-tol-ppm 7.8125` the
+`massql_query.py`'s `ms1_df["mz"] >= precmz - tol` uses `>=` / `<=`. Also proven: at `--precursor-tol-ppm 7.8125` the
 `499.99609375` peak lands exactly on the bound and **`ms1_i` comes back populated** (`1000.0`).
 
 **Resolution: `mzWindow` stays inclusive for Step 10; Step 9 gets `mzWindowExclusive`.** Changing the single
@@ -472,7 +474,7 @@ ever absent.** Four sources had drifted apart:
   no precursor, so they are undefined. The reference reaches this for the right reason — MassQL's `ms1_df`
   carries no `ms1scan` column, so `massql_query.py`'s empty-MS1 branch fires. Issue #26 sanctions exactly these
   as nullable. **Unchanged.**
-- **`base_peak_i` / `base_peak_mz` were a LEFT-JOIN ARTIFACT.** `massql_query.py:186` computed base peaks from
+- **`base_peak_i` / `base_peak_mz` were a LEFT-JOIN ARTIFACT.** `massql_query.py`'s `merge(base, how="left", on="scan")` computed base peaks from
   `ms2_df` and then `results_df.merge(base, how="left", on="scan")`. For an MS1DATA query `results_df` holds MS1
   scan ids while `ms2_df` holds only MS2 ids — in `small.mzML` those sets are **disjoint** (`[1,2,8,9,…]` vs
   `[3,4,5,…]`), so every row missed the join and became `NaN` → `null`.
@@ -549,6 +551,54 @@ links pointing out of the repo — which is why the move was verified by measure
 Check 5's pattern also had to gain a `/`: it matched `docs/[A-Za-z_]+\.md`, so a subdirectory path would have
 stopped matching and the check would have covered *less* than before while still reporting green.
 
+<a id="c42"></a>
+**C42 — `SPIKE.md` §4's API sketch is pre-C22 and its "literal diff" claim is impossible; `SpectraStream` is
+reshaped to `hasNext()`/`next()`; and ten defects in [Step 11](Tech_Step11.md) are resolved before coding it.**
+
+**Fallout:** Tech_Step6.md, Tech_Step7.md, Tech_Step11.md
+
+Found by reviewing Step 11 as its implementer. **Two `SPIKE.md` errors that Step 11 inherited by being told to
+copy §4 "exactly":**
+
+1. **The sketch shows `SpectraFile` as a parameter type** (`SPIKE.md:60-73`), which [C22](#c22) abolished — and
+   the `io/` tree line still says `SpectraReader iface`. Step 11 §1 carried a C22 note saying the type is
+   `SpectraStream` and then, six lines below, declared `execute(MassqlQuery, SpectraFile, MassqlOptions)`. Its
+   Done-when demanded a match "exactly", so **the box could not be satisfied**: matching it meant writing code
+   that does not compile.
+2. **"Mirror `massql_query.py`'s interface exactly so the differential test is a literal diff"** (`SPIKE.md:44`).
+   Impossible since [C40](#c40): `ResultJson` emits **compact** JSON while the reference uses `indent=2`, and
+   Java/Python float formatting differs regardless. [Step 12](Tech_Step12.md) compares **parsed values, never
+   text**. What must mirror is the *interface* — argv order, flag names, defaults, the stdout/stderr split.
+
+**`SpectraStream` was reshaped in the same round**, because its old form made one of Step 11's own rules
+unenforceable:
+
+| Before | After | Why |
+|---|---|---|
+| `boolean next()` + `ScanView current()` | `boolean hasNext()` + `ScanView next()` | idiomatic, and one call per iteration instead of two |
+| — | `next()` throws `NoSuchElementException` past the end | Step 11 §1 required *"calling `execute` twice must throw rather than silently return an empty result"* and **nothing implemented it** — a second `execute` returned `[]`, indistinguishable from a real no-match |
+| `Format format()` | **removed** | no production caller; `FormatSniffTest` was its only user, and it can call the package-private `SpectraFile.sniff` directly. `Format` is package-private now too, so it appears in no public signature |
+| *(undocumented)* | every method javadoc'd | `format()` had **no javadoc at all**, which is what surfaced the review |
+
+**Deliberately NOT an `Iterator`**, despite the names. `next()` returns the *same mutable view* each call — the
+property that bounds retained memory to one scan — so `Iterator` would make
+`StreamSupport.stream(…).toList()` legal and silently produce N aliases of one object, every element reporting
+the last scan. `SpectraStreamContractTest` asserts the type is not assignable to `Iterator` or `Iterable`, so the
+hazard is unreachable rather than merely warned about.
+
+Each reader gained a `NOT_STARTED`/`PEEKED`/`EXHAUSTED` peek machine — written out three times, since they share
+no base class and can therefore be got wrong three times. **20 contract tests run against all three**, and they
+have teeth: deleting the peek buffer from `MgfReader` alone produces four failures.
+
+**Eight further Step 11 defects, all fixed in place**: the single-pass-versus-"several queries per file" tension
+(both true — ownership stays with the caller, but one stream serves one query); exit 1 and exit 2 being
+**mechanically indistinguishable**, because `SpectraFile.open` throws a plain `MassqlException` for both
+categories; `executeWithDiagnostics` missing from *Scope* and §1; Deliverables naming **three** test classes
+where *Tests required* names **seven**; the §3 "`Appendable`" requirement already met more simply by
+`ResultJson.write` returning one `String`; an overstated claim that Step 12 delegates stream hygiene entirely
+here; and no testable seam for `Main` — `MainExitCodeTest` cannot assert exit codes against a method that calls
+`System.exit`, so `Main.run(String[], PrintStream, PrintStream)` returns the code and only `main` exits.
+
 ### Corrections found while reviewing Step 9 as its implementer
 
 **C35 — [Step 9](Tech_Step9.md) names a type that does not exist, and its §1 contradicts itself.** Five
@@ -619,7 +669,7 @@ forward instead of waiting for Step 12 to fail.**
 
 C33(c) established that MassQL accumulates intensities in **`float32`**. `tic` is the same
 computation: `msql_engine.py:638,660` produce it as `ms2_df.groupby("scan").sum()["i"]` over that float32
-column, then `massql_query.py:158` renames `i` → `tic`. So the golden's `tic` carries float32 accumulation
+column, then `massql_query.py`'s `rename(columns={"i": "tic"})` renames `i` → `tic`. So the golden's `tic` carries float32 accumulation
 error while our float64 sum is exact.
 
 **Measured against `output/small_mzml_results.json` — all six rows differ:**
@@ -1149,7 +1199,7 @@ The unified rule for [Step 6](Tech_Step6.md) is unchanged (**`SCANS=` if present
 index**), but revises C6: charge defaults to 1 only on the *pyteomics* path. Also measured: **MassQL loads
 21,942 of `PlusRise.mgf`'s 34,513 spectra** (758,544 peak rows) — [Step 8](Tech_Step8.md) must assert
 **21,942**, not 34,513. And **MGF `ms1_df` is a synthetic 1-row all-zero placeholder, not empty**, so
-`massql_query.py:170`'s `len(ms1_df) == 0` branch never fires for MGF (Step 6's conclusion still holds; its
+`massql_query.py`'s `len(ms1_df) == 0`'s `len(ms1_df) == 0` branch never fires for MGF (Step 6's conclusion still holds; its
 rationale did not).
 
 <a id="c15"></a>

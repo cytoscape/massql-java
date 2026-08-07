@@ -32,8 +32,9 @@ class SpectraStreamCloseTest {
         Path mzml = Fixtures.require("data/small.mzML");
         for (int i = 0; i < 200; i++) {
             try (SpectraStream s = SpectraFile.open(mzml)) {
-                assertTrue(s.next(), "cycle " + i + " produced no scans");
-                assertEquals(1, s.current().scanId());
+                assertTrue(s.hasNext(), "cycle " + i + " produced no scans");
+                ScanView v = s.next();
+                assertEquals(1, v.scanId());
             }
         }
     }
@@ -46,8 +47,9 @@ class SpectraStreamCloseTest {
         Path mzxml = Fixtures.require("data/small.mzXML");
         for (int i = 0; i < 200; i++) {
             try (SpectraStream s = SpectraFile.open(mzxml)) {
-                assertTrue(s.next(), "cycle " + i + " produced no scans");
-                assertEquals(1, s.current().scanId());
+                assertTrue(s.hasNext(), "cycle " + i + " produced no scans");
+                ScanView v = s.next();
+                assertEquals(1, v.scanId());
             }
         }
     }
@@ -57,7 +59,7 @@ class SpectraStreamCloseTest {
         Path mgf = Fixtures.require("fixtures/micro/micro.mgf");
         for (int i = 0; i < 200; i++) {
             try (SpectraStream s = SpectraFile.open(mgf)) {
-                assertTrue(s.next());
+                assertTrue(s.hasNext());
             }
         }
     }
@@ -65,8 +67,8 @@ class SpectraStreamCloseTest {
     @Test
     void closingMidStreamIsFineAndTheStreamIsThenUnusable() {
         SpectraStream s = SpectraFile.open(Fixtures.require("data/small.mzML"));
-        assertTrue(s.next());
-        assertTrue(s.next());
+        assertTrue(s.hasNext());
+        assertTrue(s.hasNext());
         s.close();
         assertThrows(RuntimeException.class, s::next, "a closed stream must refuse to advance");
     }

@@ -19,6 +19,13 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
  */
 public interface ScanView {
 
+    /**
+     * The scan's identifier, as MassQL derives it — which is <b>not</b> always its position in the file.
+     *
+     * <p>mzML parses the last {@code scan=N} segment of the spectrum id; mzXML uses {@code num}; MGF uses
+     * {@code SCANS=} when present and otherwise the 1-based block index (Correction C7). This is the value
+     * that reaches the result JSON's {@code scan} key, so the goldens are keyed on it.
+     */
     int scanId();
 
     /** 1 or 2. Levels above 2 are skipped by the reader and reported via {@link SpectraStream#diagnostics()}. */
@@ -39,6 +46,17 @@ public interface ScanView {
     /** Precursor charge, or {@code 0} if not recorded. */
     int charge();
 
+    /**
+     * How many peaks this scan holds, <b>without decoding them</b>.
+     *
+     * <p>Read from metadata — mzML's {@code defaultArrayLength}, mzXML's {@code peaksCount}, MGF's line
+     * count — so it costs no base64 decode, inflate or array allocation. That is what lets the executor
+     * skip zero-peak scans before paying for them (Correction C35c), and why this is a separate accessor
+     * rather than {@code materialize().rowCount()}.
+     *
+     * <p>{@code 0} is a real, expected value: PlusRise.mgf has 12,571 peak-less blocks, and mzML files
+     * carry empty MS1 scans.
+     */
     int peakCount();
 
     /**

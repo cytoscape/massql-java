@@ -20,7 +20,7 @@ class MzxmlEdgeCaseTest {
     private static List<Integer> scanIdsOf(Path p) {
         List<Integer> out = new ArrayList<>();
         try (SpectraStream s = SpectraFile.open(p)) {
-            while (s.next()) out.add(s.current().scanId());
+            while (s.hasNext()) { ScanView v = s.next(); out.add(v.scanId()); }
         }
         return out;
     }
@@ -49,7 +49,7 @@ class MzxmlEdgeCaseTest {
         // (DEPENDENCY_POLICY constraint 2).
         Path p = Fixtures.require("fixtures/edge/empty_msLevel_tag.mzXML");
         try (SpectraStream s = SpectraFile.open(p)) {
-            while (s.next()) { /* drain */ }
+            while (s.hasNext()) { ScanView v = s.next(); /* drain */ }
             String all = String.join("\n", s.diagnostics());
             assertTrue(all.contains("msLevel"),
                     "the 8 dropped scans must be reported. diagnostics: " + all);
@@ -68,9 +68,10 @@ class MzxmlEdgeCaseTest {
         assertTrue(head.contains("compressionType=\"zlib\""), "expected a zlib fixture");
         try (SpectraStream s = SpectraFile.open(p)) {
             int decoded = 0;
-            while (s.next()) {
-                int n = s.current().materialize().rowCount();
-                assertTrue(n > 0, "scan " + s.current().scanId() + " decoded to zero peaks");
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                int n = v.materialize().rowCount();
+                assertTrue(n > 0, "scan " + v.scanId() + " decoded to zero peaks");
                 decoded++;
             }
             assertEquals(2, decoded);
@@ -86,8 +87,8 @@ class MzxmlEdgeCaseTest {
         Path p = Fixtures.require("fixtures/micro/micro_noprecursor.mzXML");
         int ms2 = 0;
         try (SpectraStream s = SpectraFile.open(p)) {
-            while (s.next()) {
-                ScanView v = s.current();
+            while (s.hasNext()) {
+                ScanView v = s.next();
                 if (v.msLevel() == 2) {
                     assertEquals(0.0, v.precmz(),
                             "absent <precursorMz> -> the 0 sentinel (our contract, not parity)");
@@ -109,9 +110,10 @@ class MzxmlEdgeCaseTest {
                         + "<precursorMz>500.5</precursorMz>"
                         + "<peaks precision=\"32\" byteOrder=\"network\"></peaks></scan>");
         try (SpectraStream s = SpectraFile.open(p)) {
-            assertTrue(s.next());
-            assertEquals(500.5, s.current().precmz(), "the value is element text, not an attribute");
-            assertEquals(0.1, s.current().rt(), 1e-12, "PT6S -> 0.1 minutes");
+            assertTrue(s.hasNext());
+            ScanView v = s.next();
+            assertEquals(500.5, v.precmz(), "the value is element text, not an attribute");
+            assertEquals(0.1, v.rt(), 1e-12, "PT6S -> 0.1 minutes");
         }
     }
 
@@ -121,10 +123,11 @@ class MzxmlEdgeCaseTest {
                 "<scan num=\"7\" msLevel=\"1\" peaksCount=\"0\" polarity=\"+\" retentionTime=\"PT0S\">"
                         + "<peaks precision=\"32\" byteOrder=\"network\"></peaks></scan>");
         try (SpectraStream s = SpectraFile.open(p)) {
-            assertTrue(s.next());
-            assertEquals(0, s.current().peakCount());
-            assertEquals(0, s.current().materialize().rowCount());
-            assertFalse(s.next());
+            assertTrue(s.hasNext());
+            ScanView v = s.next();
+            assertEquals(0, v.peakCount());
+            assertEquals(0, v.materialize().rowCount());
+            assertFalse(s.hasNext());
         }
     }
 
@@ -138,9 +141,10 @@ class MzxmlEdgeCaseTest {
                         + "<scan num=\"2\" msLevel=\"1\" peaksCount=\"0\" polarity=\"+\" retentionTime=\"PT0S\">"
                         + "<peaks precision=\"32\" byteOrder=\"network\"></peaks></scan>");
         try (SpectraStream s = SpectraFile.open(p)) {
-            assertTrue(s.next());
-            assertEquals(2, s.current().scanId(), "scan 1 has no <peaks> and must be skipped");
-            assertFalse(s.next());
+            assertTrue(s.hasNext());
+            ScanView v = s.next();
+            assertEquals(2, v.scanId(), "scan 1 has no <peaks> and must be skipped");
+            assertFalse(s.hasNext());
             assertTrue(String.join("\n", s.diagnostics()).contains("not a mass spectrum"),
                     "the skip must be reported: " + s.diagnostics());
         }
@@ -154,9 +158,10 @@ class MzxmlEdgeCaseTest {
                         + "<scan num=\"2\" msLevel=\"1\" peaksCount=\"0\" polarity=\"+\" retentionTime=\"PT0S\">"
                         + "<peaks precision=\"32\" byteOrder=\"network\"></peaks></scan>");
         try (SpectraStream s = SpectraFile.open(p)) {
-            assertTrue(s.next());
-            assertEquals(2, s.current().scanId());
-            assertFalse(s.next());
+            assertTrue(s.hasNext());
+            ScanView v = s.next();
+            assertEquals(2, v.scanId());
+            assertFalse(s.hasNext());
             assertTrue(String.join("\n", s.diagnostics()).contains("ms level > 2"), "" + s.diagnostics());
         }
     }
@@ -173,7 +178,7 @@ class MzxmlEdgeCaseTest {
                         + "<scan num=\"2\" msLevel=\"2\" peaksCount=\"0\" polarity=\"+\" retenti");
         MassqlException e = assertThrows(MassqlException.class, () -> {
             try (SpectraStream s = SpectraFile.open(p)) {
-                while (s.next()) { /* drain until it fails */ }
+                while (s.hasNext()) { ScanView v = s.next(); /* drain until it fails */ }
             }
         });
         assertTrue(e.getMessage().toLowerCase().contains("truncat")

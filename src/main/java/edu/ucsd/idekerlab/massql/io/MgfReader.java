@@ -28,19 +28,16 @@ import java.util.List;
  * <p>MGF is a text format, so peaks are parsed as the block is read rather than deferred behind an
  * offset the way the binary formats do. Retained memory is still bounded by one scan.
  */
-final class MgfReader implements SpectraStream {
+final class MgfReader extends AbstractSpectraStream {
 
-    private final Path path;
     private final BufferedReader reader;
     private final List<String> diagnostics = new ArrayList<>();
 
-    private boolean closed = false;
     private int blockIndex = 0;          // 1-based once incremented; the scan-id fallback
     private final Scan scan = new Scan();
-    private boolean valid = false;
 
     MgfReader(Path path) {
-        this.path = path;
+        super(path);
         try {
             this.reader = Files.newBufferedReader(path, StandardCharsets.UTF_8);
         } catch (IOException e) {
@@ -48,18 +45,12 @@ final class MgfReader implements SpectraStream {
         }
     }
 
-    @Override public Format format() { return Format.MGF; }
     @Override public List<String> diagnostics() { return Collections.unmodifiableList(diagnostics); }
 
-    @Override
-    public ScanView current() {
-        if (!valid) throw new MassqlException("no current scan; call next() first");
-        return scan;
-    }
+    @Override protected ScanView view() { return scan; }
 
     @Override
-    public boolean next() {
-        if (closed) throw new MassqlException("stream is closed");
+    protected boolean advance() {
         try {
             return readBlock();
         } catch (IOException e) {
@@ -68,7 +59,6 @@ final class MgfReader implements SpectraStream {
     }
 
     private boolean readBlock() throws IOException {
-        valid = false;
         String line;
 
         // Skip to BEGIN IONS, tolerating blank lines, comments and file-level headers
@@ -149,7 +139,6 @@ final class MgfReader implements SpectraStream {
         }
 
         scan.finish(blockIndex, mz, in, n);
-        valid = true;
         return true;
     }
 
@@ -202,9 +191,7 @@ final class MgfReader implements SpectraStream {
     }
 
     @Override
-    public void close() {
-        if (closed) return;      // idempotent
-        closed = true;
+    protected void releaseResources() {
         try {
             reader.close();
         } catch (IOException e) {

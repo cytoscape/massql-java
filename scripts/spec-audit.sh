@@ -651,6 +651,68 @@ fi
 echo
 
 # --------------------------------------------------------------------------------------------
+# Check 8 -- every anchor a spec attributes to massql_query.py actually appears in it.
+#
+# Added by C42, for a defect C40 caused and C40's own fallout pass missed. Editing
+# massql_query.py (+46 lines) silently invalidated the LINE NUMBERS the specs cited: 9 of 13
+# distinct citations went stale, several by 40-65 lines, and the worst landed INSIDE comments C40
+# had just added -- a reader following "massql_query.py:194-195" for the trailing-newline rule
+# arrived at a sentence about micro.mgf phantom scan-id collisions.
+#
+# Check 3 could not see it. It verifies that a spec cites the correction's LABEL, not that the
+# spec's other facts survived the code change.
+#
+# The fix was to stop citing line numbers at all. Specs now name a STABLE ANCHOR -- a function
+# name or a distinctive expression -- which survives edits above it and, unlike a line number, can
+# be checked. This is that check.
+#
+# NOTE the direction: it verifies the anchor EXISTS, not that it says what the spec claims. A
+# renamed or deleted function fails here; a function whose body changed meaning does not. That is
+# a real limit, and the honest mitigation is that anchors are chosen to be the thing the claim is
+# about, so a meaning change usually renames or removes them.
+# --------------------------------------------------------------------------------------------
+
+echo "8. every massql_query.py anchor a spec cites exists in it (the C42 check)"
+
+ORACLE_WRAPPER=../massql/massql_query.py
+
+if [ ! -f "$ORACLE_WRAPPER" ]; then
+    # The oracle directory is deliberately outside the repo and absent in CI (C26/C41), so this
+    # check is advisory there rather than a failure -- it cannot verify what it cannot read.
+    pass "skipped: $ORACLE_WRAPPER not present (the oracle dir is not part of the deliverable)"
+else
+    # Any leftover line-number citation is itself the defect this check exists to prevent.
+    stale=$(grep -rhoE 'massql_query\.py[`]*:[0-9]+' docs/ | sort -u || true)
+    if [ -n "$stale" ]; then
+        while read -r s; do
+            [ -n "$s" ] || continue
+            fail "a spec still cites '$s' by LINE NUMBER. Line numbers rot the moment that file is
+        edited -- 9 of 13 did, under C40. Cite a stable anchor instead: a function name, or a
+        distinctive expression such as 'for col in (\"precmz\", \"ms1scan\", \"charge\")'."
+        done < <(printf '%s\n' "$stale")
+    fi
+
+    # Every backticked anchor attributed to the wrapper must be findable in it.
+    missing=0
+    checked_anchors=0
+    while read -r anchor; do
+        [ -n "$anchor" ] || continue
+        checked_anchors=$((checked_anchors + 1))
+        grep -qF "$anchor" "$ORACLE_WRAPPER" || {
+            fail "specs cite \`$anchor\` in massql_query.py, but it is not there.
+        Either the wrapper changed and the specs did not follow, or the anchor was mistyped."
+            missing=$((missing + 1))
+        }
+    done < <(grep -rhoE "\`massql_query\.py\`'s \`[^\`]+\`" docs/ \
+             | sed -E "s/^.*'s \`//; s/\`$//" | sort -u)
+
+    if [ "$missing" -eq 0 ] && [ -z "$stale" ]; then
+        pass "$checked_anchors distinct anchor(s) all present in massql_query.py, and no line-number citations remain"
+    fi
+fi
+echo
+
+# --------------------------------------------------------------------------------------------
 
 if [ "$FAILURES" -ne 0 ]; then
     printf 'spec-audit: %d FAILURE(S).\n' "$FAILURES" >&2
@@ -701,6 +763,15 @@ printf 'spec-audit: GREEN (%d checks).\n' "$CHECKS"
 #          classes and must NOT fail.
 #
 #   5.  mv docs/VENDORED.md /tmp/ -> fails from both Tech_Step6.md and Tech_Step7.md
+#
+#   8.  Both directions verified:
+#         add "`massql_query.py:194-195`" to any spec  -> fails: "cites ... by LINE NUMBER"
+#         sed -i '' 's/clean_nan/scrub_nan/g' ../massql/massql_query.py
+#                                                     -> fails: "cite `clean_nan` ... not there"
+#
+#       ⚠ Rename ALL occurrences in that probe, not just the `def`. Renaming the definition alone
+#       leaves the call site, the anchor string is still found, and the check appears not to work
+#       when in fact the probe was unrealistic.
 #
 #   7.  All three dimensions verified, and the check needed a fix to earn the third:
 #         mv docs/harness/oracle/PINNED.md /tmp/          -> "(no such file)"
