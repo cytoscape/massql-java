@@ -26,9 +26,9 @@ Governing sections: [`SPIKE.md`](SPIKE.md) §4 (layout), §5 (readers), §6d (bu
 ## Scope
 
 **In scope**
-- `git init`, package skeleton, `pom.xml`, `.gitignore`, `Makefile` stub.
+- `git init`, package skeleton, the build script, `.gitignore`, `Makefile` stub.
 - The dependency set, exclusions, and version pins — with measured byte sizes.
-- Surefire/failsafe split, ANTLR plugin wiring, JaCoCo.
+- Unit/integration test split, ANTLR plugin wiring, JaCoCo.
 - The exception hierarchy and `MassqlOptions`, since every later step throws or reads them.
 - A first `dependency-audit.txt`.
 
@@ -44,12 +44,12 @@ Governing sections: [`SPIKE.md`](SPIKE.md) §4 (layout), §5 (readers), §6d (bu
 | Path | Content |
 |---|---|
 | `/Users/shreuland/dev/massql-java/` | New git repo; remote `github.com/cytoscape/massql-java` |
-| `pom.xml` | Full build as specified below |
-| `.gitignore` | `target/`, IDE files |
-| `Makefile` | `verify` target stub. ⚠ **Filled out at Step 9**, not Step 13 — `mvn` is never invoked directly now; the Makefile is the only entry point and both workflows call its targets. See [`README.md`](README.md) |
-| `dependency-audit.txt` | `mvn dependency:tree` output + total byte size + the exclusion rationale |
+| `build.gradle`, `cli/build.gradle`, `settings.gradle`, `gradle.properties` | Full build as specified below |
+| `.gitignore` | build output, IDE files |
+| `Makefile` | `verify` target stub. ⚠ **Filled out at Step 9**, not Step 13 — the build tool is never invoked directly; the Makefile is the only entry point and both workflows call its targets. See [`README.md`](README.md) |
+| `dependency-audit.txt` | The SDK runtime closure + total byte size + the exclusion rationale |
 | `DEPENDENCY_POLICY.md` | The constraint list below, as the standing rule for later steps |
-| `src/main/antlr4/edu/ucsd/idekerlab/massql/lang/Massql.g4` | Placeholder grammar; real content in Step 4 |
+| `src/main/antlr/edu/ucsd/idekerlab/massql/lang/Massql.g4` | Placeholder grammar; real content in Step 4 |
 | `src/main/java/.../massql/MassqlException.java`, `MassqlParseException.java`, `MassqlOptions.java` | See Specification §5 |
 | `.github/workflows/ci.yml` | Full suite on every push to master and every PR — see §8 |
 | `.github/workflows/release.yml` | Version-stamped jar from a semver tag, attached to the release and deployed to the Cytoscape nexus — see §8 |
@@ -64,7 +64,7 @@ Group/artifact: `edu.ucsd.idekerlab:massql-java`. Base package
 
 ```
 massql-java/                                    packaging=jar, <release>17</release>
-  src/main/antlr4/…/massql/lang/Massql.g4       NOT src/main/resources — see trap below
+  src/main/antlr/…/massql/lang/Massql.g4        NOT src/main/resources — see trap below
   src/main/java/…/massql/
     Massql.java              ← public entry point            (Step 11)
     MassqlOptions.java       ← precursorTolPpm default 20.0  (this step)
@@ -110,7 +110,8 @@ Both shipping artifacts audited: **zero** `META-INF/services`, **zero** `META-IN
 libraries. javolution is a proper OSGi bundle with a unique symbolic name, nothing else in Cytoscape provides
 `javolution.*`, and its `org.osgi.core` dependency is not compile-scope so it never enters the closure.
 
-**Banned via `maven-enforcer-plugin` at `validate`**, so the build fails rather than the bundle:
+**Banned via the `checkBannedDependencies` task, wired into `check`**, so the build fails rather than the
+bundle:
 `io.github.msdk:*`, `com.google.guava:guava`, `jsr305`, `checker-qual`, `error_prone_annotations`,
 `j2objc-annotations`, `it.unimi.dsi:*`, `org.slf4j:*`, `ch.qos.logback:*`, all JAXB coordinates,
 `org.openscience.cdk:*`.
@@ -174,27 +175,41 @@ mandatory at construction.
 
 ### 6. Build wiring
 
-- **`antlr4-maven-plugin` 4.13.2** bound to `generate-sources`, reading `src/main/antlr4/`, `visitor=true`,
-  `listener=false`. Commit a placeholder grammar that generates cleanly so the toolchain is proven before
-  [Step 4](Tech_Step4.md) starts.
-- **Surefire** runs `*Test.java` at the `test` phase. **Failsafe** runs `*IT.java` at the `verify` phase. The
-  reviewer runs `make verify`; a developer iterating runs `make test` and expects milliseconds.
+> ⚠ **This section was rewritten when the build moved from Maven to Gradle (C43).** The requirements below are
+> unchanged; only the mechanism is. The completed-step exit criteria further down still name `mvn` because they
+> record what was actually run at the time — that is history and is deliberately left alone.
 
-  > ⚠ **The `Makefile` is the only entry point — do not invoke `mvn` directly.** The `mvn` phase names in
-  > this spec describe the *mechanism* each target wraps, not commands to type. `make verify` also runs
-  > `skipcheck` (C26's zero-skip guard) and `audit`, and CI calls the same targets, so what runs locally
-  > and what runs on a push cannot drift. `make` alone lists the targets; `make it` runs the integration
-  > suite without the unit suite. See [`README.md`](README.md).
-- **JaCoCo** `prepare-agent` + `report`, bound to `verify`.
-- If any formatter (Spotless etc.) is added later, it **must exclude `target/generated-sources/`** —
-  `open-cyweb` binds Spotless to the `test` phase and it would reformat generated parser code.
+- **Gradle's `antlr` plugin (ANTLR 4.13.2)** reads `src/main/antlr/`, with
+  `arguments += ['-visitor', '-no-listener', '-package', 'edu.ucsd.idekerlab.massql.lang']`. Commit a
+  placeholder grammar that generates cleanly so the toolchain is proven before [Step 4](Tech_Step4.md) starts.
+
+  > ⛔ **`-package` is mandatory**, unlike `antlr4-maven-plugin` which derived it from the directory path.
+  > Gradle's plugin mirrors the source layout into the output folder but emits **no `package` declaration**, so
+  > without it every generated class lands in the default package and nothing referencing them compiles.
+
+  > ⛔ **The generator must not become a dependency.** Gradle's plugin makes the compile and runtime
+  > configurations `extendsFrom` the tool configuration, which would add 15.44 MB (`icu4j` alone is 14.4 MB)
+  > to a 0.75 MB closure. `build.gradle` severs it; see `DEPENDENCY_POLICY.md`.
+- **The `test` suite** runs `*Test.java` from `src/test`. **The `integrationTest` suite** (JVM Test Suite
+  plugin) runs `*IT.java` from `src/integrationTest`, and `check` depends on it. The reviewer runs
+  `make verify`; a developer iterating runs `make test` and expects milliseconds.
+
+  > ⚠ **The `Makefile` is the only entry point — do not invoke `./gradlew` directly.** The task names in this
+  > spec describe the *mechanism* each target wraps, not commands to type. `make verify` also runs `audit` and
+  > `spec-audit`, and CI calls the same targets, so what runs locally and what runs on a push cannot drift.
+  > `make` alone lists the targets; `make it` runs the integration suite without the unit suite. See
+  > [`README.md`](README.md).
+- **JaCoCo**, taking execution data from **both** suites — binding it to the unit suite alone would exclude
+  every gate, since the gates are the ITs. `check` enforces a **90% instruction** minimum (C43).
+- **Spotless** is the entire code-style specification; there is no style document. It **must exclude
+  `build/generated-src/`** — otherwise it reformats generated parser code — and
+  `src/main/.../io/vendor/`, which is held byte-identical to upstream.
 
 ### 7. First dependency audit
 
 ```
-mvn -q dependency:tree -Dverbose > dependency-audit.txt
-mvn -q dependency:build-classpath -Dmdep.outputFile=/tmp/cp.txt
-tr ':' '\n' < /tmp/cp.txt | xargs -I{} stat -f '%z {}' | awk '{s+=$1} END {print s " bytes total"}'
+./gradlew -q :dependencyAudit          # SDK runtime closure: coordinate, bytes, resolved path
+make audit                             # writes dependency-audit.txt and enforces the budget
 ```
 
 Append the total and the exclusion rationale to `dependency-audit.txt` and commit it. This file is the artifact
@@ -211,37 +226,41 @@ matters:
 
 | # | cy-ndex-2 | massql-java | Why |
 |---|---|---|---|
-| 1 | `mvn test` | **`mvn verify`** | `mvn test` runs surefire only. **All three gates of this spike live in `*IT.java`** (reader parity, differential, CLI contract), so `mvn test` would report green while skipping every one of them. |
+| 1 | unit tests only | **unit + integration** | A unit-only run skips the separate `integrationTest` suite. **All three gates of this spike live in `*IT.java`** (reader parity, differential, CLI contract), so it would report green while skipping every one of them. |
 | 2 | JDK 11 | **JDK 17** | Constraint 7 — matches Cytoscape 3.10.4's parent pom. |
 | 3 | `xvfb-run` | *(none)* | cy-ndex-2 needs a virtual display because Cytoscape touches AWT. Nothing here does ([`SPIKE.md`](SPIKE.md) §6d: "No display needed"). |
 | 4 | release uses `-DskipTests` | **runs the full suite** | For an SDK whose entire value is bug-for-bug agreement with one pinned MassQL commit, publishing an unverified jar defeats the purpose. `verify` also packages, so it is one build, not two. |
 
-**`ci.yml`** — push to `master` + PRs against `master`: checkout, JDK 17 with maven cache, **`make fixtures`**
-then **`make verify`** (which itself runs `skipcheck` and `audit`),
-`scripts/dependency-audit.sh`, then an **"assert tests actually ran"** step, then upload reports on failure.
+**`ci.yml`** — push to `master` + PRs against `master`: checkout, JDK 17 with the Gradle cache,
+**`make fixtures`** then **`make verify`** (which itself runs `audit` and `spec-audit`), then upload reports on
+failure.
 
-That last step is not ceremony. Fixtures with unstated provenance are gitignored (the Ewing pair), so tests
-needing them **skip by design** — which means a misconfigured run can execute *nothing* and still be green.
-The step sums `Tests run:` across surefire and failsafe reports and fails if the total is zero. Verified locally
-against the real reports: counts **10** (9 unit + 1 IT).
+⚠ The original design added a separate **"assert tests actually ran"** CI step, because a misconfigured run can
+execute *nothing* and still be green. That guard moved into `make verify` so it is also reachable locally, and
+its mechanism has since changed twice: first to `make skipcheck`, then — because a hand-maintained test-count
+floor rots on every test added — to the **90% coverage gate** (C43). A test that stops running now shows up as
+lost coverage.
 
-**`release.yml`** — on published release: extract the version from the tag (`v1.2.3` → `1.2.3`) and **reject
-anything that is not plain semver**, so a typo cannot publish a bogus coordinate; **`make set-version`**
-(which re-checks semver itself); **`make fixtures`** then **`make verify`**; `gh release upload` the jar;
-**`make deploy`** to the nexus. Every step goes through the Makefile.
+**`release.yml`** — on published release: extract **which artifact and which version** from the tag and
+**reject anything that is not `sdk-vX.Y.Z` or `cli-vX.Y.Z`**, so a typo cannot publish a bogus coordinate and a
+bare `v1.2.3` cannot silently release the wrong one; **`make set-version-sdk`** / **`make set-version-cli`**
+(which re-check semver themselves); **`make fixtures`** then **`make verify`**; `gh release upload` that
+artifact's jar; **`make publish-sdk`** / **`make publish-cli`** to the nexus. Every step goes through the
+Makefile.
 
-Requires `distributionManagement` in the pom (added, pointing at
+The publishing repository is declared in `build.gradle` / `cli/build.gradle`, pointing at
 `nrnb-nexus.ucsd.edu/repository/cytoscape_releases` exactly as cy-ndex-2 does, so `massql-app` needs no extra
-repo config) and `REPO_USER` / `REPO_PWD` secrets in the `MVN` environment.
+repo config. Credentials come from `REPO_USER` / `REPO_PWD` in the environment — Gradle has no `settings.xml`,
+so there is no `<server>` id to match. ⚠ The GitHub *environment* holding those secrets is still named `MVN`;
+renaming it here would break the binding, so it keeps its name.
 
 ## Known traps
 
 - **Putting the `.g4` in `src/main/resources/`.** Cytoscape app poms set `<filtering>true</filtering>` on
   resources, and a grammar containing `${...}` gets **silently corrupted** — a grammar that compiles today and
-  breaks when the app embeds it. `src/main/antlr4/` only.
-- **Letting a dependency-update bot bump slf4j-api to 2.x.** See constraint 2. Consider pinning via
-  `dependencyManagement` and a `maven-enforcer-plugin` `bannedDependencies` rule so the build fails rather than
-  the bundle.
+  breaks when the app embeds it. `src/main/antlr/` only.
+- **Letting a dependency-update bot bump slf4j-api to 2.x.** See constraint 2. The `checkBannedDependencies`
+  task rejects `org.slf4j:*` outright, so the build fails rather than the bundle.
 - **Assuming an exclusion is safe because the parser doesn't import it.** Another class in the same artifact may.
   Verify by building and running (§3).
 - **Adding `junit` at compile scope.** It must never leak into the artifact `massql-app` embeds.
@@ -249,9 +268,9 @@ repo config) and `REPO_USER` / `REPO_PWD` secrets in the `MVN` environment.
 ## Tests required
 
 - A trivial `ScaffoldTest.java` asserting the generated placeholder parser class loads — proves the ANTLR
-  plugin, `generate-sources` wiring and `<release>17</release>` all work together.
-- A trivial `ScaffoldIT.java` — proves failsafe is actually bound and running, which is easy to get silently
-  wrong.
+  plugin, `generateGrammarSource` wiring and the Java 17 target all work together.
+- A trivial `ScaffoldIT.java` — proves the `integrationTest` suite is actually wired and running, which is easy
+  to get silently wrong.
 - `MassqlOptionsTest.java` — defaults, immutability of `withPrecursorTolPpm`.
 
 ## Done when

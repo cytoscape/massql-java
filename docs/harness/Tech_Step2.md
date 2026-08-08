@@ -119,8 +119,9 @@ a silently-changed upstream file becomes a visible error rather than a mysteriou
 > ⚠ **Correction C26 reverses what this paragraph used to say next** — *"tests that depend on these files
 > must skip with a clear message when they are absent, never fail"*. That instruction is how the whole
 > verification story came to prove nothing: the fixtures lived outside the repo, CI never had them, and
-> every parity assertion **skipped silently** while the test counter stayed healthy (surefire counts skips
-> inside "Tests run"). A missing fixture is now a **hard failure** carrying the
+> every parity assertion **skipped silently** while the test counter stayed healthy — a skipped test still
+> counts as one that ran. (The guard that closed this was `make skipcheck`; since [C43](Tech_Step_INDEX.md#c43)
+> it is the 90% coverage gate, which needs no maintained test count.) A missing fixture is now a **hard failure** carrying the
 > `scripts/fetch-fixtures.sh` command; CI fetches and caches these two files and asserts the skipped-test
 > count is **0**. See [`FIXTURES.md`](FIXTURES.md).
 

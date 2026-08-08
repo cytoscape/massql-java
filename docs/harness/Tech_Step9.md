@@ -27,6 +27,8 @@ historical quirks rather than designed behaviour, and reproducing them faithfull
 is the requirement.
 
 Governing sections: [`SPIKE.md`](SPIKE.md) §3 (exact rules), §6a (tolerance / comparator / algebra rows), §7 Step 2.
+(Both `SPIKE.md` and [`msql.ebnf`](oracle/msql.ebnf) live in this repo under `docs/harness/` since
+[C41](Tech_Step_INDEX.md#c41); the paths cited below are in-repo.)
 
 ## Scope
 

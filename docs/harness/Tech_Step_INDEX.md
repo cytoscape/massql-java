@@ -38,7 +38,7 @@ owning step.
 | [7](Tech_Step7.md) | **Hand-written** mzXML reader (C23) | 3, 5, 6, 2 | 1 d | | ✅ **DONE 2026-08-03 — 335 tests** |
 | [8](Tech_Step8.md) | Reader parity — bit-identical vs Python | 2, 6, 7 | 0.5 d | ⛔ **GATE** | ✅ **GATE GREEN 2026-08-03 — 392 tests** |
 | [9](Tech_Step9.md) | Condition filters (9a required + 9b) | 4, 5, 8 | 2 d | | ✅ **DONE 2026-08-05 — 453 tests** |
-| [10](Tech_Step10.md) | `scaninfo` collation, result model, JSON | 9, 5 | 1.5 d | | not started |
+| [10](Tech_Step10.md) | `scaninfo` collation, result model, JSON | 9, 5 | 1.5 d | | ✅ **DONE 2026-08-06 — 542 tests** |
 | [11](Tech_Step11.md) | Public API surface + CLI | 10 | 0.5 d | | not started |
 | [12](Tech_Step12.md) | Integration layers 2–4 + error paths | 11, 2, 8 | 1.5 d | ⛔ **GATE** | not started |
 | [13](Tech_Step13.md) | Harden, document, hand off | 12 | 2 d | ⛔ **REVIEW** | not started |
@@ -93,7 +93,7 @@ These are decided. Specs implement them; they are not open for re-litigation ins
 | 1 | Function axis | **`scaninfo` only.** The other 5 functions reject cleanly (Step 4) |
 | 2 | Condition axis | **Both 9a and 9b** — the full `WHERE`/`FILTER` set (Step 9) |
 | 3 | Repo on disk | `/Users/shreuland/dev/massql-java`, sibling to `massql/` |
-| 4 | Repo home + publishing | `github.com/cytoscape/massql-java` → nrnb-nexus `cytoscape_releases`. `mvn install` to `~/.m2` during the spike |
+| 4 | Repo home + publishing | `github.com/cytoscape/massql-java` → nrnb-nexus `cytoscape_releases`, as two independently versioned artifacts (`massql-java`, `massql-java-cli`). Publish to a local repo during the spike |
 | 5 | MGF fixture | Commit the full 14 MB `PlusRise.mgf`. **Do not trim** — the 664-record golden belongs to the full file |
 | 6 | Parser | **ANTLR 4.13.2**, embedded |
 | 7 | mzML + MGF readers | **Vendor** MSDK's `MzMLParser` + `MSNumpress` (Correction C16 — Guava); MGF hand-written |
@@ -551,6 +551,56 @@ links pointing out of the repo — which is why the move was verified by measure
 Check 5's pattern also had to gain a `/`: it matched `docs/[A-Za-z_]+\.md`, so a subdirectory path would have
 stopped matching and the check would have covered *less* than before while still reporting green.
 
+<a id="c43"></a>
+**C43 — the build moves from Maven to Gradle, which silently reintroduces a 15.44 MB dependency leak, breaks
+two tests, and retires `skipcheck` in favour of a coverage gate.**
+
+**Fallout:** DEPENDENCY_POLICY.md, Tech_Step3.md, Tech_Step11.md, Tech_Step12.md, Tech_Step13.md, SPIKE.md,
+Tech_Step2.md, Tech_Step4.md, Tech_Step5.md, Tech_Step8.md, Tech_Step10.md, FIXTURES.md, GRAMMAR_NOTES.md
+
+Java style is now enforced by the build rather than by prose: **Spotless is the entire style specification**,
+and there is no style document to drift from it. `pom.xml` is deleted. Six findings are worth recording because
+each was invisible until measured.
+
+1. ⛔ **Gradle's `antlr` plugin puts the code GENERATOR on the runtime classpath.** It makes the compile and
+   runtime configurations `extendsFrom` the tool configuration, adding `antlr4`, `ST4`, `antlr-runtime` **3.x**
+   (a second major version beside our 4.x), `treelayout` and `com.ibm.icu:icu4j` — **15.44 MB against a 0.75 MB
+   closure and a 1.5 MB budget, ~21× over**, `icu4j` alone being 14.4 MB. It cannot happen under Maven, where a
+   `<plugin>`'s dependencies live in the plugin's own classloader. `build.gradle` severs the inheritance and
+   `dependency-audit.txt` names all five artifacts, so removing the fix fails `make audit`.
+2. ⛔ **`-package` is mandatory for ANTLR under Gradle.** The plugin mirrors `src/main/antlr`'s layout into the
+   output directory but emits **no `package` declaration** — unlike `antlr4-maven-plugin`, which derived it from
+   the path. Without it every generated class lands in the default package and all 52 references fail to
+   compile. Gradle's documentation implies the directory layout is sufficient; it is not.
+3. **`skipcheck` is deleted.** Its hand-maintained `MIN_TESTS` floor rotted on every test added. Replaced by
+   **`jacocoTestCoverageVerification` at 90% instruction coverage**, wired into `check` — a test that stops
+   running now shows up as lost coverage, with no number to maintain. This **reverses `pom.xml`'s explicit
+   decision** ("Not a coverage gate… a percentage target would only invite tests written for the number"), so it
+   is recorded rather than slipped in. Reaching 90% required deleting three genuinely dead methods
+   (`AstBuilder.reject(String, Token)`, `SpectrumTable.assertRowInRange`, `RowMask.ofRange` — all 0% covered,
+   the last two with no caller anywhere) and testing three behaviours that had none.
+4. **ErrorProne now fails the build on dead code**, scoped to `UnusedMethod` / `UnusedVariable` /
+   `UnusedNestedClass` only. ⚠ It catches **private** members only, so of the three dead methods above it would
+   have caught one; nothing can flag an unused *public* method in a library. The coverage gate is the other
+   half. `error_prone_core` **2.39.0** is the ceiling — 2.40+ requires Java 21.
+5. **Two tests derived the repository root by climbing a fixed number of parent directories**, correct for
+   `target/test-classes` and wrong for `build/classes/java/test`. Both now walk *up* to the directory holding
+   `settings.gradle` — a marker chosen because `cli/` has its own `build.gradle` and would otherwise match.
+6. **The unit suite depended on an integration-test class.** `ReaderParityIT.FIXTURES_WITH_DUMPS` was read by
+   two unit tests, which is impossible once `integrationTest` depends on `test`. The inventory moved to
+   `io/ParityFixtures.java`, where it belongs: it is fixture *data*, and the tests that assert properties of the
+   inventory itself are unit tests.
+
+**Two specification defects surfaced by the packaging work.** [Step 11](Tech_Step11.md) documented
+`java -cp massql-java.jar …cli.Main`, which **could never have run** — that classpath holds the thin SDK jar
+alone, with no `antlr4-runtime` or `javolution`. And [Step 12](Tech_Step12.md) said to drive the CLI "as a
+subprocess" without ever stating how the JVM is launched, leaving `CliContractIT` to invent one. Both are fixed
+by the CLI uber-jar: `java -jar massql-java-cli-<version>.jar`, correct by construction.
+
+The CLI is now a **separate Gradle project** (`cli/`), versioned and released independently of the SDK. Because
+it depends on the SDK as an external project it can only compile against the public API, which makes the
+boundary `ApiEncapsulationTest` checks a compile error as well as an assertion.
+
 <a id="c42"></a>
 **C42 — `SPIKE.md` §4's API sketch is pre-C22 and its "literal diff" claim is impossible; `SpectraStream` is
 reshaped to `hasNext()`/`next()`; and ten defects in [Step 11](Tech_Step11.md) are resolved before coding it.**
@@ -894,8 +944,8 @@ Scan 5 is the only such scan and it is absent from `micro_mzxml_results.json`, s
 `../massql` (deliberately outside this repo) and gates on `Assumptions.assumeTrue`, so a missing
 fixture makes the test **skip**. `ci.yml` checks out only `massql-java`, so `../massql` never exists
 there: [Step 6](Tech_Step6.md)'s oracle cross-check, [Step 8](Tech_Step8.md)'s parity assertions and
-**`Ms1ScanDocumentOrderIT` — the assertion Step 7 exists for — all skip silently.** Surefire counts
-skips inside `Tests run`, so the CI test-count guard cannot see it either. A green CI proved only that
+**`Ms1ScanDocumentOrderIT` — the assertion Step 7 exists for — all skip silently.** A skipped test still
+counts as one that ran, so the CI test-count guard cannot see it either. A green CI proved only that
 the code compiles and the pure-unit tests pass.
 
 **Resolution: commit the fixtures and goldens into the repo** (~29 MB + 7.8 MB), resolve `Fixtures`
@@ -1156,7 +1206,7 @@ exactly as [Step 7](Tech_Step7.md) already does for mzXML, replacing Guava `Rang
 **Shipping closure is now two artifacts — 785,599 B (0.749 MB), 49.9% of budget:**
 `javolution-core-java-msftbx` 459,292 (the ServiceLoader-free `XMLStreamReaderImpl`) + `antlr4-runtime`
 326,307. Both audited: zero `META-INF/services`, zero `META-INF/versions`, zero native libs. **No Guava, no
-slf4j, no MSDK, no commons-io, no JAXB, no CDK.** Enforced by `maven-enforcer-plugin` at `validate`, so the
+slf4j, no MSDK, no commons-io, no JAXB, no CDK.** Enforced by `checkBannedDependencies`, wired into `check`, so the
 build fails rather than the bundle.
 
 > Also worth recording: **JUnit itself violates constraints 1 and 4** (`junit-platform-commons` ships 10
@@ -1238,7 +1288,7 @@ Verified; do not re-derive.
   Corroborates that golden intensities are `(double)(float)raw` ([Step 6](Tech_Step6.md) §3) and that `rt` must
   be carried as a double ([Step 5](Tech_Step5.md) §1).
 - **Ewing fixtures are live:** `DP00570_F02.mzxml` = 3,761,778 B; `DP00570_F02.mgf` = 2,196,881 B; HTTP 200.
-- **Toolchain present:** JDK 17.0.18, Maven 3.9.12, Docker daemon up, git. Python **3.12.0 via pyenv** — the
+- **Toolchain present:** JDK 17.0.18, Gradle 9.3.1 (via the committed wrapper), Docker daemon up, git. Python **3.12.0 via pyenv** — the
   `python3` shim resolves to 3.13, so always name the interpreter explicitly. `massql` is not importable.
 - **On disk today:** `data/small.mzML` (5,103,183 B), `data/PlusRise.mgf` (15,172,489 B),
   `output/small_mzml_results.json` (6 records), `output/plusrise_results.json` (664 records),

@@ -9,7 +9,7 @@ the replacement for pandas/numpy, and the single largest chunk of production cod
 
 | Step | Why |
 |---|---|
-| [Step 3](Tech_Step3.md) | Provides the Maven build, `<release>17</release>`, JUnit wiring, and `MassqlException`. |
+| [Step 3](Tech_Step3.md) | Provides the build (Gradle since [C43](Tech_Step_INDEX.md#c43)), the Java 17 target, JUnit wiring, and `MassqlException`. |
 
 ## Context
 

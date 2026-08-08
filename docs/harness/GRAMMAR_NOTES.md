@@ -1,6 +1,6 @@
 # Grammar notes
 
-Every deliberate divergence between `src/main/antlr4/…/Massql.g4` and the Lark source it was
+Every deliberate divergence between `src/main/antlr/…/Massql.g4` ([C43](Tech_Step_INDEX.md#c43) moved it from `src/main/antlr4/`) and the Lark source it was
 translated from, plus the facts a future re-sync will need.
 
 ## Source

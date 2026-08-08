@@ -21,7 +21,8 @@ engineering is done by now; this step exists because a spike that cannot be inde
 actually answered its questions. The review gate is the deliverable, and the artifacts below are what gets
 reviewed.
 
-Governing sections: [`SPIKE.md`](SPIKE.md) §7 Step 3, §8 (honest framing), §9 (the constraints to assert), §11 (the eight
+Governing sections — all in this repo under `docs/harness/` since [C41](Tech_Step_INDEX.md#c41):
+[`SPIKE.md`](SPIKE.md) §7 Step 3, §8 (honest framing), §9 (the constraints to assert), §11 (the eight
 questions), §6d.
 
 ## Scope
@@ -47,12 +48,12 @@ questions), §6d.
 |---|---|
 | `README.md` | The primary review artifact |
 | `Makefile` | ✅ **Already filled in at Step 9** (the Step 3 stub grew a full target set, and both workflows now call it). This step adds only the **differential table** to `verify` |
-| `dependency-audit.txt` | Final `mvn dependency:tree` + measured total (updated from Step 6) |
+| `dependency-audit.txt` | Final SDK runtime closure + measured total (updated from Step 6) |
 | `scripts/check-osgi-readiness.sh` | The §9 assertions, scripted |
 | `docs/FEATURE_MATRIX.md` | Parses / executes / rejects, generated from `UnsupportedConstructs` |
 | `docs/SPIKE_ANSWERS.md` | The eight §11 questions, answered |
 | `.github/workflows/ci.yml` | **Already exists** (Step 3 §8) — this step adds the OSGi-readiness check to it |
-| `target/site/jacoco/` | Coverage report (generated, not committed) |
+| `build/reports/jacoco/` | Coverage report (generated, not committed) |
 
 ## Specification
 
@@ -125,20 +126,22 @@ accumulation-order tolerance was accepted, it is a deviation and belongs here.
 
 ### 3. `make verify`
 
-> ✅ **The Makefile was filled in early, at Step 9** — ad-hoc `mvn` invocations had already begun to diverge
-> from what CI ran, so the convention was pulled forward: **`mvn` is never invoked directly; the Makefile is
-> the only entry point**, and both workflows call its targets. What remains for this step is the
-> **differential table** below, not the plumbing.
+> ✅ **The Makefile was filled in early, at Step 9** — ad-hoc build-tool invocations had already begun to
+> diverge from what CI ran, so the convention was pulled forward: **the build tool is never invoked directly;
+> the Makefile is the only entry point**, and both workflows call its targets. What remains for this step is
+> the **differential table** below, not the plumbing.
 >
-> Already in place: `build`, `test`, `it` (integration only, skipping the unit suite), `verify`,
-> `skipcheck` (C26's zero-skip guard, previously duplicated inline in `ci.yml`), `audit`,
-> **`spec-audit`**, `fixtures`, `report`, `clean`, `set-version`, `deploy`, `test-one`/`it-one`, and a
-> `help` default goal.
+> Already in place: `build`, `test`, `it` (integration only, skipping the unit suite), `verify`, `audit`,
+> **`spec-audit`**, `lint`/`lint-fix`, `coverage`, `cli`, `fixtures`, `report`, `clean`,
+> `set-version-sdk`/`set-version-cli`, `publish-sdk`/`publish-cli`, `test-one`/`it-one`, and a `help` default
+> goal.
+>
+> ⚠ `skipcheck` (C26's zero-skip guard) **no longer exists** — its hand-maintained test-count floor rotted on
+> every test added, and it was replaced by the 90% coverage gate inside `check` (C43).
 
 ```
-make verify   →  mvn verify (unit + integration + JaCoCo + enforcer)
-              +  make skipcheck   (tests ran, and NONE were skipped)
-              +  make audit       (dependency tree + size budget)
+make verify   →  gradle check (unit + integration + coverage gate + lint + banned deps)
+              +  make audit       (SDK runtime closure + size budget)
               +  make spec-audit  (the specs still describe the code)
               +  the three differential comparisons        ← THIS STEP
               +  prints a per-format pass/fail table       ← THIS STEP
@@ -171,20 +174,21 @@ MGF      DP00570_F02.mgf      …/…       ok    ok      n/a      ok   ok      
 visible in the table itself. **Non-zero exit on any FAIL.** Skipped fixtures print `SKIP` with the reason, and a
 run where nothing executed must fail rather than print an empty table.
 
-✅ `make test` (unit only, fast) and `make audit` (dependency tree + size) already exist, added when the
-Makefile was filled in at Step 9 — along with `it`, `skipcheck`, `spec-audit`, `fixtures`, `report`, `build`,
-`set-version`, `deploy` and `test-one`/`it-one`. Nothing to add here but the differential table.
+✅ `make test` (unit only, fast) and `make audit` (SDK closure + size) already exist, added when the
+Makefile was filled in at Step 9 — along with `it`, `spec-audit`, `fixtures`, `report`, `build`,
+`lint`/`lint-fix`, `coverage`, `cli`, `set-version-sdk`/`set-version-cli`, `publish-sdk`/`publish-cli` and
+`test-one`/`it-one`. Nothing to add here but the differential table.
 
 ### 4. Dependency audit
 
-Final `mvn dependency:tree` after all exclusions, plus the measured total byte size, committed as
+The final SDK runtime closure after all exclusions, plus the measured total byte size, committed as
 `dependency-audit.txt`. This is the artifact that answers *"did dependency complexity stay bounded?"*
 
 **Measured in Step 3: 785,599 B = 0.749 MB, 49.9% of budget** — two artifacts, `javolution-core-java-msftbx`
 (459,292) + `antlr4-runtime` (326,307). Confirm this is unchanged after both readers are vendored.
 
 The tree must show **no MSDK at all**, and no `dsiutils`, `fastutil`, `guava`, `jsr305`, `checker-qual`,
-`slf4j`, `logback`, `jaxb-*`, `cdk-*` or `commons-*`. All are banned by the enforcer at `validate`
+`slf4j`, `logback`, `jaxb-*`, `cdk-*` or `commons-*`. All are rejected by `checkBannedDependencies`
 (Correction C16), so this is a re-confirmation rather than a fresh check.
 
 `scripts/dependency-audit.sh` already exits non-zero on a violation or budget breach, and CI runs it
@@ -198,7 +202,7 @@ Scripted so Phase 2 isn't a surprise. Unpack the resolved runtime closure and as
 |---|---|
 | No `META-INF/services/**` in any jar | The thread-context classloader can't see inside an OSGi bundle. cytoscape-mcp hit this twice — Lucene and the MCP SDK |
 | No `ServiceLoader` / `Class.forName` in our own bytecode | Same |
-| **No slf4j in any form** | Correction C16 removed it entirely — it was only ever needed by MSDK's `MzMLFileImportMethod`, and MSDK is no longer a dependency. The enforcer bans `org.slf4j:*`. (C4's narrower rule — pin 1.7.26, never 2.x — still applies if logging is ever reintroduced, since 2.x uses `ServiceLoader`.) |
+| **No slf4j in any form** | Correction C16 removed it entirely — it was only ever needed by MSDK's `MzMLFileImportMethod`, and MSDK is no longer a dependency. `checkBannedDependencies` rejects `org.slf4j:*`. (C4's narrower rule — pin 1.7.26, never 2.x — still applies if logging is ever reintroduced, since 2.x uses `ServiceLoader`.) |
 | No `META-INF/versions/**` | Multi-release jars break Felix resolution on Cytoscape 3.10.x |
 | No JAXB, no native libs (`.so`/`.dylib`/`.dll`), no `sun.misc.Unsafe` | §9 |
 | No logback / slf4j **binding** (api only) | `cy-ndex-2` embeds slf4j+logback while cytoscape-mcp excludes `org/slf4j/**`; don't add to that conflict |
@@ -221,11 +225,11 @@ re-specify them here. This step only *adds* to the existing `ci.yml`:
 - confirmation that **no test reaches the network** (`DEPENDENCY_POLICY.md` constraint 8) — the 46 parse
   goldens are checked-in files, never live calls to `massql.gnps2.org/parse`.
 
-Already in place from Step 3 and not to be duplicated: JDK 17, **`make verify`** (which wraps `mvn verify`, not
-`mvn test` — every gate lives
-in an `*IT.java`), the dependency audit as a gate, and the "assert tests actually ran" guard that stops a
-skip-everything run from passing green — **strengthened by Correction C26** to also assert the skipped-test
-count is **0**, plus a floor on the number executed, and a `fetch-fixtures.sh` step with an `actions/cache`
+Already in place from Step 3 and not to be duplicated: JDK 17, **`make verify`** (which runs `gradle check`,
+covering the `integrationTest` suite — every gate lives in an `*IT.java`), the dependency audit as a gate, and
+the guard that stops a skip-everything run from passing green — introduced by Correction C26 and since
+**replaced by the 90% coverage gate** (C43), which needs no maintained count, plus a `fetch-fixtures.sh` step
+with an `actions/cache`
 for the two gitignored Ewing files.
 
 **`docs/SPIKE_ANSWERS.md`** — answer all eight §11 questions plainly. Four are already settled and just need

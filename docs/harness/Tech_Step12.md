@@ -28,6 +28,8 @@ per-format golden can hide a bug that affects both the Java reader and — becau
 the same Python loader — nothing at all. Comparing two formats of the same data has no such blind spot.
 
 Governing sections: [`SPIKE.md`](SPIKE.md) §6b layers 2–4, §3 (the population table), §7 Step 2 done-criteria, §11.
+(Both `SPIKE.md` and [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md) live in this repo under
+`docs/harness/` since [C41](Tech_Step_INDEX.md#c41); the paths cited below are in-repo.)
 
 ## Scope
 
@@ -208,8 +210,27 @@ rule ([Step 7](Tech_Step7.md)), where all 687 links are now verified.
 
 ### 3. Layer 4 — the CLI contract
 
-Drive `cli.Main` as a subprocess. **Two independent properties, deliberately tested separately**
-(Correction C25c) — the original version asserted both at once by reading data off the pipe, which made
+Drive `cli.Main` as a subprocess.
+
+> ⚠ **How the JVM is launched was never specified** (Correction **C43**). This section said "as a subprocess"
+> and stopped, leaving `CliContractIT` to invent a command — and the one [Step 11](Tech_Step11.md) documented
+> could not have worked, since it put only the thin SDK jar on the classpath. Use the CLI uber-jar, which
+> bundles `antlr4-runtime` and `javolution`:
+>
+> ```java
+> // `java.home` rather than a bare "java": the forked JVM must be the one running the test.
+> Path java = Paths.get(System.getProperty("java.home"), "bin", "java");
+> Path cliJar = TestPaths.repositoryRoot().resolve("cli/build/libs")   // built by :cli:shadowJar
+>         .resolve("massql-java-cli-" + System.getProperty("cliVersion") + ".jar");
+> new ProcessBuilder(java.toString(), "-jar", cliJar.toString(),
+>                    spectra.toString(), query.toString(), "--output", out.toString())
+> ```
+>
+> The IT lives in `cli/src/integrationTest/java` and must depend on `:cli:shadowJar`, so the jar it forks is
+> guaranteed to exist and to be current. A test that silently skips because the jar is absent would reproduce
+> exactly the C26 failure.
+
+**Two independent properties, deliberately tested separately** (Correction C25c) — the original version asserted both at once by reading data off the pipe, which made
 a stream-hygiene regression present as a data mismatch and vice versa.
 
 **(a) Functional correctness — read the result from `--output FILE`, not the pipe.** Point `--output` at

@@ -329,7 +329,18 @@ while IFS=: read -r lineno corr; do
     ' "$INDEX")
 
     num=${corr#C}
-    decl=$(printf '%s\n' "$body" | grep -oiE '^>? *\*\*Fallout:\*\*.*' | head -1 || true)
+    # A Fallout declaration may WRAP across lines. Taking only the first line silently dropped every
+    # spec after the wrap -- the check then reported "all cite back" while validating a subset, which
+    # is precisely the vacuous-guard failure this script exists to prevent (C26). Found when C43
+    # declared 13 specs across two lines and 7 of them went unchecked.
+    #
+    # So: take the Fallout line and every following line until the first blank one, and flatten.
+    decl=$(printf '%s\n' "$body" | awk '
+        BEGIN { on = 0 }
+        !on && tolower($0) ~ /^>? *\*\*fallout:\*\*/ { on = 1; printf "%s ", $0; next }
+        on  && /^[[:space:]]*$/ { exit }
+        on  { printf "%s ", $0 }
+    ' || true)
 
     # ---- ratchet branch: C38+ must declare, and the declaration is what gets enforced.
     if [ "$num" -ge "$RATCHET_FROM" ]; then

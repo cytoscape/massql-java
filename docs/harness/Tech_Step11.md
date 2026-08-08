@@ -62,8 +62,8 @@ Governing sections: [`SPIKE.md`](SPIKE.md) §4.
 | Path | Content |
 |---|---|
 | `src/main/java/…/massql/Massql.java` | The **four** entry points (C42 — this said "three", omitting `executeWithDiagnostics`) |
-| `src/main/java/…/massql/cli/Main.java` | The CLI |
-| `src/test/java/…` — **all seven** classes named in *Tests required*: `MassqlApiTest`, `ApiEncapsulationTest`, `cli/MainTest`, `cli/MainStreamDisciplineTest`, `cli/MainOutputFileTest`, `cli/MainExitCodeTest`, `cli/MainNoStackTraceOnStdoutTest` | ⚠ This row listed **three** while *Tests required* names **seven** (Correction **C42**). `spec-audit` check 4 enforces the match the moment Done-when is ticked, so a name here that is never written fails the build — the C38 lesson |
+| `cli/src/main/java/…/massql/cli/Main.java` | The CLI. ⚠ **A separate Gradle project** (C43): it is versioned and released independently of the SDK, and because it depends on the SDK as an external project it can only compile against the **public API** — making the boundary `ApiEncapsulationTest` checks a compile error too |
+| `src/test/java/…` — `MassqlApiTest`, `ApiEncapsulationTest`; and `cli/src/test/java/…` — `MainTest`, `MainStreamDisciplineTest`, `MainOutputFileTest`, `MainExitCodeTest`, `MainNoStackTraceOnStdoutTest`. **All seven** are named in *Tests required* | ⚠ This row listed **three** while *Tests required* names **seven** (Correction **C42**). `spec-audit` check 4 enforces the match the moment Done-when is ticked, so a name here that is never written fails the build — the C38 lesson |
 | `docs/API.md` | The public surface, with the stability promise and a usage example |
 
 ## Specification
@@ -187,9 +187,14 @@ Do not make callers parse diagnostics out of a log they cannot see.
 Mirror `massql_query.py`'s interface, plus one addition:
 
 ```
-java -cp massql-java.jar edu.ucsd.idekerlab.massql.cli.Main \
+java -jar massql-java-cli-<version>.jar \
      <spectra-file> <query-file> [--precursor-tol-ppm 20] [--output FILE]
 ```
+
+> ⚠ **This replaces a command that could never have run** (Correction **C43**). The original form,
+> `java -cp massql-java.jar edu.ucsd.idekerlab.massql.cli.Main …`, puts only the thin SDK jar on the
+> classpath — no `antlr4-runtime`, no `javolution` — so it would fail at the first parse. `make cli` builds
+> the uber-jar (`./gradlew :cli:shadowJar`), which bundles both and is correct by construction.
 
 | Aspect | Requirement |
 |---|---|

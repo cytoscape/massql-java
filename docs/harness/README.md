@@ -40,26 +40,33 @@ by tests, so their paths are code:
 | [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) | the frozen 12-key result contract the Phase-2 app consumes and `MASSQL_PARSE` reads back. `ResultSchemaContractTest` parses it |
 | [`VENDORED.md`](../VENDORED.md) | the EPL-1.0 election and vendored-code provenance a redistributor needs. `VendoredProvenanceTest` asserts it |
 
-## Building and testing — `make` only, never `mvn`
+## Building and testing — `make` only, never `./gradlew`
 
 **The `Makefile` is the only entry point.** `make` with no argument lists every target. CI and
 `release.yml` call the same targets, so what you run locally and what runs on a push cannot drift.
 
+The build produces **two independently versioned artifacts** (`gradle.properties`): `massql-java`, the thin SDK
+jar `massql-app` embeds, and `massql-java-cli`, a standalone uber-jar. Neither version forces the other.
+
 | | |
 |---|---|
-| `make build` | compile and package the jar |
-| `make test` | unit tests only (surefire, `*Test.java`) — seconds, for the edit loop |
-| `make it` | integration tests only (failsafe, `*IT.java`), **skipping** the unit suite — the fast way to re-check a gate |
-| `make verify` | the review entry point: unit + integration + JaCoCo + enforcer, then `skipcheck` and `audit` |
-| `make skipcheck` | asserts tests ran **and none were skipped** (Correction C26) |
-| `make audit` | regenerate `dependency-audit.txt` and check the ~1.5 MB budget |
+| `make build` | compile and package both jars |
+| `make test` | unit tests only (`src/test`, `*Test.java`) — seconds, for the edit loop |
+| `make it` | integration tests only (`src/integrationTest`, `*IT.java`) — the fast way to re-check a gate |
+| `make verify` | the review entry point: unit + integration + coverage gate + lint + banned deps, then `audit` and `spec-audit` |
+| `make lint` / `make lint-fix` | Spotless — report / fix. The config **is** the style specification; there is no style document |
+| `make coverage` | JaCoCo report. The 90% instruction gate runs inside `make verify` |
+| `make cli` | build the standalone CLI uber-jar |
+| `make audit` | regenerate `dependency-audit.txt` and check the ~1.5 MB SDK budget |
 | `make fixtures` | download the two gitignored Ewing-lab fixtures |
 | `make test-one T=X` / `make it-one T=X` | a single suite |
+| `make set-version-sdk V=` / `make set-version-cli V=` | stamp one artifact's version |
+| `make publish-sdk` / `make publish-cli` | publish one artifact to the nexus |
 
-**If you need something `make` does not do, add a target** — do not reach for `mvn`. A one-off
+**If you need something `make` does not do, add a target** — do not reach for `./gradlew`. A one-off
 invocation is how the ad-hoc commands that prompted this file came to diverge from CI in the first
-place. `mvn` appears in these specs only where it *describes the mechanism* a target wraps (the
-surefire/failsafe split in [Step 3](Tech_Step3.md)) or in a completed step's record of what was run.
+place. `mvn` still appears in completed steps' records of what was run at the time; that is history and is
+left alone. Anywhere it *describes how the build works today*, it has been corrected to Gradle.
 
 ## ⚠ Two locations, and only one of them matters for reading
 
@@ -85,7 +92,7 @@ Paths in the specs resolve like this:
 
 | Path form in a spec | Where it actually lives |
 |---|---|
-| `src/main/java/…`, `docs/…`, `pom.xml` | **this repo** |
+| `src/main/java/…`, `docs/…`, `build.gradle` | **this repo** |
 | `data/…`, `fixtures/…`, `goldens/…`, `reference_parses/…` | **this repo**, under `src/test/resources/` (C26) |
 | [`oracle/PINNED.md`](oracle/PINNED.md), [`oracle/msql.ebnf`](oracle/msql.ebnf) and siblings | **this repo**, `docs/harness/oracle/` (C41 — these were in the oracle directory until then) |
 | `output/…` (where goldens are *generated*) | the oracle directory; the committed copies are `src/test/resources/goldens/query-results/` |

@@ -267,7 +267,8 @@ Known expected counts, for a fast sanity read: `small.mzML` and `small.mzXML` �
 > ⚠ **Correction C26 reverses what this paragraph used to say.** It required gitignored fixtures to
 > **skip with a clear message** when absent. That is exactly how this suite came to prove nothing: the
 > fixtures lived outside the repo, CI never had them, and *every* parity assertion skipped while the
-> test counter stayed healthy (surefire counts skips inside "Tests run").
+> test counter stayed healthy — a skipped test still counts as one that ran. The guard is now the 90% coverage
+> gate ([C43](Tech_Step_INDEX.md#c43)); a test that stops running shows up as lost coverage.
 
 Fixtures are **committed to this repository** under `src/test/resources/`, and a missing fixture is a
 **hard failure** — `Fixtures.require` throws, there is no skip path, and `FixturesContractTest` asserts

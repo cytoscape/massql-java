@@ -6,8 +6,9 @@ This file exists because of **Correction C26**: fixtures used to live in a sibli
 directory outside this repository, and `Fixtures.require` gated on `Assumptions.assumeTrue`. CI checks
 out only `massql-java`, so that directory never existed there and **every fixture-dependent test
 skipped silently** — the oracle cross-checks, the Step 8 parity assertions, and
-`Ms1ScanDocumentOrderIT`. Surefire counts skips inside "Tests run", so the CI test-count guard could not
-see it. CI was green for four steps while proving only that the code compiled.
+`Ms1ScanDocumentOrderIT`. A skipped test still counts as a test that ran, so the CI test-count guard could
+not see it. CI was green for four steps while proving only that the code compiled. That guard is now the 90%
+coverage gate ([C43](Tech_Step_INDEX.md#c43)), which needs no hand-maintained count.
 
 ## Layout
 

@@ -4,10 +4,13 @@ build/
 cli/build/
 .gradle/
 
-# Maven's output directory. Still ignored while pom.xml exists, so a `mvn` run during the
-# Gradle transition cannot dump 656 untracked files into `git status`. Remove this line in the
-# same commit that deletes pom.xml.
+# Maven is gone (pom.xml was deleted with the Gradle migration), but this stays ignored: IDE Java
+# language servers that imported this project as a Maven module keep compiling into target/classes
+# and target/test-classes from their own cached config, which lives outside the repo and does not
+# notice that pom.xml disappeared. Re-importing the project as Gradle stops it; until every
+# developer has done that, an unignored target/ dumps ~140 untracked files into `git status`.
 target/
+
 
 # The wrapper script and JAR ARE committed, deliberately: `./gradlew` must work in a fresh
 # checkout. That is what lets the Makefile be the only entry point and CI use the same Gradle

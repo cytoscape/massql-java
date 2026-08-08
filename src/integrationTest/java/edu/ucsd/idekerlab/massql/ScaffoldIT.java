@@ -5,14 +5,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 /**
- * Proves failsafe is actually bound and running. Easy to get silently wrong: if the
- * *IT.java include pattern or the failsafe executions block is misconfigured, `mvn verify`
- * passes while running zero integration tests -- and every later gate lives in an *IT.
+ * Proves the {@code integrationTest} suite is actually wired and running.
+ *
+ * <p>Easy to get silently wrong: if the JVM Test Suite block in {@code build.gradle} is
+ * misconfigured, or {@code check} stops depending on it, the build passes while running zero
+ * integration tests — and every later gate lives in an {@code *IT}.
+ *
+ * <p>Under Maven this asserted the same thing about the failsafe plugin. The mechanism changed with
+ * the Gradle migration; the failure it guards against did not.
  */
 class ScaffoldIT {
 
     @Test
-    void failsafeIsWired() {
+    void theIntegrationTestSuiteIsWired() {
         assertTrue(true);
     }
 }

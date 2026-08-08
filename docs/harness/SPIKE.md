@@ -17,7 +17,7 @@ pure-Java MassQL SDK works. **Then stop for manual review** before any Cytoscape
 
 **Why this split is the right call:** `massql-java` physically cannot compile against Cytoscape because
 Cytoscape isn't on its classpath. That compile-time firewall is the only thing that reliably keeps
-`org.cytoscape` imports out of engine code. It also means the entire spike is verified with `mvn verify`
+`org.cytoscape` imports out of engine code. It also means the entire spike is verified with `make verify`
 and a shell command — no Cytoscape, no OSGi, no 84 MB log files, no bundle resolution debugging.
 A pure-Java MassQL SDK is also independently useful (there is currently **no** Java MassQL implementation
 anywhere — verified), so it deserves to be its own artifact rather than buried in an app.
@@ -27,7 +27,7 @@ anywhere — verified), so it deserves to be its own artifact rather than buried
    value beyond Cytoscape (MZmine, GNPS tooling) and might belong somewhere more neutral.
 2. **How does `massql-app` consume it?** Publish to the Cytoscape nexus
    (`nrnb-nexus.ucsd.edu/repository/cytoscape_releases`) — what the existing Cytoscape repos already
-   resolve against — or Maven Central for wider reach. `mvn install` to `~/.m2` is fine for the spike, but
+   resolve against — or Maven Central for wider reach. Publishing to a local repo is fine for the spike, but
    Phase 2 needs a real answer.
 
 ---
@@ -170,7 +170,7 @@ The public API is the contract with `massql-app`, so design it deliberately — 
 
 ```
 massql-java/                          packaging=jar, <release>17</release>
-  src/main/antlr4/…/Massql.g4          NOT in src/main/resources (see §9)
+  src/main/antlr/…/Massql.g4           NOT in src/main/resources (see §9)
   src/main/java/…/massql/
     Massql.java              ← public entry point
     MassqlOptions.java       ← precursorTolPpm (default 20.0), future knobs
@@ -285,7 +285,7 @@ Verification lives in `massql-java` from day one, not bolted on at the end. Two 
 **unit tests pin semantics** and run in milliseconds; **integration tests prove the whole pipeline** against
 real files in all three formats and diff against the Python goldens.
 
-### 6a. Unit tests — `*Test.java`, JUnit 5, `mvn test`
+### 6a. Unit tests — `*Test.java`, JUnit 5, `make test`
 
 | Area | What gets pinned |
 |---|---|
@@ -307,7 +307,7 @@ real files in all three formats and diff against the Python goldens.
 values computable by hand. When a tolerance test fails on a 4-peak spectrum you can see why; on a
 34,000-spectrum file you cannot.
 
-### 6b. Integration tests — `*IT.java`, failsafe, `mvn verify`
+### 6b. Integration tests — `*IT.java`, its own source set, `make it`
 
 Four layers, **each run against all three formats**:
 
@@ -409,13 +409,13 @@ golden belongs to the full file. Or commit the full 14 MB and skip this; it's re
 ### 6d. Build wiring
 
 - JUnit 5 (`junit-jupiter`), **test scope only** — never leaks into the artifact `massql-app` embeds.
-- Split fast from slow: unit tests via surefire (`mvn test`), integration tests via failsafe on `*IT.java`
-  (`mvn verify`). The reviewer runs `mvn verify`.
+- Split fast from slow: unit tests in `src/test` (`make test`), integration tests in `src/integrationTest`
+  on `*IT.java` (`make it`). The reviewer runs `make verify`, which runs both.
 - **No network in any test.** The 47 golden parses are checked-in files, never live calls to
   `massql.gnps2.org/parse`. Flaky CI destroys the credibility of a conformance number.
-- `make verify` wraps `mvn verify` plus the three differential comparisons and prints a **pass/fail table
+- `make verify` wraps `gradle check` plus the three differential comparisons and prints a **pass/fail table
   per format**. That table is the review artifact.
-- CI (GitHub Actions, JDK 17): `mvn verify` on push/PR. No display needed — nothing here touches AWT.
+- CI (GitHub Actions, JDK 17): `make verify` on push/PR. No display needed — nothing here touches AWT.
 
 ---
 
@@ -459,7 +459,7 @@ ANTLR auto-rewrites the direct left recursion. Two gotchas worth a day if you hi
 Write the §6a parser rows as you go: conformance, rejection, case matrix.
 
 **Done when:** all `scaninfo` goldens parse to an equivalent AST; every other golden parses or rejects
-cleanly with a named construct; `mvn test` green.
+cleanly with a named construct; `make test` green.
 **Escape hatch:** `https://massql.gnps2.org/parse?query=...` returns the canonical AST as JSON (verified
 live). Parse remotely, execute locally — removes all parser risk but adds a network dependency to an SDK
 that should work offline. Price it only if the grammar fights back.
@@ -490,7 +490,7 @@ Order within the step matters:
 4. **`cli/Main`**, then integration layers 2–4 (differential, cross-format equivalence, CLI contract) and
    the error-path tests.
 
-**Done when:** `mvn verify` is green and the differential table reads **6/6 on `small.mzML`, 664/664 (or
+**Done when:** `make verify` is green and the differential table reads **6/6 on `small.mzML`, 664/664 (or
 the trimmed count) on the MGF, and the full mzXML golden** — per column. Record wall-clock and peak heap; if
 Java isn't at least as fast as pandas on the MGF, something is quadratic (probably a linear scan where a
 binary search belongs).
@@ -503,7 +503,7 @@ What makes the repo reviewable rather than just working.
   12-key result contract, the three format-population rules from §3, CLI usage, and how to run `make verify`.
 - **`make verify`** printing the per-format pass/fail table. The reviewer should not have to reconstruct how
   to validate the thing.
-- **Dependency audit checked in** — `mvn dependency:tree` after exclusions, with total byte size. This is
+- **Dependency audit checked in** — the SDK runtime closure after exclusions, with total byte size. This is
   the artifact that answers "did dependency complexity stay bounded?"
 - **OSGi-readiness assertions** (§9) as a scripted check, so Phase 2 isn't a surprise.
 - **Coverage report** (JaCoCo) — not as a target to game, but so the reviewer can see which of the §3 rules
@@ -559,11 +559,11 @@ them with a scripted check in Step 3:
   diagnostics and let the caller log. Sidesteps a real conflict (`cy-ndex-2` embeds slf4j+logback while
   cytoscape-mcp deliberately excludes `org/slf4j/**`).
 - **Under ~1.5 MB of embedded dependencies** after the §5 exclusions.
-- **`<release>17</release>`** — matches Cytoscape 3.10.4's parent pom.
-- Put the `.g4` in **`src/main/antlr4/`, never `src/main/resources/`** — Cytoscape app poms set
+- **Java 17** — matches Cytoscape 3.10.4's parent pom. (The build is Gradle since
+  [C43](Tech_Step_INDEX.md#c43); §6d's Maven wording was updated with it.)
+- Put the `.g4` in **`src/main/antlr/`, never `src/main/resources/`** — Cytoscape app poms set
   `<filtering>true</filtering>` on resources and a grammar containing `${...}` gets silently corrupted. Also
-  confirm any formatter (Spotless, bound to the `test` phase in `open-cyweb`) excludes
-  `target/generated-sources/`.
+  confirm the formatter (Spotless) excludes the generated-source directory.
 - **Close your file handles.** MSDK memory-maps files, so `SpectraFile` must be `AutoCloseable` and the app's
   `shutDown()` will depend on it. Add an integration test that opens and closes many files without leaking.
 
@@ -585,7 +585,7 @@ verification; a dialog with file chooser, query name, scan-column selector and q
 `ResultToNodeTable` writing the 12-key JSON into `massql _<query name>` joined on scan (watch for graphml
 typing `scan` as String while results carry Integer — the most likely real bug there); and
 `MassqlParseFunction extends AbstractFunction` registered as `org.cytoscape.equations.Function`
-(`org.cytoscape:equations-api:3.10.4` is in `~/.m2` — verified). `massql-java` arrives as a nested jar on
+(`org.cytoscape:equations-api:3.10.4` is in the local Maven repo — verified). `massql-java` arrives as a nested jar on
 `Bundle-ClassPath` via `Embed-Dependency`, the normal pattern (`cy-ndex-2-3.7.3.jar` nests 26 of them).
 
 ---

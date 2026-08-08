@@ -14,7 +14,7 @@ import org.opentest4j.TestAbortedException;
  * {@code ../massql} directory and gated on {@code Assumptions.assumeTrue}. CI checks out only
  * {@code massql-java}, so that directory never existed there and every fixture-dependent test — the
  * oracle cross-checks, the Step 8 parity assertions, {@code Ms1ScanDocumentOrderIT} — <b>skipped</b>.
- * Surefire counts skips inside "Tests run", so the CI test-count guard could not see it. CI was green
+ * A skipped test still counts as one that ran, so the CI test-count guard could not see it. CI was green
  * and proved only that the code compiled.
  *
  * <p>The fix is easy to undo by accident: one {@code assumeTrue} added to "make CI pass" restores the

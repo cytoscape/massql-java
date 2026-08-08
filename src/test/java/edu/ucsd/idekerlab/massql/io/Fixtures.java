@@ -14,8 +14,8 @@ import java.nio.file.Paths;
  * one was gated with {@code Assumptions.assumeTrue} — a <b>skip</b>. But {@code ci.yml} checks out only
  * {@code massql-java}, so {@code ../massql} never existed in CI: Step 6's oracle cross-check, Step 8's
  * bit-identity parity and {@code Ms1ScanDocumentOrderIT} — the assertion Step 7 exists for — all skipped
- * silently. Surefire counts skips inside "Tests run", so the CI test-count guard could not see it either.
- * A green build proved only that the code compiled.
+ * silently. A skipped test still counts as one that ran, so the CI test-count guard could not see it
+ * either. A green build proved only that the code compiled.
  *
  * <p>So: fixtures are committed here, and a missing fixture is a <b>hard failure</b>. There is no skip
  * path. If you are tempted to add one, re-read the paragraph above.

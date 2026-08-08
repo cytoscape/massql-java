@@ -6,8 +6,8 @@ nested jar on `Bundle-ClassPath`, and the failure modes there are expensive to d
 Each rule states its **failure mechanism**. A rule without one gets bumped by the next person who finds it
 inconvenient — which is exactly how this project nearly shipped Guava (see §Guava below).
 
-Most of these are enforced by `maven-enforcer-plugin` at the `validate` phase, so **the build fails rather than
-the bundle**. `scripts/check-osgi-readiness.sh` (Tech_Step13) checks the rest against the packaged artifact.
+Most of these are enforced by the `checkBannedDependencies` task in `build.gradle`, wired into `check`, so
+**the build fails rather than the bundle**. `scripts/check-osgi-readiness.sh` (Tech_Step13) checks the rest against the packaged artifact.
 
 ---
 
@@ -19,19 +19,21 @@ cytoscape-mcp hit this twice — Lucene and the MCP SDK.
 *Consequence for us:* we cannot use `javax.xml.stream.XMLInputFactory`, which is why `javolution` is a
 dependency at all — the vendored parsers instantiate `javolution.xml.internal.stream.XMLStreamReaderImpl`
 **directly**. Instantiating the JDK's internal implementation by name would need `Class.forName`, also banned.
-*Enforced:* enforcer bans known offenders; the readiness script unpacks the closure and greps.
+*Enforced:* the banned-dependency rule rejects known offenders; the readiness script unpacks the closure and
+greps.
 
 **2. No logging framework. The SDK logs nothing at all.**
 Return diagnostics to the caller and let them log. `cy-ndex-2` embeds slf4j+logback while cytoscape-mcp
 deliberately excludes `org/slf4j/**`; do not add to that conflict. Note slf4j **2.x** switched to
 `ServiceLoader`, so a future "harmless" logging addition would breach constraint 1 as well.
-*Enforced:* enforcer bans `org.slf4j:*` and `ch.qos.logback:*`.
+*Enforced:* the banned-dependency rule rejects `org.slf4j:*` and `ch.qos.logback:*`.
 
 **3. No JAXB, no native code, no `sun.misc.Unsafe`.**
 JAXB is not in the JDK from 11 onward and drags a provider-lookup stack. Native libraries cannot be loaded
 from inside a nested jar. `Unsafe` needs JVM flags we do not control.
 *Note:* MSDK's mzXML pom declares JAXB but the code only touches `javax.xml.datatype`, still in the JDK on 17.
-*Enforced:* enforcer bans the JAXB coordinates; readiness script scans for `.so`/`.dylib`/`.dll` and `Unsafe`.
+*Enforced:* the banned-dependency rule rejects the JAXB coordinates; the readiness script scans for
+`.so`/`.dylib`/`.dll` and `Unsafe`.
 
 **4. No `META-INF/versions/**` (multi-release jars) in the shipping closure.**
 They break Felix resolution on Cytoscape 3.10.x.
@@ -46,7 +48,7 @@ the check must be scoped to compile+runtime and never to test.
 `dependency-audit.txt`. This is the one constraint with no hard failure mechanism; it is a bloat guideline. Do
 not let that make it feel negotiable, because the artifacts that blow it tend to breach constraints 1–5 too.
 
-**7. `<release>17</release>`.** Matches Cytoscape 3.10.4's parent pom. Class file major version ≤ 61.
+**7. Java 17.** Matches Cytoscape 3.10.4's parent pom. Class file major version ≤ 61.
 
 **8. No network access in any test.** The 46 parse goldens are checked-in files; never call
 `massql.gnps2.org/parse` from a test. Flaky CI destroys the credibility of a conformance number.
@@ -68,6 +70,23 @@ Both audited 2026-07-30: zero `META-INF/services`, zero `META-INF/versions`, zer
 is a proper OSGi bundle with a unique symbolic name, and nothing else in Cytoscape provides `javolution.*`, so
 there is no split package or version conflict. Its `org.osgi.core` dependency is not compile-scope and does not
 enter the closure.
+
+### ⛔ A build tool is not a dependency
+
+*Added by [C43](docs/harness/Tech_Step_INDEX.md#c43), with the Maven → Gradle migration.*
+
+`org.antlr:antlr4` — the **code generator** — must never reach the shipping closure. Only `antlr4-runtime`
+does, and the two are not interchangeable: the generator drags `ST4`, `antlr-runtime` **3.x** (a second major
+version beside our 4.x), `treelayout` and `com.ibm.icu:icu4j`, whose **14.4 MB** alone is nine times this
+entire closure. Measured total: **15.44 MB, ~21× the constraint 6 budget**.
+
+This is not hypothetical. Gradle's `antlr` plugin makes the compile and runtime configurations `extendsFrom`
+the tool configuration, so it happens *by default*; `build.gradle` severs that inheritance explicitly. It could
+not occur under Maven, where a `<plugin>`'s dependencies live in the plugin's own classloader — it became
+possible only with the Gradle migration.
+
+`dependency-audit.txt` names all five artifacts as ones that must not appear, so removing the severing surfaces
+as a failing `make audit` rather than a jar that quietly grew.
 
 ## MSDK is a vendoring source, not a dependency
 
@@ -110,9 +129,10 @@ Before adding anything, in this order:
    `py_expression_eval` all became ordinary Java. Assume the same until proven otherwise.
 2. **Unpack the jar and check constraints 1, 3, 4, 5** — do not trust the pom. The Guava finding came from
    reading `MsScan.java`, not from a dependency tree.
-3. **Trace it transitively.** Guava arrives via `msdk-datamodel`, not via the artifact you name. `mvn
-   dependency:tree -Dverbose` and read the whole thing.
+3. **Trace it transitively.** Guava arrives via `msdk-datamodel`, not via the artifact you name. Run
+   `./gradlew dependencies --configuration runtimeClasspath` and read the whole thing.
 4. **Check what Cytoscape already exports, and at what version.** A package the framework provides at an
    incompatible version is worse than one it does not provide at all.
-5. **Add an enforcer rule** for whatever you decided to keep out, so the decision survives you.
+5. **Add it to `bannedDependencies`** in `build.gradle` for whatever you decided to keep out, so the decision
+   survives you.
 6. **Regenerate `dependency-audit.txt`** (`make audit`) and commit it.

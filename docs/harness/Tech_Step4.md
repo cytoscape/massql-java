@@ -10,7 +10,7 @@ reference parse corpus.
 
 | Step | Why |
 |---|---|
-| [Step 3](Tech_Step3.md) | Provides the Maven build with the ANTLR plugin wired, `src/main/antlr4/` in place, and `MassqlParseException` with its `construct()` contract. |
+| [Step 3](Tech_Step3.md) | Provides the build with the ANTLR plugin wired, `src/main/antlr/` in place ([C43](Tech_Step_INDEX.md#c43) moved it from `src/main/antlr4/` with the Gradle migration), and `MassqlParseException` with its `construct()` contract. |
 | [Step 1](Tech_Step1.md) | Provides [`msql.ebnf`](oracle/msql.ebnf) — now in-repo at `docs/harness/oracle/` (Correction **C41**), previously the oracle working directory — (the translation source, **165 lines** — confirmed) and `oracle/reference_parses/` (the conformance corpus: **46 files — 35 `scaninfo`, 11 non-`scaninfo`**. Note [`SPIKE.md`](SPIKE.md) says 47; 46 is the measured count at the pinned SHA and is authoritative). |
 
 ## Context
@@ -48,7 +48,7 @@ Governing sections: [`SPIKE.md`](SPIKE.md) §6a (parser rows), §7 Step 1, §8 (
 
 | Path | Content |
 |---|---|
-| `src/main/antlr4/…/massql/lang/Massql.g4` | The grammar |
+| `src/main/antlr/…/massql/lang/Massql.g4` | The grammar |
 | `src/main/java/…/massql/lang/ast/*.java` | Typed AST records |
 | `src/main/java/…/massql/lang/AstBuilder.java` | ANTLR visitor → AST |
 | `src/main/java/…/massql/lang/UnsupportedConstructs.java` | The reject list, in one place |

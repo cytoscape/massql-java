@@ -342,7 +342,7 @@ the original row records what was *asked for*, and losing it is how a real gap g
 | `MgfPopulationTest` | → `ScaninfoCollationTest` | `charge = 1` never null (C6); every `ms1_*` null; and `rt` **per row** — `micro.mgf` carries `RTINSECONDS` on 2 of 3 blocks, so it exercises both the absent→`0.0` rule and the seconds÷60 conversion. ⚠ A first draft of this test asserted `rt == 0.0` for *every* row and failed against correct code; the golden was right |
 | `ResultJsonShapeTest` | → `ResultJsonTest` | the 12 keys in order for **both** levels; MS1 precursor keys **present and null**; MS1 base peaks **non-null** |
 | `ResultJsonRoundTripTest` | → `ResultJsonTest` | `everyEmittedFloatParsesBackToIDENTICALBITS`, over subnormals, `1e300`, `0.1+0.2` and the golden's `rt` |
-| `CollationAnchorTest` | → **`CollationAnchorIT`** | promoted to an **integration test**: it reads the real `data/small.mzML` and its committed goldens, which is failsafe's job, not surefire's. Asserts the first golden record field by field at **both** 20 and 60 ppm |
+| `CollationAnchorTest` | → **`CollationAnchorIT`** | promoted to an **integration test**: it reads the real `data/small.mzML` and its committed goldens, which belongs in the `integrationTest` suite, not the unit suite ([C43](Tech_Step_INDEX.md#c43) made that a separate Gradle source set, `src/integrationTest/java`). Asserts the first golden record field by field at **both** 20 and 60 ppm |
 | — | **`ResultSchemaContractTest`** *(new)* | parses [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) and asserts `ResultJson`'s key order matches. **Demonstrated to fail** when two keys are swapped in the document |
 
 ## Done when
