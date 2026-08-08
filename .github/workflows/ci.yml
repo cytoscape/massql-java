@@ -2,13 +2,13 @@
 #
 # Modelled on ../cy-ndex-2/.github/workflows/ci.yml, with four deliberate differences:
 #
-#   0. Every step calls `make`, never `mvn`. The Makefile is the only entry point, so what CI
-#      runs and what a developer runs cannot drift — and a guard like the zero-skip assertion
-#      lives in a target that is runnable locally rather than only here.
-#   1. `make verify` wraps `mvn verify`, NOT `mvn test`. cy-ndex-2 runs `mvn test`, which
-#      invokes surefire only. All three of this spike's gates live in *IT.java files run by
-#      failsafe (reader parity, the differential, the CLI contract), so a test-only run would
-#      report green while skipping every gate.
+#   0. Every step calls `make`, never `./gradlew`. The Makefile is the only entry point, so what
+#      CI runs and what a developer runs cannot drift — and a guard like the coverage gate is
+#      reachable locally rather than only here.
+#   1. `make verify` runs `gradle check`, NOT just `gradle test`. All three of this spike's gates
+#      live in *IT.java files run by the separate integrationTest suite (reader parity, the
+#      differential, the CLI contract), so a unit-test-only run would report green while
+#      skipping every gate.
 #   2. JDK 17, not 11 — DEPENDENCY_POLICY.md constraint 7 (matches Cytoscape 3.10.4).
 #   3. No `xvfb-run`. cy-ndex-2 needs a virtual display because Cytoscape touches AWT;
 #      nothing in massql-java does (SPIKE.md §6d: "No display needed").
@@ -33,7 +33,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'maven'
+          cache: 'gradle'
 
       # The two Ewing-lab fixtures are the only test data not committed: ewinglab.org states no
       # redistribution terms (Correction C26). Everything else lives in src/test/resources.
@@ -54,19 +54,17 @@ jobs:
       - name: Fetch uncommitted fixtures
         run: make fixtures
 
-      # Unit + integration tests, JaCoCo, the enforcer dependency bans (which run at the
-      # validate phase, so a banned dependency fails the build rather than the bundle), then
-      # `skipcheck` and `audit`.
+      # Unit + integration tests, Spotless, the banned-dependency rule and the 90% coverage gate,
+      # then the dependency audit and spec-audit.
       #
-      # `make verify` rather than `mvn -B verify`: the Makefile is the ONLY entry point, so what
-      # CI runs and what a developer runs cannot drift. The zero-skip assertion used to be
-      # duplicated inline here -- it now lives in `make skipcheck`, which means it is also
-      # runnable locally, which is the only way a guard like that actually gets used.
+      # `make verify` rather than `./gradlew check`: the Makefile is the ONLY entry point, so what
+      # CI runs and what a developer runs cannot drift.
       #
-      # What skipcheck guards (Correction C26): fixtures once lived outside the repo and
-      # Fixtures.require() used assumeTrue, so every parity assertion SKIPPED while the counter --
-      # which includes skips in "Tests run" -- stayed healthy. CI was green for four steps while
-      # proving only that the code compiled. It now asserts a floor AND zero skips.
+      # The coverage gate is what keeps a green build meaningful (Correction C26): fixtures once
+      # lived outside the repo and Fixtures.require() used assumeTrue, so every parity assertion
+      # SKIPPED while the test counter stayed healthy. CI was green for four steps while proving
+      # only that the code compiled. A test that stops running now shows up as lost coverage, with
+      # no hand-maintained count to rot.
       - name: Verify
         run: make verify
 
@@ -76,6 +74,8 @@ jobs:
         with:
           name: test-reports
           path: |
-            target/surefire-reports/
-            target/failsafe-reports/
+            build/test-results/
+            build/reports/
+            cli/build/test-results/
+            cli/build/reports/
           retention-days: 7

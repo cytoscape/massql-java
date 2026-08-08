@@ -57,6 +57,16 @@ class FormatSniffTest {
     }
 
     @Test
+    void textWithNoMarkupIsTreatedAsAPeakList(@TempDir Path dir) throws IOException {
+        // SpectraFile's documented last resort: no angle bracket anywhere means this cannot be
+        // either XML format, so it is assumed to be a peak list rather than rejected. That matters
+        // for an MGF whose BEGIN IONS sits beyond the 8 KB sniff window -- a long COM=/CHARGE=
+        // preamble would otherwise be classified as "unknown format" instead of being read.
+        Path p = write(dir, "headerless.dat", "COM=a very long preamble\nCHARGE=2+\n123.4 5678.9\n");
+        assertEquals(Format.MGF, SpectraFile.sniff(p));
+    }
+
+    @Test
     void unknownContentThrowsAndNamesTheFile(@TempDir Path dir) throws IOException {
         Path p = write(dir, "mystery.xml", "<?xml version=\"1.0\"?>\n<somethingElse><a/></somethingElse>");
         MassqlException e = assertThrows(MassqlException.class, () -> SpectraFile.sniff(p));

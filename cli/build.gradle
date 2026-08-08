@@ -1,0 +1,80 @@
+// massql-java-cli -- the standalone command-line wrapper, distributed as an uber-jar.
+//
+// Separate from the SDK for two reasons:
+//
+//   1. It is versioned and released independently (cliVersion in gradle.properties). A CLI fix
+//      does not force massql-app to resolve a new SDK coordinate, and vice versa.
+//   2. It can only compile against the SDK's PUBLIC API. The encapsulation boundary Tech_Step11
+//      cares about is therefore a compile error, not something a test has to catch.
+//
+// Shadow lives HERE and only here. Applied at the root it could make a fat jar the SDK's published
+// artifact, which would hand OSGi consumers a bundle with javolution baked inside.
+
+plugins {
+    id 'java'
+    id 'jacoco'
+    id 'maven-publish'
+    id 'com.gradleup.shadow' version '9.0.0-rc3'
+}
+
+group = 'edu.ucsd.idekerlab'
+version = cliVersion          // independent of sdkVersion
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-Xlint:all'
+}
+
+dependencies {
+    implementation project(':')
+    testImplementation "org.junit.jupiter:junit-jupiter:${rootProject.ext.junitVersion}"
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// The uber-jar IS this project's artifact, not a classified extra -- hence the empty classifier.
+// Bundles the SDK plus javolution and antlr4-runtime so `java -jar` works with no classpath.
+tasks.named('shadowJar') {
+    archiveBaseName = 'massql-java-cli'
+    archiveClassifier = ''
+    manifest {
+        attributes 'Main-Class': 'edu.ucsd.idekerlab.massql.cli.Main'
+    }
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.named('shadowJar')
+}
+
+publishing {
+    publications {
+        cli(MavenPublication) {
+            artifact tasks.named('shadowJar')
+            artifactId = 'massql-java-cli'
+            pom {
+                name = 'massql-java-cli'
+                description = 'Standalone MassQL command-line tool (uber-jar).'
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = 'cytoscape'
+            url = version.toString().endsWith('SNAPSHOT')
+                    ? 'https://nrnb-nexus.ucsd.edu/repository/cytoscape_snapshots/'
+                    : 'https://nrnb-nexus.ucsd.edu/repository/cytoscape_releases/'
+            credentials {
+                username = System.getenv('REPO_USER')
+                password = System.getenv('REPO_PWD')
+            }
+        }
+    }
+}

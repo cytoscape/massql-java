@@ -1,22 +1,20 @@
 # massql-java — the ONLY entry point for building and testing.
 #
-# Do not invoke `mvn` directly. Every command a developer or CI runs has a target here, so
+# Do not invoke `gradlew` directly. Every command a developer or CI runs has a target here, so
 # "build", "test" and "verify" mean one thing in a terminal, in the docs and in CI. If you
-# need something this file does not do, ADD A TARGET rather than running maven by hand.
+# need something this file does not do, ADD A TARGET rather than running Gradle by hand.
 #
-# `make verify` is the review entry point (Tech_Step13 §3). Filled in early, at Step 9,
-# because ad-hoc `mvn` invocations had already started to diverge from what CI ran.
+# `make verify` is the review entry point (Tech_Step13 §3).
+#
+# Two artifacts, versioned INDEPENDENTLY (gradle.properties):
+#   massql-java       the SDK, the thin jar massql-app embeds  -> make publish-sdk
+#   massql-java-cli   the standalone CLI uber-jar              -> make publish-cli
 
-MVN := mvn -B
-JAR := target/massql-java-0.1.0-SNAPSHOT.jar
-
-# Minimum tests expected to execute. A run below this means suites are not being discovered,
-# which is how a green build can prove nothing (Correction C26).
-MIN_TESTS := 539
+GRADLE := ./gradlew --console=plain
 
 .DEFAULT_GOAL := help
-.PHONY: help all build test it verify skipcheck audit spec-audit fixtures report clean \
-        test-one it-one set-version deploy
+.PHONY: help all build test it verify lint lint-fix coverage cli audit spec-audit fixtures \
+        report clean test-one it-one set-version-sdk set-version-cli publish-sdk publish-cli
 
 ## help: list the targets (default)
 help:
@@ -26,58 +24,49 @@ help:
 	@echo
 	@echo "  Single suites:  make test-one T=MgfReaderTest     make it-one T=ReaderParityIT"
 	@echo
-	@echo "  Never run mvn directly — add a target instead."
+	@echo "  Never run ./gradlew directly — add a target instead."
 
 ## all: alias for verify
 all: verify
 
-## build: compile and package the jar
+## build: compile and package both jars
 build:
-	$(MVN) package -DskipTests
-	@echo "  -> $(JAR)"
+	$(GRADLE) assemble
+	@ls -1 build/libs/*.jar cli/build/libs/*.jar 2>/dev/null | sed 's/^/  -> /'
 
-## test: unit tests only (surefire, *Test.java). Seconds, for the edit loop.
+## test: unit tests only (*Test.java in src/test). Seconds, for the edit loop.
 test:
-	$(MVN) test
+	$(GRADLE) test
 
-## it: integration tests only (failsafe, *IT.java), skipping the unit suite. Fast gate re-check.
+## it: integration tests only (*IT.java in src/integrationTest). Fast gate re-check.
 it:
-	$(MVN) test-compile failsafe:integration-test failsafe:verify
+	$(GRADLE) integrationTest
 
-## verify: unit + integration + JaCoCo + enforcer, then skipcheck, audit and spec-audit. What the reviewer runs.
+## verify: unit + integration + coverage gate + lint + banned deps, then audit and spec-audit. What the reviewer runs.
 verify:
-	$(MVN) verify
-	@$(MAKE) --no-print-directory skipcheck
+	$(GRADLE) check
 	@$(MAKE) --no-print-directory audit
 	@$(MAKE) --no-print-directory spec-audit
 
-## skipcheck: assert tests ran and NOTHING was skipped (Correction C26)
-skipcheck:
-	@set -eu; \
-	total=0; skipped=0; \
-	for f in target/surefire-reports/*.txt target/failsafe-reports/*.txt; do \
-	  [ -e "$$f" ] || continue; \
-	  line=$$(grep -ohE 'Tests run: [0-9]+, Failures: [0-9]+, Errors: [0-9]+, Skipped: [0-9]+' "$$f" | head -1 || true); \
-	  if [ -z "$$line" ]; then continue; fi; \
-	  n=$$(printf '%s' "$$line" | sed -E 's/Tests run: ([0-9]+).*/\1/'); \
-	  s=$$(printf '%s' "$$line" | sed -E 's/.*Skipped: ([0-9]+).*/\1/'); \
-	  total=$$((total + n)); skipped=$$((skipped + s)); \
-	done; \
-	echo "  tests executed: $$total (skipped: $$skipped)"; \
-	if [ "$$total" -lt $(MIN_TESTS) ]; then \
-	  echo "  FAIL: only $$total tests ran, expected at least $(MIN_TESTS)." >&2; \
-	  echo "        Suites are not being discovered — a green run here proves nothing." >&2; \
-	  exit 1; \
-	fi; \
-	if [ "$$skipped" -ne 0 ]; then \
-	  echo "  FAIL: $$skipped test(s) skipped." >&2; \
-	  echo "        Under C26 a missing fixture must FAIL, so a skip means an assumeTrue or" >&2; \
-	  echo "        @Disabled was reintroduced. Offending suites:" >&2; \
-	  grep -l 'Skipped: [1-9]' target/surefire-reports/*.txt target/failsafe-reports/*.txt 2>/dev/null >&2 || true; \
-	  exit 1; \
-	fi
+## lint: report style violations (Spotless is the whole style specification)
+lint:
+	$(GRADLE) spotlessCheck
 
-## audit: regenerate dependency-audit.txt and check the size budget
+## lint-fix: fix them
+lint-fix:
+	$(GRADLE) spotlessApply
+
+## coverage: write the JaCoCo report (build/reports/jacoco/test/html/index.html)
+coverage:
+	$(GRADLE) jacocoTestReport
+	@echo "  -> build/reports/jacoco/test/html/index.html"
+
+## cli: build the standalone CLI uber-jar
+cli:
+	$(GRADLE) :cli:shadowJar
+	@ls -1 cli/build/libs/*.jar | sed 's/^/  -> /'
+
+## audit: regenerate dependency-audit.txt and check the SDK size budget
 audit:
 	@bash scripts/dependency-audit.sh
 
@@ -101,24 +90,40 @@ report:
 
 ## clean: remove build output
 clean:
-	$(MVN) clean
+	$(GRADLE) clean
 
-## set-version: stamp the pom version, e.g. make set-version V=1.2.3 (release.yml)
-set-version:
-	@[ -n "$(V)" ] || { echo "usage: make set-version V=1.2.3" >&2; exit 2; }
+# Version stamping is per-artifact: a CLI fix must not force a new SDK coordinate, and vice versa.
+## set-version-sdk: stamp the SDK version, e.g. make set-version-sdk V=1.2.3 (release.yml)
+set-version-sdk:
+	@$(MAKE) --no-print-directory stamp KEY=sdkVersion V=$(V)
+
+## set-version-cli: stamp the CLI version, e.g. make set-version-cli V=1.2.3 (release.yml)
+set-version-cli:
+	@$(MAKE) --no-print-directory stamp KEY=cliVersion V=$(V)
+
+.PHONY: stamp
+stamp:
+	@[ -n "$(V)" ] || { echo "usage: make set-version-$(KEY:Version=) V=1.2.3" >&2; exit 2; }
 	@echo "$(V)" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$$' \
 	  || { echo "refusing '$(V)': not plain semver X.Y.Z" >&2; exit 2; }
-	$(MVN) versions:set -DnewVersion=$(V) -DgenerateBackupPoms=false
+	@grep -q "^$(KEY)=" gradle.properties \
+	  || { echo "$(KEY) not found in gradle.properties" >&2; exit 2; }
+	@sed -i.bak "s|^$(KEY)=.*|$(KEY)=$(V)|" gradle.properties && rm -f gradle.properties.bak
+	@grep "^$(KEY)=" gradle.properties | sed 's/^/  /'
 
-## deploy: publish to the Cytoscape nexus. Needs REPO_USER / REPO_PWD (release.yml only).
-deploy:
-	$(MVN) deploy -DskipTests
+## publish-sdk: publish the SDK jar to the Cytoscape nexus. Needs REPO_USER / REPO_PWD.
+publish-sdk:
+	$(GRADLE) :publish
+
+## publish-cli: publish the CLI uber-jar to the Cytoscape nexus. Needs REPO_USER / REPO_PWD.
+publish-cli:
+	$(GRADLE) :cli:publish
 
 # Single-suite runs. T is the class name, e.g. make test-one T=MgfReaderTest
 test-one:
 	@[ -n "$(T)" ] || { echo "usage: make test-one T=SomeTest" >&2; exit 2; }
-	$(MVN) test -Dtest=$(T) -DfailIfNoSpecifiedTests=false
+	$(GRADLE) test --tests '*$(T)'
 
 it-one:
 	@[ -n "$(T)" ] || { echo "usage: make it-one T=SomeIT" >&2; exit 2; }
-	$(MVN) test-compile failsafe:integration-test failsafe:verify -Dit.test=$(T)
+	$(GRADLE) integrationTest --tests '*$(T)'

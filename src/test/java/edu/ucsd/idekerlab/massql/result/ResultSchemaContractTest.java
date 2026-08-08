@@ -2,12 +2,12 @@ package edu.ucsd.idekerlab.massql.result;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import edu.ucsd.idekerlab.massql.TestPaths;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -37,15 +37,7 @@ import org.junit.jupiter.api.Test;
 class ResultSchemaContractTest {
 
     private static Path projectRoot() {
-        Path here;
-        try {
-            here = Paths.get(ResultSchemaContractTest.class.getProtectionDomain()
-                    .getCodeSource().getLocation().toURI());
-        } catch (URISyntaxException e) {
-            throw new AssertionError(e);
-        }
-        // .../<root>/target/test-classes -> <root>
-        Path root = here.getParent().getParent();
+        Path root = TestPaths.repositoryRoot();
         assertTrue(Files.isDirectory(root.resolve("docs")), "expected the project root at " + root);
         return root;
     }

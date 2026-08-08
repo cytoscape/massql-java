@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.antlr.v4.runtime.ParserRuleContext;
-import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 
 /**
@@ -32,11 +31,6 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
             // ANTLR columns are 0-based; MassqlParseException.position() is documented 1-based.
             pos = where.getStart().getCharPositionInLine() + 1;
         }
-        return new MassqlParseException(construct, UnsupportedConstructs.message(construct), pos, null);
-    }
-
-    private static MassqlParseException reject(String construct, Token where) {
-        int pos = where == null ? -1 : where.getCharPositionInLine() + 1;
         return new MassqlParseException(construct, UnsupportedConstructs.message(construct), pos, null);
     }
 

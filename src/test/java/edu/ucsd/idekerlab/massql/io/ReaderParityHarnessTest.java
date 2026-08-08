@@ -140,12 +140,12 @@ class ReaderParityHarnessTest {
         // Folds in the old ParityCoverageTest (C32): a dump that failed to parse would yield an empty map
         // and make every downstream assertion vacuous. ParityDump.of() fails on empty; this asserts the
         // whole expected set is present, so a deleted dump cannot quietly shrink the gate.
-        for (String f : ReaderParityIT.FIXTURES_WITH_DUMPS.keySet()) {
+        for (String f : ParityFixtures.FIXTURES_WITH_DUMPS.keySet()) {
             ParityDump d = ParityDump.of(f);
             assertFalse(d.scans().isEmpty(), f + " parsed to zero scans");
             assertTrue(d.peakRows() > 0, f + " reports no peak rows");
         }
-        assertEquals(16, ReaderParityIT.FIXTURES_WITH_DUMPS.size(),
+        assertEquals(16, ParityFixtures.FIXTURES_WITH_DUMPS.size(),
                 "expected 16 fixtures with dumps; if this changed, update PARITY_REPORT.md's coverage table");
     }
 

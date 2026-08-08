@@ -4,11 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
 
-import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.junit.jupiter.params.ParameterizedTest;
@@ -46,52 +43,12 @@ import org.junit.jupiter.params.provider.MethodSource;
 class ReaderParityIT {
 
     /**
-     * Fixture → expected number of reader scans with no dump entry (all of which must have zero peaks).
-     *
-     * <p>Asserting this number is what stops a reader that drops real spectra from passing. The values are
-     * facts about the fixtures: MassQL discards a scan whose intensity array is empty, so the delta is
-     * exactly the count of empty scans.
-     *
-     * <p><b>Deliberately absent</b>: {@code micro_nopolarity.mzXML} and {@code micro_noprecursor.mzXML} —
-     * MassQL raises {@code KeyError} on both (C27c), so no dump can exist and parity is not available. They
-     * pin our own contract in {@code MzxmlPolarityTest} / {@code MzxmlEdgeCaseTest}. Also absent:
-     * {@code micro_multiprec.mzML}, whose peak parity the mzXML twin already establishes.
+     * The fixture inventory and its expected reader-only scan counts live in {@link ParityFixtures},
+     * in the unit-test source set, because two unit tests assert properties of the inventory itself.
      */
-    static final Map<String, Integer> FIXTURES_WITH_DUMPS = new LinkedHashMap<>();
-    static {
-        // Real fixtures.
-        FIXTURES_WITH_DUMPS.put("small.mzML", 0);
-        FIXTURES_WITH_DUMPS.put("small.mzXML", 0);
-        FIXTURES_WITH_DUMPS.put("DP00570_F02.mzxml", 0);
-        FIXTURES_WITH_DUMPS.put("DP00570_F02.mgf", 0);
-        // 12,571 of PlusRise's 34,513 blocks carry no peak lines (C24b). MassQL loads 21,942.
-        FIXTURES_WITH_DUMPS.put("PlusRise.mgf", 12_571);
-        // Micro fixtures: scan 4 is a zero-peak MS1, so each mzML/mzXML variant has exactly one extra.
-        // micro.mgf is MS2-only, so its zero-peak MS1 never existed on our side -- hence 0, not 1.
-        FIXTURES_WITH_DUMPS.put("micro.mzML", 1);
-        FIXTURES_WITH_DUMPS.put("micro_rtseconds.mzML", 1);
-        FIXTURES_WITH_DUMPS.put("micro.mzXML", 1);
-        FIXTURES_WITH_DUMPS.put("micro_p64.mzXML", 1);
-        FIXTURES_WITH_DUMPS.put("micro_zlib.mzXML", 1);
-        FIXTURES_WITH_DUMPS.put("micro_p64_zlib.mzXML", 1);
-        FIXTURES_WITH_DUMPS.put("micro_nested.mzXML", 1);
-        FIXTURES_WITH_DUMPS.put("micro_multiprec.mzXML", 1);
-        FIXTURES_WITH_DUMPS.put("micro.mgf", 0);
-        // Correction C36: MGF drops zero-intensity peaks. Block 2 of this fixture is ALL zeros, so
-        // MassQL emits no rows for it and it vanishes from the dataframe -- our reader still yields
-        // the block, now with zero peaks, hence exactly one reader-only scan.
-        FIXTURES_WITH_DUMPS.put("micro_zeroint.mgf", 1);
-        // C37: two MS1 scans with DIFFERENT peaks -- the only fixture that can discriminate
-        // condition ORDER. Every scan has peaks, so nothing is reader-only.
-        FIXTURES_WITH_DUMPS.put("micro_ms1var.mzML", 0);
+    static List<String> fixtures() {
+        return ParityFixtures.fixtures();
     }
-
-    /** Where each fixture lives under {@code src/test/resources}. */
-    private static Path fixturePath(String name) {
-        return Fixtures.require(name.startsWith("micro") ? "fixtures/micro/" + name : "data/" + name);
-    }
-
-    static List<String> fixtures() { return List.copyOf(FIXTURES_WITH_DUMPS.keySet()); }
 
     /**
      * Relative tolerance for the intensity <b>sum</b> only.
@@ -136,7 +93,7 @@ class ReaderParityIT {
         int matchedMs1 = 0, matchedMs2 = 0;
         long peaks = 0;
 
-        try (SpectraStream s = SpectraFile.open(fixturePath(fixture))) {
+        try (SpectraStream s = SpectraFile.open(ParityFixtures.fixturePath(fixture))) {
             while (s.hasNext()) {
                 ScanView v = s.next();
                 if (v.msLevel() == 1) ms1++; else ms2++;
@@ -191,8 +148,8 @@ class ReaderParityIT {
                     fixture + ": every yielded scan must be either dump-matched or a counted zero-peak extra");
         }
 
-        assertEquals(FIXTURES_WITH_DUMPS.get(fixture).intValue(), readerOnly,
-                fixture + ": expected exactly " + FIXTURES_WITH_DUMPS.get(fixture)
+        assertEquals(ParityFixtures.FIXTURES_WITH_DUMPS.get(fixture).intValue(), readerOnly,
+                fixture + ": expected exactly " + ParityFixtures.FIXTURES_WITH_DUMPS.get(fixture)
                         + " reader-only (zero-peak) scan(s), saw " + readerOnly
                         + ". This count is ASSERTED, not tolerated: a reader that dropped real spectra "
                         + "would otherwise pass this gate silently (C32c)");

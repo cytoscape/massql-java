@@ -20,8 +20,8 @@ import java.nio.file.Paths;
  * <p>So: fixtures are committed here, and a missing fixture is a <b>hard failure</b>. There is no skip
  * path. If you are tempted to add one, re-read the paragraph above.
  *
- * <p>Resolution is via the classpath, matching {@code lang/Corpus}. Test resources are real files under
- * {@code target/test-classes}, so the returned {@link Path} can be memory-mapped — which the mzML and
+ * <p>Resolution is via the classpath, matching {@code lang/Corpus}. Test resources are unpacked as real
+ * files in the build output, so the returned {@link Path} can be memory-mapped — which the mzML and
  * mzXML readers require and a jar-embedded resource could not satisfy.
  *
  * <p><b>The one exception</b> is the two Ewing-lab files ({@code data/DP00570_F02.*}), gitignored because

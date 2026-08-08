@@ -1,0 +1,399 @@
+// massql-java -- the SDK. The CLI is a separate, independently versioned project in cli/.
+//
+// Build/lint conventions follow ../cytoscape-mcp so both projects behave the same way, taking
+// only what applies here: java, spotless, jacoco, maven-publish. Its OSGi/BND bundling, the
+// Cytoscape repositories and its embed configuration are all irrelevant to a plain library.
+//
+// Code style is NOT documented in prose anywhere. Spotless below is the whole specification:
+// `make lint` reports, `make lint-fix` fixes.
+
+plugins {
+    id 'java'
+    id 'antlr'
+    id 'jacoco'
+    id 'maven-publish'
+    // 8.9.0, not ../cytoscape-mcp's 6.25.0: forbidWildcardImports arrived in 7.1.0 and
+    // expandWildcardImports in 8.2.0, and this project relies on both.
+    id 'com.diffplug.spotless' version '8.9.0' apply false
+    // Dead-code detection at compile time -- see the ErrorProne block below.
+    id 'net.ltgt.errorprone' version '5.1.0' apply false
+}
+
+group = 'edu.ucsd.idekerlab'
+version = sdkVersion          // gradle.properties; independent of cliVersion
+
+ext.antlrVersion = '4.13.2'
+ext.junitVersion = '5.11.4'
+
+allprojects {
+    apply plugin: 'com.diffplug.spotless'
+    apply plugin: 'net.ltgt.errorprone'
+
+    repositories {
+        mavenCentral()
+    }
+
+    spotless {
+        java {
+            // Vendored MSDK code is held byte-identical to upstream by policy (docs/VENDORED.md,
+            // asserted by VendoredProvenanceTest). Formatting it would break that guarantee.
+            targetExclude 'src/main/java/edu/ucsd/idekerlab/massql/io/vendor/**'
+
+            // .aosp() = 4-space indent, 100-column limit -- what this codebase already uses.
+            //
+            // .skipJavadocFormatting() is deliberate: in this project the javadoc IS the
+            // specification (reader sentinel contracts, the C36 zero-intensity note, and so on),
+            // written with intentional line breaks. Google's javadoc formatter would reflow ~1,965
+            // lines of it -- harmless semantically, unreviewable as a diff.
+            googleJavaFormat('1.17.0').aosp().skipJavadocFormatting()
+
+            importOrder('java', 'javax', 'org', 'com', 'edu.ucsd')
+            removeUnusedImports()
+
+            // Wildcard imports: expand any that exist, then forbid new ones. Upstream advises
+            // dropping the (JavaParser-based, expensive) expansion once the tree is clean and
+            // keeping only the cheap check.
+            expandWildcardImports()
+            forbidWildcardImports()
+
+            // Escape hatch for the few places where manual alignment carries meaning -- e.g. the
+            // column-aligned one-line accessors in MgfReader's Scan.
+            toggleOffOn()
+        }
+    }
+}
+
+// Shell scripts and the Makefile get no formatter otherwise. Markdown is deliberately EXCLUDED:
+// two trailing spaces is a semantic line break there, and scripts/spec-audit.sh matches exact
+// spec text, so reformatting docs could both change rendering and break the audit.
+spotless {
+    format 'scripts', {
+        target 'scripts/**/*.sh', 'Makefile'
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    // Free, no plugin. Not -Werror: that is only worth enabling once the warning count is
+    // measured at zero, rather than assumed.
+    options.compilerArgs << '-Xlint:all'
+}
+
+// ---------------------------------------------------------------------------------------------
+// ErrorProne -- dead code fails the build
+// ---------------------------------------------------------------------------------------------
+//
+// WHY. A migration audit found three methods with zero coverage that turned out to be genuinely
+// unreachable: an AstBuilder.reject overload that no call site bound to, SpectrumTable's
+// assertRowInRange, and RowMask.ofRange. Nothing in the build objected to any of them; they were
+// found only because the coverage report happened to be read line by line.
+//
+// ⚠ WHAT THIS DOES AND DOES NOT CATCH. UnusedMethod flags PRIVATE members only -- deliberately, so
+// it never has to reason about callers in other files. Of those three it would have caught exactly
+// one (the private reject overload). No static analyser can flag an unused PUBLIC method in a
+// library, because a library's callers are by definition outside the repo.
+//
+// The other half of the answer is the coverage gate: a method at 0% is either dead or untested, and
+// both are worth acting on. That is what actually surfaced all three. The two tools cover different
+// halves, so they are not redundant.
+//
+// Only the unused-code checks are enabled. This is not a general static-analysis adoption -- turning
+// on ErrorProne's full catalogue would flood a mature codebase with findings unrelated to the reason
+// it was added, which is how a check gets switched off wholesale.
+allprojects {
+    dependencies {
+        // 2.39.0 is the NEWEST release still compiled for Java 17. From 2.40 onward ErrorProne
+        // targets Java 21 (class file 65) and fails here with UnsupportedClassVersionError, because
+        // this project is pinned to JDK 17 by DEPENDENCY_POLICY.md constraint 7 (Cytoscape 3.10.4).
+        // Do not bump this without changing that constraint first.
+        errorprone 'com.google.errorprone:error_prone_core:2.39.0'
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.errorprone {
+            disableAllChecks = true
+            error 'UnusedMethod', 'UnusedVariable', 'UnusedNestedClass'
+            // ANTLR's generated parser is full of unused members by construction.
+            excludedPaths = '.*/generated-src/.*'
+        }
+    }
+}
+
+dependencies {
+    // DEPENDENCY_POLICY.md: these two are the entire shipping closure.
+    implementation "com.github.chhh:javolution-core-java-msftbx:6.11.8"
+    implementation "org.antlr:antlr4-runtime:${antlrVersion}"
+
+    // The ANTLR *tool*, used only by generateGrammarSource. See the severing below.
+    antlr "org.antlr:antlr4:${antlrVersion}"
+}
+
+// ---------------------------------------------------------------------------------------------
+// ANTLR
+// ---------------------------------------------------------------------------------------------
+
+// ⛔ Gradle's antlr plugin makes the compile/runtime configurations extendFrom `antlr`, putting the
+// whole ANTLR TOOL closure on the CONSUMER classpath. Measured, that is:
+//
+//     org.antlr:antlr4                  1,350,599
+//     org.antlr:antlr-runtime:3.5.3       173,220   <- duplicate of antlr4-runtime, different major
+//     org.antlr:ST4                       251,081
+//     org.abego.treelayout                 26,773
+//     com.ibm.icu:icu4j:72.1           14,386,028   <- fourteen megabytes
+//                                      ----------
+//                                      16,187,701   = 15.44 MB
+//
+// against a shipping closure of 0.75 MB and a ~1.5 MB budget -- so ~21x over, not a rounding error.
+// antlr-runtime 3.x sitting beside antlr4-runtime is also exactly the duplicate-artifact situation
+// DEPENDENCY_POLICY.md exists to prevent.
+//
+// generateGrammarSource takes its tool classpath from the `antlr` configuration directly, so
+// severing the inheritance costs nothing. scripts/dependency-audit.sh is the regression test.
+configurations.configureEach { conf ->
+    if (conf.name != 'antlr' && conf.extendsFrom.any { it.name == 'antlr' }) {
+        conf.extendsFrom = conf.extendsFrom.findAll { it.name != 'antlr' }
+    }
+}
+
+tasks.named('generateGrammarSource') {
+    // Visitor yes, listener no -- the parser is consumed through a visitor. Gradle's plugin
+    // generates listeners by default, which the Maven build explicitly disabled.
+    //
+    // -package is REQUIRED and is not optional the way Gradle's documentation implies. The plugin
+    // mirrors src/main/antlr's directory structure into the output folder, but ANTLR itself emits
+    // no `package` declaration unless told to, so the generated classes land in the correct
+    // directory as members of the DEFAULT package -- and every reference to them fails to compile.
+    // antlr4-maven-plugin derived this from the path automatically; Gradle's does not.
+    arguments += ['-visitor', '-no-listener', '-package', 'edu.ucsd.idekerlab.massql.lang']
+}
+
+// ---------------------------------------------------------------------------------------------
+// Tests: fast unit suite, separate integration suite
+// ---------------------------------------------------------------------------------------------
+
+testing {
+    suites {
+        test {
+            useJUnitJupiter(junitVersion)
+        }
+
+        // *IT.java, in src/integrationTest/java. These read real spectra fixtures and the
+        // committed goldens, so they are slow and kept out of the edit loop -- `make test` runs
+        // the unit suite, `make it` runs these, `make verify` runs both.
+        integrationTest(JvmTestSuite) {
+            useJUnitJupiter(junitVersion)
+            dependencies {
+                implementation project()
+            }
+            targets.configureEach {
+                testTask.configure {
+                    shouldRunAfter(test)
+                }
+            }
+        }
+    }
+}
+
+configurations {
+    integrationTestImplementation.extendsFrom testImplementation
+    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+dependencies {
+    // The ITs share the unit suite's helpers -- io/Fixtures (package-private, same package) and
+    // io/ParityDump -- and its resources, which is where the spectra fixtures live.
+    integrationTestImplementation sourceSets.test.output
+}
+
+tasks.named('check') {
+    dependsOn testing.suites.integrationTest
+}
+
+// ---------------------------------------------------------------------------------------------
+// Coverage gate
+// ---------------------------------------------------------------------------------------------
+
+// Replaces the old `make skipcheck`, whose hand-maintained test-count floor rotted on every test
+// added. 90% instruction coverage, enforced by the build.
+//
+// INSTRUCTION rather than BRANCH: measured branch coverage at this scope is ~83%, so a 90% branch
+// rule would fail on arrival and mean something different from "90% coverage".
+def coverageExclusions = [
+    // Upstream MSDK, held byte-identical by policy -- not ours to test.
+    'edu/ucsd/idekerlab/massql/io/vendor/**',
+    // Machine-generated from Massql.g4. NOTE: MassqlParserFacade and its ThrowingErrorListener are
+    // HAND-WRITTEN and must stay counted, so these are named exactly rather than globbed as
+    // `Massql*`.
+    'edu/ucsd/idekerlab/massql/lang/MassqlParser.class',
+    'edu/ucsd/idekerlab/massql/lang/MassqlParser$*.class',
+    'edu/ucsd/idekerlab/massql/lang/MassqlLexer.class',
+    'edu/ucsd/idekerlab/massql/lang/MassqlBaseVisitor.class',
+    'edu/ucsd/idekerlab/massql/lang/MassqlVisitor.class',
+]
+
+tasks.withType(JacocoReportBase).configureEach {
+    // Both suites contribute. The Maven build only ever bound the agent to surefire, so its
+    // coverage numbers silently excluded every IT -- and in this project the gates ARE the ITs.
+    dependsOn tasks.named('test'), tasks.named('integrationTest')
+    executionData.setFrom(fileTree(layout.buildDirectory.dir('jacoco')).include('*.exec'))
+    classDirectories.setFrom(
+        files(classDirectories.files.collect { fileTree(dir: it, excludes: coverageExclusions) })
+    )
+}
+
+jacocoTestReport {
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = true
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                counter = 'INSTRUCTION'
+                value = 'COVEREDRATIO'
+                minimum = 0.90
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestCoverageVerification')
+}
+
+// ---------------------------------------------------------------------------------------------
+// Dependency policy
+// ---------------------------------------------------------------------------------------------
+
+// Turns DEPENDENCY_POLICY.md from prose into a failing build.
+//
+// Implemented directly rather than with a Maven-enforcer port: the only such plugin
+// (org.kordamp.gradle.project-enforcer) last released 0.14.0 in August 2024, predating Gradle 9,
+// and this is twenty lines with no supply-chain surface.
+//
+// The pom's companion `requireUpperBoundDeps` rule has no equivalent here because it needs none:
+// Gradle's conflict resolution already selects the highest requested version by default.
+ext.bannedDependencies = [
+    // MSDK is a VENDORING SOURCE, never a dependency (C1, C16). Depending on any MSDK artifact
+    // drags Guava back in via msdk-datamodel.
+    'io.github.msdk:*',
+    'it.unimi.dsi:dsiutils',
+    'it.unimi.dsi:fastutil',
+    'com.google.guava:guava',
+    // Guava's annotation satellites. jsr305 exports javax.annotation (69 classes) -- a
+    // duplicate-exporter conflict source under OSGi.
+    'com.google.code.findbugs:jsr305',
+    'org.checkerframework:checker-qual',
+    'com.google.errorprone:error_prone_annotations',
+    'com.google.j2objc:j2objc-annotations',
+    // Constraint 5: the SDK logs nothing at all, so no slf4j in any form, and no logging
+    // framework beyond it. (slf4j 2.x would also breach constraint 1 via ServiceLoader.)
+    'ch.qos.logback:*',
+    'org.slf4j:*',
+    // Constraint 3: no JAXB.
+    'javax.xml.bind:*',
+    'com.sun.xml.bind:*',
+    'jakarta.xml.bind:*',
+    // Out of scope, and CDK is 2.7 MB with Guava underneath.
+    'org.openscience.cdk:*',
+]
+
+allprojects {
+    tasks.register('checkBannedDependencies') {
+        group = 'verification'
+        description = 'Fails if a forbidden coordinate reaches the runtime classpath.'
+        doLast {
+            def patterns = rootProject.ext.bannedDependencies
+            def offenders = []
+            configurations.runtimeClasspath.resolvedConfiguration
+                    .resolvedArtifacts.each { artifact ->
+                def id = artifact.moduleVersion.id
+                def coord = "${id.group}:${id.name}"
+                patterns.each { pattern ->
+                    def regex = '^' + java.util.regex.Pattern.quote(pattern)
+                            .replace('\\*', '\\E.*\\Q') + '$'
+                    if (coord ==~ regex) {
+                        offenders << "${coord}:${id.version}  (banned by '${pattern}')"
+                    }
+                }
+            }
+            if (offenders) {
+                throw new GradleException(
+                        "DEPENDENCY_POLICY.md violation in ${project.path}:\n  "
+                                + offenders.unique().join('\n  ')
+                                + "\n\nSee DEPENDENCY_POLICY.md before relaxing this.")
+            }
+        }
+    }
+
+    tasks.named('check') {
+        dependsOn tasks.named('checkBannedDependencies')
+    }
+}
+
+// Feeds scripts/dependency-audit.sh. ROOT PROJECT ONLY -- this measures the SDK closure that
+// massql-app embeds under OSGi, which is what DEPENDENCY_POLICY.md's size budget is about. The
+// CLI uber-jar is a standalone download and deliberately not an audited number.
+// Machine-readable TSV -- `coord <TAB> bytes <TAB> absolute-path` -- so the script can unzip each
+// artifact for the META-INF/services, META-INF/versions and native-library constraint checks. Under
+// Maven the script reconstructed paths as ~/.m2/repository/g/a/v/a-v.jar; Gradle's cache inserts a
+// SHA-1 directory, so paths cannot be derived and are emitted here instead.
+tasks.register('dependencyAudit') {
+    group = 'verification'
+    description = 'Emits the SDK runtime closure as TSV for scripts/dependency-audit.sh.'
+    doLast {
+        configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts
+                .collect { artifact ->
+                    def id = artifact.moduleVersion.id
+                    [coord: "${id.group}:${id.name}:${id.version}", file: artifact.file]
+                }
+        // Sorted so the committed dependency-audit.txt changes only when the closure does.
+                .sort { it.coord }
+                .each { row ->
+                    println "${row.coord}\t${row.file.length()}\t${row.file.absolutePath}"
+                }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Publishing
+// ---------------------------------------------------------------------------------------------
+
+publishing {
+    publications {
+        sdk(MavenPublication) {
+            from components.java
+            artifactId = 'massql-java'
+            pom {
+                name = 'massql-java'
+                description = 'Pure-Java MassQL SDK (scaninfo subset).'
+            }
+        }
+    }
+    repositories {
+        maven {
+            // Matches cy-ndex-2 and the other Cytoscape repos, so massql-app resolves this with
+            // no extra repo config. Credentials come from the environment: Gradle has no
+            // settings.xml, so there is no <server> id to match.
+            name = 'cytoscape'
+            url = version.toString().endsWith('SNAPSHOT')
+                    ? 'https://nrnb-nexus.ucsd.edu/repository/cytoscape_snapshots/'
+                    : 'https://nrnb-nexus.ucsd.edu/repository/cytoscape_releases/'
+            credentials {
+                username = System.getenv('REPO_USER')
+                password = System.getenv('REPO_PWD')
+            }
+        }
+    }
+}

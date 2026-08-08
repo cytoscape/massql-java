@@ -1,0 +1,14 @@
+// Two projects, versioned independently (see gradle.properties):
+//
+//   :        the SDK -- publishes massql-java, the thin jar massql-app embeds under OSGi.
+//   :cli     the standalone CLI -- publishes massql-java-cli, a Shadow uber-jar.
+//
+// The root IS the SDK rather than a third empty umbrella project, so no existing source
+// path moved during the Maven -> Gradle migration.
+//
+// Because :cli depends on the SDK as a separate project, it can only compile against the
+// SDK's PUBLIC API. That makes the encapsulation boundary a compile error rather than
+// something a test has to notice.
+rootProject.name = 'massql-java'
+
+include 'cli'

@@ -35,13 +35,6 @@ public final class RowMask {
         return new RowMask(new BitSet(length), length);
     }
 
-    /** A mask with exactly the given half-open range set. */
-    public static RowMask ofRange(int length, IntRange range) {
-        BitSet b = new BitSet(length);
-        if (!range.isEmpty()) b.set(range.start(), range.end());
-        return new RowMask(b, length);
-    }
-
     public int length() { return length; }
     public boolean get(int row) { return bits.get(row); }
     public int cardinality() { return bits.cardinality(); }

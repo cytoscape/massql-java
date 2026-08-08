@@ -1,6 +1,5 @@
 package edu.ucsd.idekerlab.massql.spectra;
 
-import edu.ucsd.idekerlab.massql.MassqlException;
 
 import java.util.Arrays;
 
@@ -185,12 +184,6 @@ public final class SpectrumTable {
 
     /** Every row, as a fresh all-set mask. */
     public RowMask allRows() { return RowMask.all(rowCount()); }
-
-    void assertRowInRange(int row) {
-        if (row < 0 || row >= mz.length) {
-            throw new MassqlException("row " + row + " out of range [0," + mz.length + ")");
-        }
-    }
 
     @Override public String toString() {
         return "SpectrumTable[msLevel=" + msLevel + ", scans=" + index.scanCount()

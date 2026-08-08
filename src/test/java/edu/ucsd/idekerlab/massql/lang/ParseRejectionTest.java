@@ -113,6 +113,29 @@ class ParseRejectionTest {
         assertFalse(e.construct().isBlank());
     }
 
+    /**
+     * The traps that read as legal MassQL must be <b>explained</b>, not merely rejected.
+     *
+     * <p>{@code MassqlParserFacade.explain} adds guidance for exactly these, because ANTLR's own
+     * "mismatched input 'WHERE'" tells a user nothing about what to change. The rejections are
+     * covered above — <b>the guidance was not</b>, so those hints could have been deleted or broken
+     * with every test still green.
+     */
+    @Test
+    void theTrapsThatLookLikeLegalMassqlExplainThemselves() {
+        // Lowercase `filter`.
+        MassqlParseException lowerFilter = assertThrows(MassqlParseException.class,
+                () -> Massql.parse("QUERY scaninfo(MS2DATA) WHERE MS2PROD=100 filter MS2PROD=200"));
+        assertTrue(lowerFilter.getMessage().contains("FILTER has no lowercase form"),
+                "lowercase 'filter' should say so: " + lowerFilter.getMessage());
+
+        // Lowercase `or`.
+        MassqlParseException lowerOr = assertThrows(MassqlParseException.class,
+                () -> Massql.parse("QUERY scaninfo(MS2DATA) WHERE MS2PROD=(100 or 200)"));
+        assertTrue(lowerOr.getMessage().contains("OR has no lowercase form"),
+                "lowercase 'or' should say so: " + lowerOr.getMessage());
+    }
+
     @Test
     void garbageInputNeverCrashes() {
         // "Never a crash" is a hard requirement: an NPE or AIOOBE here is a bug even on junk.

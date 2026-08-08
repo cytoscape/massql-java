@@ -2,12 +2,12 @@ package edu.ucsd.idekerlab.massql.io.vendor;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import edu.ucsd.idekerlab.massql.TestPaths;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -76,21 +76,13 @@ class VendoredProvenanceTest {
     }
 
     /**
-     * The project root, located from this class's own {@code target/test-classes} rather than from the
-     * working directory — surefire and an IDE do not agree on the latter.
+     * The project root, located from this class's own position on disk rather than from the working
+     * directory — Gradle and an IDE do not agree on the latter. See {@link TestPaths}.
      */
     private static Path projectRoot() {
-        Path here;
-        try {
-            here = Paths.get(VendoredProvenanceTest.class.getProtectionDomain()
-                    .getCodeSource().getLocation().toURI());
-        } catch (URISyntaxException e) {
-            throw new AssertionError(e);
-        }
-        // .../<root>/target/test-classes -> <root>
-        Path root = here.getParent().getParent();
+        Path root = TestPaths.repositoryRoot();
         assertTrue(Files.isDirectory(root.resolve("src/main/java")),
-                "expected the project root at " + root + ", derived from " + here);
+                "expected the project root at " + root);
         return root;
     }
 

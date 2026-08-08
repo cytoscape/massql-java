@@ -3,6 +3,7 @@ package edu.ucsd.idekerlab.massql.io;
 import static org.junit.jupiter.api.Assertions.*;
 
 import edu.ucsd.idekerlab.massql.MassqlException;
+import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -49,7 +50,7 @@ class MzxmlEdgeCaseTest {
         // (DEPENDENCY_POLICY constraint 2).
         Path p = Fixtures.require("fixtures/edge/empty_msLevel_tag.mzXML");
         try (SpectraStream s = SpectraFile.open(p)) {
-            while (s.hasNext()) { ScanView v = s.next(); /* drain */ }
+            while (s.hasNext()) { s.next(); /* drain */ }
             String all = String.join("\n", s.diagnostics());
             assertTrue(all.contains("msLevel"),
                     "the 8 dropped scans must be reported. diagnostics: " + all);
@@ -178,12 +179,38 @@ class MzxmlEdgeCaseTest {
                         + "<scan num=\"2\" msLevel=\"2\" peaksCount=\"0\" polarity=\"+\" retenti");
         MassqlException e = assertThrows(MassqlException.class, () -> {
             try (SpectraStream s = SpectraFile.open(p)) {
-                while (s.hasNext()) { ScanView v = s.next(); /* drain until it fails */ }
+                while (s.hasNext()) { s.next(); /* drain until it fails */ }
             }
         });
         assertTrue(e.getMessage().toLowerCase().contains("truncat")
                         || e.getMessage().toLowerCase().contains("malformed"),
                 "the failure should name truncation: " + e.getMessage());
+    }
+
+    @Test
+    void aScanWithNoPeaksCountDerivesItFromTheBase64Length() {
+        // peaksCount is schema-required, so no real fixture omits it -- but MzxmlReader carries a
+        // documented fallback for when it is absent, and the reason it exists is specific: a
+        // wrongly-zero count would not merely mis-size an array, it would break the ms1scan chain,
+        // which surfaces much later as a precursor-linkage bug.
+        //
+        // Two peaks: 4 big-endian float32s = 16 bytes, so the count is derivable exactly
+        // (16 bytes / (2 values x 4 bytes) = 2).
+        Path p = writeMinimal("no-peakscount.mzXML",
+                "<scan num=\"1\" msLevel=\"1\" polarity=\"+\" retentionTime=\"PT0S\">"
+                        + "<peaks precision=\"32\" byteOrder=\"network\">"
+                        + "QskAAER6AABDSEAARPoAAA=="
+                        + "</peaks></scan>");
+        try (SpectraStream s = SpectraFile.open(p)) {
+            assertTrue(s.hasNext());
+            ScanView v = s.next();
+            assertEquals(2, v.peakCount(),
+                    "with peaksCount absent the count must come from the base64 length, not default to 0");
+            SpectrumTable t = v.materialize();
+            assertEquals(2, t.rowCount(), "the decoded peaks must agree with the derived count");
+            assertEquals(100.5, t.mz(0), 1e-4);
+            assertEquals(200.25, t.mz(1), 1e-4);
+        }
     }
 
     @Test

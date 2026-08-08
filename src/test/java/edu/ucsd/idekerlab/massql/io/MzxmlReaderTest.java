@@ -64,14 +64,12 @@ class MzxmlReaderTest {
         assertEquals(48, expected.size(), "sanity: the dump itself should describe 48 scans");
 
         int ms1 = 0, ms2 = 0;
-        long peaks = 0;
         Map<Integer, Integer> ms1scanOf = new LinkedHashMap<>();
         try (SpectraStream s = SpectraFile.open(mzxml)) {
             while (s.hasNext()) {
                 ScanView v = s.next();
                 if (v.msLevel() == 1) ms1++; else { ms2++; ms1scanOf.put(v.scanId(), v.ms1scan()); }
                 SpectrumTable t = v.materialize();
-                peaks += t.rowCount();
                 Integer want = expected.get(v.scanId());
                 assertNotNull(want, "reader produced scan " + v.scanId() + ", absent from the dump");
                 assertEquals(want.intValue(), t.rowCount(), "peak count differs for scan " + v.scanId());

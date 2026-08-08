@@ -110,7 +110,7 @@ class MzxmlSchema20IT {
         // produce NO diagnostics. If any appear, the walk is discarding scans it should not.
         Path mzxml = Fixtures.require("data/DP00570_F02.mzxml");
         try (SpectraStream s = SpectraFile.open(mzxml)) {
-            while (s.hasNext()) { ScanView v = s.next(); /* drain */ }
+            while (s.hasNext()) { s.next(); /* drain */ }
             assertEquals(java.util.List.of(), s.diagnostics(),
                     "unexpected diagnostics on a clean file: " + s.diagnostics());
         }

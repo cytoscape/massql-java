@@ -1,6 +1,17 @@
-# Build output. Covers everything Maven generates: generated-sources (the ANTLR parser),
-# classes, surefire-reports, failsafe-reports, jacoco.exec and the site report.
+# Build output. Covers everything Gradle generates in both projects: generated-src (the ANTLR
+# parser), classes, test-results, reports, the jacoco *.exec files and the assembled jars.
+build/
+cli/build/
+.gradle/
+
+# Maven's output directory. Still ignored while pom.xml exists, so a `mvn` run during the
+# Gradle transition cannot dump 656 untracked files into `git status`. Remove this line in the
+# same commit that deletes pom.xml.
 target/
+
+# The wrapper script and JAR ARE committed, deliberately: `./gradlew` must work in a fresh
+# checkout. That is what lets the Makefile be the only entry point and CI use the same Gradle
+# version a developer does.
 
 # IDE
 .idea/

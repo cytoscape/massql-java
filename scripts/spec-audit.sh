@@ -38,7 +38,29 @@ pass() {
 SPECS=docs/harness
 FIXTURES=src/test/resources/fixtures
 GOLDENS=src/test/resources/goldens
-PARITY_IT=src/test/java/edu/ucsd/idekerlab/massql/io/ReaderParityIT.java
+# The fixture inventory lives in the UNIT test source set even though ReaderParityIT (integration)
+# is its main consumer: two unit tests assert properties of the inventory itself, and
+# integrationTest depends on test, never the reverse.
+PARITY_INVENTORY=src/test/java/edu/ucsd/idekerlab/massql/io/ParityFixtures.java
+
+# Every tree that can hold a test class, across both projects -- but only those that EXIST.
+# `find` exits non-zero on a missing root, and under `set -o pipefail` that poisons the whole
+# pipeline below, making every lookup report "missing" even for classes that are right there.
+TEST_ROOTS=""
+for candidate in src/test src/integrationTest cli/src/test cli/src/integrationTest; do
+    [ -d "$candidate" ] && TEST_ROOTS="$TEST_ROOTS $candidate"
+done
+TEST_ROOTS="${TEST_ROOTS# }"
+[ -n "$TEST_ROOTS" ] || fail "no test source root exists at all -- check 4 would pass vacuously"
+
+# A moved or renamed file must FAIL here rather than making the check vacuous -- grep on a missing
+# path prints an error, returns 0 matches, and every count comparison below then passes trivially.
+# This is the same class of hole as the phantom test-class names behind C38.
+for required in "$PARITY_INVENTORY"; do
+    [ -f "$required" ] || fail "spec-audit cannot find $required -- a path this script hardcodes has
+        moved. Fix the path: without it the dump-count checks below compare against zero and pass
+        silently."
+done
 
 echo "spec-audit: do the specs still describe the code?"
 echo
@@ -133,17 +155,17 @@ echo
 # Three documents, three numbers, none right. Hand-maintained counts rot silently because nothing
 # recomputes them -- so recompute them.
 #
-# The authority is the filesystem, cross-checked against ReaderParityIT.FIXTURES_WITH_DUMPS: if
+# The authority is the filesystem, cross-checked against ParityFixtures.FIXTURES_WITH_DUMPS: if
 # the map and the directory disagree, the sweep is not covering what it appears to.
 # --------------------------------------------------------------------------------------------
 
-echo "2. stated dump counts match the filesystem and ReaderParityIT"
+echo "2. stated dump counts match the filesystem and ParityFixtures"
 
 DUMPS_ON_DISK=$(find "$GOLDENS/loader-parity" -name '*.json.gz' | wc -l | tr -d ' ')
-DUMPS_IN_IT=$(grep -c 'FIXTURES_WITH_DUMPS.put' "$PARITY_IT" | tr -d ' ')
+DUMPS_IN_IT=$(grep -c 'FIXTURES_WITH_DUMPS.put' "$PARITY_INVENTORY" | tr -d ' ')
 
 if [ "$DUMPS_ON_DISK" != "$DUMPS_IN_IT" ]; then
-    fail "$DUMPS_ON_DISK dump files on disk but ReaderParityIT lists $DUMPS_IN_IT -- the parity
+    fail "$DUMPS_ON_DISK dump files on disk but ParityFixtures lists $DUMPS_IN_IT -- the parity
         sweep is not covering every dump, or a dump is missing"
 else
     pass "$DUMPS_ON_DISK dumps on disk == $DUMPS_IN_IT entries in FIXTURES_WITH_DUMPS"
@@ -184,10 +206,23 @@ else
     pass "PARITY_REPORT.md has one table row per dump ($PARITY_ROWS)"
 fi
 
-# The test floor in the Makefile must not drift above what actually runs, or `make verify` fails
-# for a reason unrelated to the change under review.
-MIN_TESTS=$(grep -E '^MIN_TESTS' Makefile | grep -oE '[0-9]+')
-pass "Makefile MIN_TESTS = $MIN_TESTS (asserted against real runs by 'make skipcheck')"
+# The coverage gate must still exist and still be wired into `check`.
+#
+# This replaces a check on the Makefile's old MIN_TESTS floor, which was a hand-maintained test
+# count that rotted on every test added. The gate is the same kind of protection -- a floor a green
+# build cannot dodge -- but the number no longer needs maintaining. What DOES need asserting is that
+# the rule is present at all: deleting the violationRules block, or dropping the `check` dependency,
+# leaves a build that still says "BUILD SUCCESSFUL" while enforcing nothing.
+COVERAGE_MIN=$(grep -A3 "counter = 'INSTRUCTION'" build.gradle \
+    | grep -oE 'minimum = [0-9.]+' | grep -oE '[0-9.]+' || true)
+if [ -z "$COVERAGE_MIN" ]; then
+    fail "build.gradle has no INSTRUCTION coverage minimum -- the gate that replaced the old
+        MIN_TESTS floor is gone, so nothing stops coverage from decaying silently"
+elif ! grep -q "dependsOn tasks.named('jacocoTestCoverageVerification')" build.gradle; then
+    fail "the coverage gate exists but is not wired into 'check', so 'make verify' never runs it"
+else
+    pass "coverage gate present and wired into check (INSTRUCTION minimum $COVERAGE_MIN)"
+fi
 echo
 
 # --------------------------------------------------------------------------------------------
@@ -431,8 +466,12 @@ for spec in "$SPECS"/Tech_Step[0-9]*.md; do
         fi
 
         checked_classes=$((checked_classes + 1))
-        if ! find src/test -name "$cls.java" | grep -q .; then
-            fail "$(basename "$spec") names test class '$cls', which does not exist under src/test.
+        # EVERY test source root, not just src/test. Integration tests live in
+        # src/integrationTest (their own Gradle source set) and the CLI project has its own trees --
+        # searching one root would report every IT named in a completed spec as missing, which is
+        # noise, and would then be "fixed" by weakening the check that C38 exists to enforce.
+        if ! find $TEST_ROOTS -name "$cls.java" 2>/dev/null | grep -q .; then
+            fail "$(basename "$spec") names test class '$cls', which exists in none of: $TEST_ROOTS.
         Either write it, or -- if its coverage was folded into another class -- write the row as
         '($cls -- folded into <RealClass>)' so the intent stays reviewable. A phantom class name is
         where MISSING coverage looks like PRESENT coverage: under exactly this cover, MS2PREC,

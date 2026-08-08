@@ -35,7 +35,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 class PeakOrderPreconditionTest {
 
-    static List<String> fixtures() { return ReaderParityIT.fixtures(); }
+    static List<String> fixtures() { return ParityFixtures.fixtures(); }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("fixtures")
