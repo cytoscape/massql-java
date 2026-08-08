@@ -1,6 +1,9 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 
@@ -15,8 +18,9 @@ class SpectraStreamCloseTest {
 
     @Test
     void closeIsIdempotent() {
-        // mzXML added by Step 7: it memory-maps like mzML, so it carries the same release obligation.
-        for (String f : new String[]{"data/small.mzML", "data/PlusRise.mgf", "data/small.mzXML"}) {
+        // mzXML added by Step 7: it memory-maps like mzML, so it carries the same release
+        // obligation.
+        for (String f : new String[] {"data/small.mzML", "data/PlusRise.mgf", "data/small.mzXML"}) {
             SpectraStream s = SpectraFile.open(Fixtures.require(f));
             s.close();
             assertDoesNotThrow(s::close, "second close() on " + f);
@@ -26,8 +30,10 @@ class SpectraStreamCloseTest {
 
     @Test
     void twoHundredOpenCloseCyclesDoNotExhaustDescriptors() {
-        // The leak this guards is real for mzML: each open maps the file. Without release, 200 cycles
-        // exhaust descriptors or address space -- and inside Cytoscape that surfaces as an unrelated
+        // The leak this guards is real for mzML: each open maps the file. Without release, 200
+        // cycles
+        // exhaust descriptors or address space -- and inside Cytoscape that surfaces as an
+        // unrelated
         // failure much later.
         Path mzml = Fixtures.require("data/small.mzML");
         for (int i = 0; i < 200; i++) {
@@ -41,8 +47,10 @@ class SpectraStreamCloseTest {
 
     @Test
     void twoHundredOpenCloseCyclesOnAnMzxml() {
-        // Step 7 §5: MzxmlReader memory-maps via the same vendored FileMemoryMapper, so it can leak the
-        // mapped region exactly as mzML can. 200 cycles over a 3 MB file is ~600 MB of address space if
+        // Step 7 §5: MzxmlReader memory-maps via the same vendored FileMemoryMapper, so it can leak
+        // the
+        // mapped region exactly as mzML can. 200 cycles over a 3 MB file is ~600 MB of address
+        // space if
         // nothing is released.
         Path mzxml = Fixtures.require("data/small.mzXML");
         for (int i = 0; i < 200; i++) {

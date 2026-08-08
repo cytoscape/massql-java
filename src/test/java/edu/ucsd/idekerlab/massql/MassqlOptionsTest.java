@@ -1,6 +1,8 @@
 package edu.ucsd.idekerlab.massql;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +29,8 @@ class MassqlOptionsTest {
         assertThrows(IllegalArgumentException.class, () -> o.withPrecursorTolPpm(0.0));
         assertThrows(IllegalArgumentException.class, () -> o.withPrecursorTolPpm(-1.0));
         assertThrows(IllegalArgumentException.class, () -> o.withPrecursorTolPpm(Double.NaN));
-        assertThrows(IllegalArgumentException.class, () -> o.withPrecursorTolPpm(Double.POSITIVE_INFINITY));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> o.withPrecursorTolPpm(Double.POSITIVE_INFINITY));
     }
 }

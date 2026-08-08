@@ -1,8 +1,8 @@
 package edu.ucsd.idekerlab.massql.spectra;
 
-import edu.ucsd.idekerlab.massql.MassqlException;
-
 import java.util.Arrays;
+
+import edu.ucsd.idekerlab.massql.MassqlException;
 
 /**
  * Maps scan ids to row ranges, and holds the per-scan metadata.
@@ -26,17 +26,24 @@ import java.util.Arrays;
  */
 public final class ScanIndex {
 
-    private final int[] scanIds;      // ascending, distinct
-    private final int[] rowStart;     // inclusive
-    private final int[] rowEnd;       // exclusive
-    private final double[] rt;        // minutes, EXACT
-    private final byte[] polarity;    // 1 = positive, 2 = negative, 0 = unknown
-    private final double[] precmz;    // 0 = not recorded (MS2 only; all 0 for MS1)
-    private final int[] ms1scan;      // 0 = no linked MS1 scan
-    private final int[] charge;       // 0 = not recorded
+    private final int[] scanIds; // ascending, distinct
+    private final int[] rowStart; // inclusive
+    private final int[] rowEnd; // exclusive
+    private final double[] rt; // minutes, EXACT
+    private final byte[] polarity; // 1 = positive, 2 = negative, 0 = unknown
+    private final double[] precmz; // 0 = not recorded (MS2 only; all 0 for MS1)
+    private final int[] ms1scan; // 0 = no linked MS1 scan
+    private final int[] charge; // 0 = not recorded
 
-    ScanIndex(int[] scanIds, int[] rowStart, int[] rowEnd, double[] rt, byte[] polarity,
-              double[] precmz, int[] ms1scan, int[] charge) {
+    ScanIndex(
+            int[] scanIds,
+            int[] rowStart,
+            int[] rowEnd,
+            double[] rt,
+            byte[] polarity,
+            double[] precmz,
+            int[] ms1scan,
+            int[] charge) {
         this.scanIds = scanIds;
         this.rowStart = rowStart;
         this.rowEnd = rowEnd;
@@ -47,25 +54,52 @@ public final class ScanIndex {
         this.charge = charge;
     }
 
-    public int scanCount() { return scanIds.length; }
+    public int scanCount() {
+        return scanIds.length;
+    }
 
     /** Defensive copy: the internal array must never escape. */
-    public int[] scanIds() { return scanIds.clone(); }
+    public int[] scanIds() {
+        return scanIds.clone();
+    }
 
-    public int scanIdAt(int ordinal) { return scanIds[check(ordinal)]; }
-    public int rowStart(int ordinal) { return rowStart[check(ordinal)]; }
-    public int rowEnd(int ordinal)   { return rowEnd[check(ordinal)]; }
-    public int peakCount(int ordinal) { return rowEnd[check(ordinal)] - rowStart[ordinal]; }
+    public int scanIdAt(int ordinal) {
+        return scanIds[check(ordinal)];
+    }
+
+    public int rowStart(int ordinal) {
+        return rowStart[check(ordinal)];
+    }
+
+    public int rowEnd(int ordinal) {
+        return rowEnd[check(ordinal)];
+    }
+
+    public int peakCount(int ordinal) {
+        return rowEnd[check(ordinal)] - rowStart[ordinal];
+    }
 
     /** Exact retention time in minutes. This is the value that reaches the result JSON. */
-    public double rtOf(int ordinal) { return rt[check(ordinal)]; }
+    public double rtOf(int ordinal) {
+        return rt[check(ordinal)];
+    }
 
-    public byte polarityOf(int ordinal) { return polarity[check(ordinal)]; }
+    public byte polarityOf(int ordinal) {
+        return polarity[check(ordinal)];
+    }
 
     /** Raw value including MassQL's 0 sentinel; Tech_Step10 converts 0 to null. */
-    public double precmzOf(int ordinal) { return precmz[check(ordinal)]; }
-    public int ms1scanOf(int ordinal)   { return ms1scan[check(ordinal)]; }
-    public int chargeOf(int ordinal)    { return charge[check(ordinal)]; }
+    public double precmzOf(int ordinal) {
+        return precmz[check(ordinal)];
+    }
+
+    public int ms1scanOf(int ordinal) {
+        return ms1scan[check(ordinal)];
+    }
+
+    public int chargeOf(int ordinal) {
+        return charge[check(ordinal)];
+    }
 
     /**
      * Ordinal for a scan id, or {@code -1} if absent.
@@ -80,7 +114,8 @@ public final class ScanIndex {
 
     private int check(int ordinal) {
         if (ordinal < 0 || ordinal >= scanIds.length) {
-            throw new MassqlException("scan ordinal " + ordinal + " out of range [0," + scanIds.length + ")");
+            throw new MassqlException(
+                    "scan ordinal " + ordinal + " out of range [0," + scanIds.length + ")");
         }
         return ordinal;
     }

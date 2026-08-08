@@ -1,6 +1,8 @@
 package edu.ucsd.idekerlab.massql.spectra;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -47,7 +49,8 @@ class DerivedColumnsTest {
 
         assertTrue(Double.isNaN(t.iNorm(0)), "0/0 must be NaN, not 0 and not 1");
         assertTrue(Double.isNaN(t.iTicNorm(0)));
-        assertEquals(0.0, Reductions.sum(t, 0, Column.I), "the TIC of an all-zero scan is genuinely 0");
+        assertEquals(
+                0.0, Reductions.sum(t, 0, Column.I), "the TIC of an all-zero scan is genuinely 0");
     }
 
     @Test

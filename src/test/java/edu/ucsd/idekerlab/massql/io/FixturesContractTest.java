@@ -1,6 +1,8 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 import org.opentest4j.TestAbortedException;
@@ -25,7 +27,8 @@ class FixturesContractTest {
     void aMissingFixtureFailsRatherThanSkipping() {
         // TestAbortedException is what assumeTrue throws -- if it ever comes back, this catches it
         // specifically rather than letting the test report a misleading pass.
-        assertThrows(AssertionError.class,
+        assertThrows(
+                AssertionError.class,
                 () -> Fixtures.require("data/no_such_fixture_exists.mzML"),
                 "a missing fixture must raise AssertionError; if this threw TestAbortedException "
                         + "instead, someone reintroduced assumeTrue and C26's silent-skip hole is back");
@@ -33,9 +36,12 @@ class FixturesContractTest {
 
     @Test
     void theMissingFixtureMessageIsActionable() {
-        AssertionError e = assertThrows(AssertionError.class,
-                () -> Fixtures.require("data/no_such_fixture_exists.mzML"));
-        assertTrue(e.getMessage().contains("src/test/resources"),
+        AssertionError e =
+                assertThrows(
+                        AssertionError.class,
+                        () -> Fixtures.require("data/no_such_fixture_exists.mzML"));
+        assertTrue(
+                e.getMessage().contains("src/test/resources"),
                 "the message must say where the fixture belongs. Got: " + e.getMessage());
     }
 
@@ -43,9 +49,12 @@ class FixturesContractTest {
     void theEwingFixturesGetFetchInstructionsNotJustAnAbsenceReport() {
         // The two Ewing files are gitignored (unstated licence), so "missing" is an expected state
         // with a specific remedy. A bare "file not found" would send the next engineer hunting.
-        AssertionError e = assertThrows(AssertionError.class,
-                () -> Fixtures.require("data/DP00570_F02.does_not_exist"));
-        assertTrue(e.getMessage().contains("fetch-fixtures.sh"),
+        AssertionError e =
+                assertThrows(
+                        AssertionError.class,
+                        () -> Fixtures.require("data/DP00570_F02.does_not_exist"));
+        assertTrue(
+                e.getMessage().contains("fetch-fixtures.sh"),
                 "an absent Ewing fixture must name the fetch script. Got: " + e.getMessage());
     }
 
@@ -63,10 +72,14 @@ class FixturesContractTest {
 
     @Test
     void assumeTrueWouldHaveBeenSilent() {
-        // Documents, executably, why the AssertionError above matters: this is what the old code did.
+        // Documents, executably, why the AssertionError above matters: this is what the old code
+        // did.
         // JUnit reports a TestAbortedException as "skipped", not "failed" -- which is precisely how
         // an empty verification suite reported success for four steps.
-        assertThrows(TestAbortedException.class,
-                () -> org.junit.jupiter.api.Assumptions.assumeTrue(false, "this is a SKIP, not a failure"));
+        assertThrows(
+                TestAbortedException.class,
+                () ->
+                        org.junit.jupiter.api.Assumptions.assumeTrue(
+                                false, "this is a SKIP, not a failure"));
     }
 }

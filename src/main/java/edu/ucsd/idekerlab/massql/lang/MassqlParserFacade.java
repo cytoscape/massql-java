@@ -1,13 +1,13 @@
 package edu.ucsd.idekerlab.massql.lang;
 
-import edu.ucsd.idekerlab.massql.MassqlParseException;
-import edu.ucsd.idekerlab.massql.lang.ast.MassqlQuery;
-
 import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Recognizer;
+
+import edu.ucsd.idekerlab.massql.MassqlParseException;
+import edu.ucsd.idekerlab.massql.lang.ast.MassqlQuery;
 
 /**
  * Turns query text into a typed AST. The only place ANTLR is driven.
@@ -18,7 +18,7 @@ import org.antlr.v4.runtime.Recognizer;
  */
 public final class MassqlParserFacade {
 
-    private MassqlParserFacade() { }
+    private MassqlParserFacade() {}
 
     /**
      * Error listener that THROWS.
@@ -30,12 +30,21 @@ public final class MassqlParserFacade {
      */
     private static final class ThrowingErrorListener extends BaseErrorListener {
         @Override
-        public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
-                                int line, int charPositionInLine, String msg, RecognitionException e) {
+        public void syntaxError(
+                Recognizer<?, ?> recognizer,
+                Object offendingSymbol,
+                int line,
+                int charPositionInLine,
+                String msg,
+                RecognitionException e) {
             throw new MassqlParseException(
                     "<syntax>",
-                    explain(msg, offendingSymbol) + " (at position " + (charPositionInLine + 1) + ")",
-                    charPositionInLine + 1, e);
+                    explain(msg, offendingSymbol)
+                            + " (at position "
+                            + (charPositionInLine + 1)
+                            + ")",
+                    charPositionInLine + 1,
+                    e);
         }
 
         /**
@@ -45,7 +54,8 @@ public final class MassqlParserFacade {
         private static String explain(String msg, Object offendingSymbol) {
             String tok = String.valueOf(offendingSymbol);
             if (tok.contains("WHERE") || tok.contains("where") || tok.contains("Where")) {
-                return msg + ". Note the function-call form is required: "
+                return msg
+                        + ". Note the function-call form is required: "
                         + "`QUERY scaninfo(MS2DATA) WHERE ...`, not `QUERY scaninfo WHERE ...`";
             }
             if (tok.contains("filter")) {
@@ -88,7 +98,8 @@ public final class MassqlParserFacade {
         } catch (RuntimeException e) {
             // Never let an ANTLR internal failure surface as something other than our type;
             // "never a crash" is a Tech_Step4 requirement even on garbage input.
-            throw new MassqlParseException("<syntax>", "could not parse query: " + e.getMessage(), -1, e);
+            throw new MassqlParseException(
+                    "<syntax>", "could not parse query: " + e.getMessage(), -1, e);
         }
 
         try {
@@ -96,7 +107,8 @@ public final class MassqlParserFacade {
         } catch (MassqlParseException e) {
             throw e;
         } catch (RuntimeException e) {
-            throw new MassqlParseException("<internal>", "could not build AST: " + e.getMessage(), -1, e);
+            throw new MassqlParseException(
+                    "<internal>", "could not build AST: " + e.getMessage(), -1, e);
         }
     }
 }

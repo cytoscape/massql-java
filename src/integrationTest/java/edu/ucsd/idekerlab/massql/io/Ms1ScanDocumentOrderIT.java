@@ -1,6 +1,7 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -51,7 +52,8 @@ class Ms1ScanDocumentOrderIT {
     void everyMs2LinksToTheMostRecentPrecedingMs1() {
         Path mzxml = Fixtures.require("data/DP00570_F02.mzxml");
 
-        // Guard the premise FIRST. If the fixture ever gained precursorScanNum attributes, this test
+        // Guard the premise FIRST. If the fixture ever gained precursorScanNum attributes, this
+        // test
         // would silently stop distinguishing the two implementations.
         String raw;
         try {
@@ -59,7 +61,9 @@ class Ms1ScanDocumentOrderIT {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        assertEquals(0, raw.split("precursorScanNum", -1).length - 1,
+        assertEquals(
+                0,
+                raw.split("precursorScanNum", -1).length - 1,
                 "DP00570_F02.mzxml must carry ZERO precursorScanNum attributes -- that absence is the "
                         + "only reason this fixture can distinguish document order from declared linkage");
 
@@ -68,7 +72,8 @@ class Ms1ScanDocumentOrderIT {
         // streaming walk, so agreement means both got document order right rather than both sharing
         // one bug.
         //
-        // NOT from the loader-parity dump: that is built from ms1_df then ms2_df, so its `scans` list
+        // NOT from the loader-parity dump: that is built from ms1_df then ms2_df, so its `scans`
+        // list
         // is GROUPED BY LEVEL (229 MS1 entries, then 687 MS2) and cannot express document order at
         // all. Deriving the chain from it yields 913 -- the last MS1 -- for every MS2. Step 8 needs
         // to know this about the dump too.
@@ -83,7 +88,7 @@ class Ms1ScanDocumentOrderIT {
             int peaks = Integer.parseInt(attrValue(attrs, "peaksCount"));
             if (level == 1) {
                 seenMs1++;
-                if (peaks > 0) previousMs1 = num;          // C27b: an empty MS1 is not a link
+                if (peaks > 0) previousMs1 = num; // C27b: an empty MS1 is not a link
             } else if (level == 2) {
                 seenMs2++;
                 expected.put(num, previousMs1);
@@ -108,10 +113,19 @@ class Ms1ScanDocumentOrderIT {
         // Report the FIRST disagreement rather than dumping 687 pairs into the failure message --
         // a 700-entry map diff is unreadable and buries the one scan that matters.
         for (Map.Entry<Integer, Integer> e : expected.entrySet()) {
-            assertEquals(e.getValue(), actual.get(e.getKey()),
-                    "ms1scan for MS2 scan " + e.getKey() + " must be the most recent preceding MS1 by "
-                            + "DOCUMENT ORDER (expected " + e.getValue() + ", got " + actual.get(e.getKey())
-                            + "). " + expected.size() + " MS2 scans compared.");
+            assertEquals(
+                    e.getValue(),
+                    actual.get(e.getKey()),
+                    "ms1scan for MS2 scan "
+                            + e.getKey()
+                            + " must be the most recent preceding MS1 by "
+                            + "DOCUMENT ORDER (expected "
+                            + e.getValue()
+                            + ", got "
+                            + actual.get(e.getKey())
+                            + "). "
+                            + expected.size()
+                            + " MS2 scans compared.");
         }
         assertEquals(expected, actual, "the two maps must agree exactly");
     }
@@ -134,20 +148,36 @@ class Ms1ScanDocumentOrderIT {
         assertEquals(101, links.get(103));
         assertEquals(101, links.get(104));
 
-        // This file has no leading MS2, so every link must be a real scan. A precursorScanNum-resolving
+        // This file has no leading MS2, so every link must be a real scan. A
+        // precursorScanNum-resolving
         // reader produces 0/null throughout and fails here even without the map comparison above.
-        links.forEach((ms2, linked) -> assertTrue(linked > 0,
-                "scan " + ms2 + " has ms1scan 0; a precursorScanNum-resolving reader gives exactly this"));
-        links.forEach((ms2, linked) -> assertTrue(linked < ms2,
-                "scan " + ms2 + " links to " + linked + ", which does not precede it"));
+        links.forEach(
+                (ms2, linked) ->
+                        assertTrue(
+                                linked > 0,
+                                "scan "
+                                        + ms2
+                                        + " has ms1scan 0; a precursorScanNum-resolving reader gives exactly this"));
+        links.forEach(
+                (ms2, linked) ->
+                        assertTrue(
+                                linked < ms2,
+                                "scan "
+                                        + ms2
+                                        + " links to "
+                                        + linked
+                                        + ", which does not precede it"));
 
         // All 229 MS1 scans are referenced, so no whole region of the file is being mis-linked.
-        assertEquals(229, new java.util.HashSet<>(links.values()).size(),
+        assertEquals(
+                229,
+                new java.util.HashSet<>(links.values()).size(),
                 "every one of the 229 MS1 scans should be the target of at least one MS2");
 
         // Consecutive MS2 scans sharing a precursor are the norm here; if every link were distinct,
         // the reader would be inventing a 1:1 mapping.
-        assertTrue(links.size() > new java.util.HashSet<>(links.values()).size(),
+        assertTrue(
+                links.size() > new java.util.HashSet<>(links.values()).size(),
                 "687 MS2 scans over 229 MS1 scans means links must repeat");
     }
 }

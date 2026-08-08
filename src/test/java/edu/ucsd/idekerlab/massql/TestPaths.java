@@ -42,7 +42,9 @@ public final class TestPaths {
             }
         }
         throw new AssertionError(
-                "cannot locate the repository root: no ancestor of " + start + " contains "
+                "cannot locate the repository root: no ancestor of "
+                        + start
+                        + " contains "
                         + ROOT_MARKER);
     }
 

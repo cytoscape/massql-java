@@ -15,7 +15,7 @@ import edu.ucsd.idekerlab.massql.lang.ast.MassqlQuery;
  */
 public final class Massql {
 
-    private Massql() { }
+    private Massql() {}
 
     /**
      * Parses query text into a typed, immutable AST.

@@ -9,12 +9,19 @@ package edu.ucsd.idekerlab.massql.lang.ast;
 public record Qualifier(QualifierType type, Comparator comparator, Expr value) {
     public Qualifier {
         if (type == null || comparator == null || value == null) {
-            throw new IllegalArgumentException("qualifier type, comparator and value are all required");
+            throw new IllegalArgumentException(
+                    "qualifier type, comparator and value are all required");
         }
     }
 
-    @Override public String toString() {
-        String cmp = switch (comparator) { case EQ -> "="; case GT -> ">"; case LT -> "<"; };
+    @Override
+    public String toString() {
+        String cmp =
+                switch (comparator) {
+                    case EQ -> "=";
+                    case GT -> ">";
+                    case LT -> "<";
+                };
         return type + cmp + value;
     }
 }

@@ -37,7 +37,15 @@ allprojects {
         java {
             // Vendored MSDK code is held byte-identical to upstream by policy (docs/VENDORED.md,
             // asserted by VendoredProvenanceTest). Formatting it would break that guarantee.
-            targetExclude 'src/main/java/edu/ucsd/idekerlab/massql/io/vendor/**'
+            // Vendored MSDK sources are held byte-identical to upstream by policy. NOTE this is
+            // src/MAIN only: src/test/.../io/vendor/ holds OUR tests OF the vendored decoder, which
+            // are formatted like everything else.
+            targetExclude 'src/main/java/edu/ucsd/idekerlab/massql/io/vendor/**',
+            // ANTLR's generated lexer/parser. The antlr plugin adds build/generated-src as a java
+            // source directory, so Spotless picks it up unless told otherwise -- and it is full of
+            // wildcard imports that forbidWildcardImports cannot auto-fix and nobody should hand-fix.
+            // pom.xml:110 and Tech_Step3.md:189 both already required this exclusion.
+                    'build/generated-src/**'
 
             // .aosp() = 4-space indent, 100-column limit -- what this codebase already uses.
             //
@@ -50,10 +58,13 @@ allprojects {
             importOrder('java', 'javax', 'org', 'com', 'edu.ucsd')
             removeUnusedImports()
 
-            // Wildcard imports: expand any that exist, then forbid new ones. Upstream advises
-            // dropping the (JavaParser-based, expensive) expansion once the tree is clean and
-            // keeping only the cheap check.
-            expandWildcardImports()
+            // No wildcard imports, anywhere.
+            //
+            // The companion auto-fix step, expandWildcardImports(), is NOT used: it needs a
+            // JavaParser SymbolResolver wired to the compile classpath, Spotless provides no way to
+            // configure one (diffplug/spotless#2846), and it fails with "Symbol resolution not
+            // configured" on 33 files here. The 53 wildcards this repo had were expanded once,
+            // mechanically, from measured usage; this check is what keeps them from coming back.
             forbidWildcardImports()
 
             // Escape hatch for the few places where manual alignment carries meaning -- e.g. the

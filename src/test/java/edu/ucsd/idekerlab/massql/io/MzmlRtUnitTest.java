@@ -1,6 +1,8 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.nio.file.Path;
 
@@ -23,7 +25,10 @@ class MzmlRtUnitTest {
     private static double[] rtsOf(Path p) {
         java.util.List<Double> out = new java.util.ArrayList<>();
         try (SpectraStream s = SpectraFile.open(p)) {
-            while (s.hasNext()) { ScanView v = s.next(); out.add(v.rt()); }
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                out.add(v.rt());
+            }
         }
         return out.stream().mapToDouble(Double::doubleValue).toArray();
     }
@@ -33,7 +38,10 @@ class MzmlRtUnitTest {
         // micro.mzML scan rt values are 0.0, 0.5, 1.0, 1.5, 2.0 minutes, declared as "minute".
         double[] rt = rtsOf(Fixtures.require("fixtures/micro/micro.mzML"));
         assertEquals(5, rt.length);
-        assertArrayEquals(new double[]{0.0, 0.5, 1.0, 1.5, 2.0}, rt, 0.0,
+        assertArrayEquals(
+                new double[] {0.0, 0.5, 1.0, 1.5, 2.0},
+                rt,
+                0.0,
                 "unitName=\"minute\" must NOT be divided by 60");
     }
 
@@ -43,7 +51,10 @@ class MzmlRtUnitTest {
         // declares unitName="second", so it must come back as the same minutes as above.
         double[] rt = rtsOf(Fixtures.require("fixtures/micro/micro_rtseconds.mzML"));
         assertEquals(5, rt.length);
-        assertArrayEquals(new double[]{0.0, 0.5, 1.0, 1.5, 2.0}, rt, 1e-12,
+        assertArrayEquals(
+                new double[] {0.0, 0.5, 1.0, 1.5, 2.0},
+                rt,
+                1e-12,
                 "unitName=\"second\" must be divided by 60");
     }
 
@@ -51,7 +62,8 @@ class MzmlRtUnitTest {
     void theTwoFixturesAgreeAfterConversion() {
         // The direct statement of the rule: same times, different declared units, identical result.
         // If someone makes the conversion unconditional, this passes but the minute test fails; if
-        // they remove it entirely, this passes but the second test fails. Both directions are needed.
+        // they remove it entirely, this passes but the second test fails. Both directions are
+        // needed.
         double[] minutes = rtsOf(Fixtures.require("fixtures/micro/micro.mzML"));
         double[] seconds = rtsOf(Fixtures.require("fixtures/micro/micro_rtseconds.mzML"));
         assertArrayEquals(minutes, seconds, 1e-12);
@@ -65,8 +77,9 @@ class MzmlRtUnitTest {
             while (s.hasNext()) {
                 ScanView v = s.next();
                 if (v.scanId() == 3) {
-                    assertEquals(Double.doubleToLongBits(0.011218333333333334),
-                                 Double.doubleToLongBits(v.rt()));
+                    assertEquals(
+                            Double.doubleToLongBits(0.011218333333333334),
+                            Double.doubleToLongBits(v.rt()));
                     return;
                 }
             }

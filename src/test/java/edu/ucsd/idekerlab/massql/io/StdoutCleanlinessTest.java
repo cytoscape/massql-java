@@ -1,6 +1,7 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -32,7 +33,7 @@ import org.junit.jupiter.api.Test;
  */
 class StdoutCleanlinessTest {
 
-    private record Captured(String out, String err) { }
+    private record Captured(String out, String err) {}
 
     private static Captured capture(Runnable r) {
         PrintStream realOut = System.out, realErr = System.err;
@@ -46,21 +47,31 @@ class StdoutCleanlinessTest {
             System.setOut(realOut);
             System.setErr(realErr);
         }
-        return new Captured(out.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8));
+        return new Captured(
+                out.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8));
     }
 
     @Test
     void readingAnMzmlWritesNothingToStdout() {
         Path mzml = Fixtures.require("data/small.mzML");
-        Captured c = capture(() -> {
-            try (SpectraStream s = SpectraFile.open(mzml)) {
-                while (s.hasNext()) { ScanView v = s.next(); v.materialize(); }
-            }
-        });
-        assertEquals("", c.out(),
+        Captured c =
+                capture(
+                        () -> {
+                            try (SpectraStream s = SpectraFile.open(mzml)) {
+                                while (s.hasNext()) {
+                                    ScanView v = s.next();
+                                    v.materialize();
+                                }
+                            }
+                        });
+        assertEquals(
+                "",
+                c.out(),
                 "the SDK wrote to stdout; DEPENDENCY_POLICY constraint 2 requires it to write to no "
-                        + "stream at all and return diagnostics instead. Got:\n" + c.out());
-        assertFalse(c.out().contains("Data buffer"),
+                        + "stream at all and return diagnostics instead. Got:\n"
+                        + c.out());
+        assertFalse(
+                c.out().contains("Data buffer"),
                 "javolution's buffer-growth logging is back; see JavolutionQuiet");
     }
 
@@ -69,22 +80,32 @@ class StdoutCleanlinessTest {
         // Constraint 2 is "the SDK logs nothing", not "logs only to stderr". Diagnostics are
         // RETURNED via SpectraStream.diagnostics() so the caller decides where they go.
         Path mzml = Fixtures.require("data/small.mzML");
-        Captured c = capture(() -> {
-            try (SpectraStream s = SpectraFile.open(mzml)) {
-                while (s.hasNext()) { ScanView v = s.next(); v.materialize(); }
-            }
-        });
+        Captured c =
+                capture(
+                        () -> {
+                            try (SpectraStream s = SpectraFile.open(mzml)) {
+                                while (s.hasNext()) {
+                                    ScanView v = s.next();
+                                    v.materialize();
+                                }
+                            }
+                        });
         assertEquals("", c.err(), "the SDK wrote to stderr:\n" + c.err());
     }
 
     @Test
     void readingAnMgfIsSilentToo() {
         Path mgf = Fixtures.require("fixtures/micro/micro.mgf");
-        Captured c = capture(() -> {
-            try (SpectraStream s = SpectraFile.open(mgf)) {
-                while (s.hasNext()) { ScanView v = s.next(); v.materialize(); }
-            }
-        });
+        Captured c =
+                capture(
+                        () -> {
+                            try (SpectraStream s = SpectraFile.open(mgf)) {
+                                while (s.hasNext()) {
+                                    ScanView v = s.next();
+                                    v.materialize();
+                                }
+                            }
+                        });
         assertEquals("", c.out());
         assertEquals("", c.err());
     }

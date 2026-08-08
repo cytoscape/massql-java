@@ -1,6 +1,9 @@
 package edu.ucsd.idekerlab.massql.result;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,14 +24,36 @@ class ResultJsonTest {
 
     /** A fully-populated MS2 row, using the first record of {@code small_mzml_results.json}. */
     private static ScanInfoResult ms2Row() {
-        return new ScanInfoResult(3, 810.79, 2, 0.011218333333333334, null, 586278.8533592224, 2,
-                161140.859375, 736.6370849609375, null, null, 183838.71875);
+        return new ScanInfoResult(
+                3,
+                810.79,
+                2,
+                0.011218333333333334,
+                null,
+                586278.8533592224,
+                2,
+                161140.859375,
+                736.6370849609375,
+                null,
+                null,
+                183838.71875);
     }
 
     /** An MS1 row: precursor fields null, base peaks REAL (C40). */
     private static ScanInfoResult ms1Row() {
-        return new ScanInfoResult(1, null, null, 0.004935, null, 69381840.0, 1,
-                1471224.875, 810.4154747204038, null, null, null);
+        return new ScanInfoResult(
+                1,
+                null,
+                null,
+                0.004935,
+                null,
+                69381840.0,
+                1,
+                1471224.875,
+                810.4154747204038,
+                null,
+                null,
+                null);
     }
 
     /** Keys in the order they appear in the JSON text, so ORDER is pinned and not just membership. */
@@ -39,9 +64,20 @@ class ResultJsonTest {
         return out;
     }
 
-    private static final List<String> EXPECTED_12 = List.of(
-            "scan", "precmz", "ms1scan", "rt", "charge", "tic", "mslevel",
-            "base_peak_i", "base_peak_mz", "ms1_i", "ms1_precmz", "ms1_base_peak_i");
+    private static final List<String> EXPECTED_12 =
+            List.of(
+                    "scan",
+                    "precmz",
+                    "ms1scan",
+                    "rt",
+                    "charge",
+                    "tic",
+                    "mslevel",
+                    "base_peak_i",
+                    "base_peak_mz",
+                    "ms1_i",
+                    "ms1_precmz",
+                    "ms1_base_peak_i");
 
     // ---------------------------------------------------------------- shape
 
@@ -52,17 +88,22 @@ class ResultJsonTest {
 
     @Test
     void anMs1RowEmitsTheSAMEtwelveKeysInTheSameOrder() {
-        // ⛔ The C40 assertion. This is what the old spec got backwards: it required MS1DATA to emit 4
+        // ⛔ The C40 assertion. This is what the old spec got backwards: it required MS1DATA to emit
+        // 4
         // keys with precmz/ms1scan/charge ABSENT. There is one shape.
-        assertEquals(EXPECTED_12, keysInOrder(ResultJson.write(List.of(ms1Row()))),
+        assertEquals(
+                EXPECTED_12,
+                keysInOrder(ResultJson.write(List.of(ms1Row()))),
                 "MS1DATA and MS2DATA emit the same 12 keys, discriminated by mslevel (C40)");
     }
 
     @Test
     void theTwoShapesAreLiterallyIdenticalInKeyStructure() {
-        // Stated as a property rather than two separate lists, so a future edit cannot drift one apart
+        // Stated as a property rather than two separate lists, so a future edit cannot drift one
+        // apart
         // from the other.
-        assertEquals(keysInOrder(ResultJson.write(List.of(ms2Row()))),
+        assertEquals(
+                keysInOrder(ResultJson.write(List.of(ms2Row()))),
                 keysInOrder(ResultJson.write(List.of(ms1Row()))));
     }
 
@@ -70,7 +111,9 @@ class ResultJsonTest {
     void inapplicableFieldsArePRESENTwithJsonNullNotOmitted() {
         String json = ResultJson.write(List.of(ms1Row()));
         // The old contract's test asserted !json.has("precmz"). The opposite is required.
-        assertTrue(json.contains("\"precmz\":null"), "precmz must be present and null, not omitted: " + json);
+        assertTrue(
+                json.contains("\"precmz\":null"),
+                "precmz must be present and null, not omitted: " + json);
         assertTrue(json.contains("\"ms1scan\":null"));
         assertTrue(json.contains("\"charge\":null"));
         assertTrue(json.contains("\"ms1_i\":null"));
@@ -84,7 +127,8 @@ class ResultJsonTest {
         String json = ResultJson.write(List.of(ms1Row()));
         assertTrue(json.contains("\"base_peak_i\":1471224.875"), json);
         assertTrue(json.contains("\"base_peak_mz\":810.4154747204038"), json);
-        assertFalse(json.contains("\"base_peak_i\":null"),
+        assertFalse(
+                json.contains("\"base_peak_i\":null"),
                 "a survey scan has a base peak -- issue #26 marks this 'Can be null? No'");
     }
 
@@ -99,7 +143,9 @@ class ResultJsonTest {
         String json = ResultJson.write(List.of(ms1Row()));
         assertFalse(json.contains("\"None\""), json);
         assertFalse(json.contains("\"\""), json);
-        assertFalse(json.contains("\"precmz\":0"), "0 is a real m/z-adjacent value, not a stand-in for null");
+        assertFalse(
+                json.contains("\"precmz\":0"),
+                "0 is a real m/z-adjacent value, not a stand-in for null");
     }
 
     // ---------------------------------------------------------------- array framing
@@ -124,7 +170,8 @@ class ResultJsonTest {
     @Test
     void outputIsCompactWithNoIndentationOrSpaces() {
         String json = ResultJson.write(List.of(ms2Row()));
-        assertFalse(json.contains("\n"), "the node-table cell stores this verbatim; layout is waste");
+        assertFalse(
+                json.contains("\n"), "the node-table cell stores this verbatim; layout is waste");
         assertFalse(json.contains(": "), json);
         assertFalse(json.contains(", "), json);
     }
@@ -133,30 +180,38 @@ class ResultJsonTest {
 
     @Test
     void everyEmittedFloatParsesBackToIDENTICALBITS() {
-        // The actual requirement -- not byte-matching Python. Guards against a formatter that rounds.
+        // The actual requirement -- not byte-matching Python. Guards against a formatter that
+        // rounds.
         double[] awkward = {
-                0.011218333333333334,   // the mzML golden's rt; does NOT survive a float round-trip
-                586278.8533592224,      // our exact float64 tic
-                736.6370849609375,      // an exact float32-derived m/z
-                810.4154747204038,
-                1e-5, 1e300, 4.9e-324,  // subnormal
-                0.1 + 0.2,              // 0.30000000000000004
+            0.011218333333333334, // the mzML golden's rt; does NOT survive a float round-trip
+            586278.8533592224, // our exact float64 tic
+            736.6370849609375, // an exact float32-derived m/z
+            810.4154747204038,
+            1e-5,
+            1e300,
+            4.9e-324, // subnormal
+            0.1 + 0.2, // 0.30000000000000004
         };
         for (double d : awkward) {
             ScanInfoResult r = new ScanInfoResult(1, d, 1, d, 1, d, 2, d, d, d, d, d);
             String json = ResultJson.write(List.of(r));
             Matcher m = Pattern.compile("\"tic\":([^,}]+)").matcher(json);
             assertTrue(m.find(), json);
-            assertEquals(Double.doubleToLongBits(d), Double.doubleToLongBits(Double.parseDouble(m.group(1))),
+            assertEquals(
+                    Double.doubleToLongBits(d),
+                    Double.doubleToLongBits(Double.parseDouble(m.group(1))),
                     "value " + d + " did not round-trip bit-exactly; emitted " + m.group(1));
         }
     }
 
     @Test
     void rtZeroIsEmittedAsZeroNotNull() {
-        // 664 rows of plusrise_results.json have rt 0.0. An over-eager null conversion fails all of them.
-        ScanInfoResult r = new ScanInfoResult(576, 161.0209, null, 0.0, 1, 1299900.0, 2,
-                230000.0, 162.1122, null, null, null);
+        // 664 rows of plusrise_results.json have rt 0.0. An over-eager null conversion fails all of
+        // them.
+        ScanInfoResult r =
+                new ScanInfoResult(
+                        576, 161.0209, null, 0.0, 1, 1299900.0, 2, 230000.0, 162.1122, null, null,
+                        null);
         String json = ResultJson.write(List.of(r));
         assertTrue(json.contains("\"rt\":0.0"), json);
         assertFalse(json.contains("\"rt\":null"), "0.0 is a genuine retention time");
@@ -167,18 +222,21 @@ class ResultJsonTest {
     @Test
     void aNonFiniteValueReachingTheSerializerFailsRatherThanEmittingInvalidJson() {
         // NaN/infinity must have been converted to null upstream. `NaN` is not valid JSON and the
-        // reference forbids it via allow_nan=False, so emitting it would produce a document no parser
+        // reference forbids it via allow_nan=False, so emitting it would produce a document no
+        // parser
         // accepts -- worse than failing.
-        ScanInfoResult bad = new ScanInfoResult(1, 1.0, 1, 1.0, 1, Double.NaN, 2,
-                1.0, 1.0, null, null, null);
-        IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> ResultJson.write(List.of(bad)));
+        ScanInfoResult bad =
+                new ScanInfoResult(1, 1.0, 1, 1.0, 1, Double.NaN, 2, 1.0, 1.0, null, null, null);
+        IllegalStateException e =
+                assertThrows(IllegalStateException.class, () -> ResultJson.write(List.of(bad)));
         assertTrue(e.getMessage().contains("non-finite"), e.getMessage());
     }
 
     @Test
     void theSerializersKeyListIsTheRecordsOwnSoTheyCannotDrift() {
-        assertEquals(EXPECTED_12, List.of(ScanInfoResult.KEYS),
+        assertEquals(
+                EXPECTED_12,
+                List.of(ScanInfoResult.KEYS),
                 "ScanInfoResult.KEYS is the single key list; ResultJson emits in that order");
     }
 }

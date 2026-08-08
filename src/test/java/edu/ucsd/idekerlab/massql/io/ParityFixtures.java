@@ -48,7 +48,8 @@ final class ParityFixtures {
         FIXTURES_WITH_DUMPS.put("DP00570_F02.mgf", 0);
         // 12,571 of PlusRise's 34,513 blocks carry no peak lines (C24b). MassQL loads 21,942.
         FIXTURES_WITH_DUMPS.put("PlusRise.mgf", 12_571);
-        // Micro fixtures: scan 4 is a zero-peak MS1, so each mzML/mzXML variant has exactly one extra.
+        // Micro fixtures: scan 4 is a zero-peak MS1, so each mzML/mzXML variant has exactly one
+        // extra.
         // micro.mgf is MS2-only, so its zero-peak MS1 never existed on our side -- hence 0, not 1.
         FIXTURES_WITH_DUMPS.put("micro.mzML", 1);
         FIXTURES_WITH_DUMPS.put("micro_rtseconds.mzML", 1);
@@ -75,6 +76,7 @@ final class ParityFixtures {
 
     /** Where each fixture lives under {@code src/test/resources}. */
     static Path fixturePath(String name) {
-        return Fixtures.require(name.startsWith("micro") ? "fixtures/micro/" + name : "data/" + name);
+        return Fixtures.require(
+                name.startsWith("micro") ? "fixtures/micro/" + name : "data/" + name);
     }
 }

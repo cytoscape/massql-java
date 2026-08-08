@@ -1,6 +1,7 @@
 package edu.ucsd.idekerlab.massql.spectra;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -65,7 +66,8 @@ class StoreScaleTest {
 
         // Generous: allows a 10x swing for JIT, cache effects and machine noise while still
         // catching the 100x that a linear scan over 100x more rows would produce.
-        assertTrue(tLarge < Math.max(50, tSmall * 10L),
+        assertTrue(
+                tLarge < Math.max(50, tSmall * 10L),
                 "mzWindow looks linear in table size: " + tSmall + "ms vs " + tLarge + "ms");
     }
 
@@ -83,8 +85,13 @@ class StoreScaleTest {
         System.out.println("  200k exclusive windows over 300 scans: " + tSmall + " ms");
         System.out.println("  200k exclusive windows over 30k scans: " + tLarge + " ms");
 
-        assertTrue(tLarge < Math.max(50, tSmall * 10L),
-                "mzWindowExclusive looks linear in table size: " + tSmall + "ms vs " + tLarge + "ms");
+        assertTrue(
+                tLarge < Math.max(50, tSmall * 10L),
+                "mzWindowExclusive looks linear in table size: "
+                        + tSmall
+                        + "ms vs "
+                        + tLarge
+                        + "ms");
     }
 
     private static long timeWindows(SpectrumTable t, int iterations, boolean exclusive) {
@@ -95,9 +102,10 @@ class StoreScaleTest {
             int ordinal = k % scans;
             // Deterministic pseudo-random target; Math.random() would make this unreproducible.
             double centre = 100.0 + ((k * 7919L) % 33) * 0.01;
-            IntRange r = exclusive
-                    ? t.mzWindowExclusive(ordinal, centre - 0.005, centre + 0.005)
-                    : t.mzWindow(ordinal, centre - 0.005, centre + 0.005);
+            IntRange r =
+                    exclusive
+                            ? t.mzWindowExclusive(ordinal, centre - 0.005, centre + 0.005)
+                            : t.mzWindow(ordinal, centre - 0.005, centre + 0.005);
             hits += r.size();
         }
         long ms = (System.nanoTime() - t0) / 1_000_000;
@@ -109,7 +117,7 @@ class StoreScaleTest {
     void windowsRemainCorrectAtScale() {
         // Speed is worthless if the answer is wrong; check a few windows against hand values.
         SpectrumTable t = build(1_000, 33);
-        for (int ordinal : new int[]{0, 1, 500, 999}) {
+        for (int ordinal : new int[] {0, 1, 500, 999}) {
             IntRange all = t.mzWindow(ordinal, 100.0, 100.0 + 32 * 0.01);
             assertEquals(33, all.size(), "whole-scan window at ordinal " + ordinal);
             assertEquals(t.index().rowStart(ordinal), all.start());

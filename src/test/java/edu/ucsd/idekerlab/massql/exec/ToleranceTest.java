@@ -1,15 +1,15 @@
 package edu.ucsd.idekerlab.massql.exec;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
 
 import edu.ucsd.idekerlab.massql.lang.ast.Comparator;
 import edu.ucsd.idekerlab.massql.lang.ast.Expr;
 import edu.ucsd.idekerlab.massql.lang.ast.Qualifier;
 import edu.ucsd.idekerlab.massql.lang.ast.QualifierType;
-
-import java.util.List;
-
-import org.junit.jupiter.api.Test;
 
 /**
  * The tolerance rules, from {@code _get_mz_tolerance} (`msql_engine_filters.py:5-17`).
@@ -30,19 +30,28 @@ class ToleranceTest {
 
     @Test
     void ppmWinsWhenBothAreGiven() {
-        // NOT "narrower wins", NOT an error. The source checks ppm first and returns, so a 5 ppm qualifier
-        // beats a 100 Da one even though the Da window is vastly wider. Choosing "narrower" would happen to
+        // NOT "narrower wins", NOT an error. The source checks ppm first and returns, so a 5 ppm
+        // qualifier
+        // beats a 100 Da one even though the Da window is vastly wider. Choosing "narrower" would
+        // happen to
         // agree here and disagree whenever the Da value is the tighter of the two.
         double half = Tolerance.halfWidthFor(List.of(ppm(5.0), da(100.0)), 500.0);
         assertEquals(500.0 * 5.0 / 1e6, half, 0.0, "ppm must win");
 
-        // And in the other declaration order -- the rule is about which TYPE wins, not which comes first.
-        assertEquals(500.0 * 5.0 / 1e6, Tolerance.halfWidthFor(List.of(da(100.0), ppm(5.0)), 500.0), 0.0);
+        // And in the other declaration order -- the rule is about which TYPE wins, not which comes
+        // first.
+        assertEquals(
+                500.0 * 5.0 / 1e6,
+                Tolerance.halfWidthFor(List.of(da(100.0), ppm(5.0)), 500.0),
+                0.0);
     }
 
     @Test
     void ppmIsConvertedFromTheTargetValue() {
-        assertEquals(0.01, Tolerance.halfWidthFor(List.of(ppm(20.0)), 500.0), 1e-15,
+        assertEquals(
+                0.01,
+                Tolerance.halfWidthFor(List.of(ppm(20.0)), 500.0),
+                1e-15,
                 "20 ppm of 500 is 0.01 Da");
         // Computed from the TARGET, so the width scales with the target rather than being fixed.
         assertEquals(0.02, Tolerance.halfWidthFor(List.of(ppm(20.0)), 1000.0), 1e-15);
@@ -65,7 +74,8 @@ class ToleranceTest {
         assertEquals(0.1, Tolerance.halfWidthFor(null, 500.0), 0.0);
         assertEquals(0.1, Tolerance.DEFAULT_DA, 0.0);
         // An intensity qualifier is not a tolerance qualifier -- the default still applies.
-        Qualifier ip = new Qualifier(QualifierType.INTENSITYPERCENT, Comparator.EQ, new Expr.Literal(5));
+        Qualifier ip =
+                new Qualifier(QualifierType.INTENSITYPERCENT, Comparator.EQ, new Expr.Literal(5));
         assertEquals(0.1, Tolerance.halfWidthFor(List.of(ip), 500.0), 0.0);
     }
 
@@ -79,8 +89,11 @@ class ToleranceTest {
     @Test
     void theQualifierValueIsFoldedNotAssumedLiteral() {
         // Tolerances can be arithmetic expressions; folding happens once, here.
-        Expr sum = new Expr.Binary(new Expr.Literal(10.0),
-                edu.ucsd.idekerlab.massql.lang.ast.Op.ADD, new Expr.Literal(10.0));
+        Expr sum =
+                new Expr.Binary(
+                        new Expr.Literal(10.0),
+                        edu.ucsd.idekerlab.massql.lang.ast.Op.ADD,
+                        new Expr.Literal(10.0));
         Qualifier q = new Qualifier(QualifierType.TOLERANCEPPM, Comparator.EQ, sum);
         assertEquals(0.01, Tolerance.halfWidthFor(List.of(q), 500.0), 1e-15, "10+10 ppm of 500");
     }

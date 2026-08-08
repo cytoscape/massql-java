@@ -1,6 +1,12 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -35,6 +41,7 @@ class SpectraStreamContractTest {
 
     /** One fixture per format — the three readers, not just whichever is convenient. */
     private static final String MGF = "fixtures/micro/micro.mgf";
+
     private static final String MZML = "fixtures/micro/micro.mzML";
     private static final String MZXML = "fixtures/micro/micro.mzXML";
 
@@ -86,7 +93,9 @@ class SpectraStreamContractTest {
     void nextPastTheEndThrowsNoSuchElement(String f) {
         try (SpectraStream s = SpectraFile.open(fixture(f))) {
             while (s.hasNext()) s.next();
-            assertThrows(NoSuchElementException.class, s::next,
+            assertThrows(
+                    NoSuchElementException.class,
+                    s::next,
                     "reading past the end must fail, not re-serve the last scan");
         }
     }
@@ -106,20 +115,24 @@ class SpectraStreamContractTest {
         }
     }
 
-    // ---------------------------------------------------------------- the returned view is ONE object
+    // ---------------------------------------------------------------- the returned view is ONE
+    // object
 
     @ParameterizedTest
     @ValueSource(strings = {MGF, MZML, MZXML})
     void nextReturnsTheSameInstanceEveryTime(String f) {
-        // Not an accident to be fixed -- it is the design, and it is why retained memory is bounded by
+        // Not an accident to be fixed -- it is the design, and it is why retained memory is bounded
+        // by
         // the largest single scan. Asserting it here means anyone who "improves" the readers into
         // allocating per scan has to change a test that says why not to.
         try (SpectraStream s = SpectraFile.open(fixture(f))) {
             assertTrue(s.hasNext());
             ScanView first = s.next();
-            if (!s.hasNext()) return;                 // single-scan fixture: nothing to compare
+            if (!s.hasNext()) return; // single-scan fixture: nothing to compare
             ScanView second = s.next();
-            assertSame(first, second,
+            assertSame(
+                    first,
+                    second,
                     "the view is a reused cursor; a fresh instance per scan would silently multiply "
                             + "retained memory by the scan count");
         }
@@ -127,14 +140,17 @@ class SpectraStreamContractTest {
 
     @Test
     void theViewIsRewoundNotCopiedSoStaleReferencesSeeTheNewScan() {
-        // The consequence of the above, stated so it cannot surprise anyone: a reference held across
+        // The consequence of the above, stated so it cannot surprise anyone: a reference held
+        // across
         // an advance reports the NEW scan's data. materialize() is the supported way to retain.
         try (SpectraStream s = SpectraFile.open(fixture(MZML))) {
             ScanView v = s.next();
             int firstId = v.scanId();
             assertTrue(s.hasNext());
             s.next();
-            assertNotEquals(firstId, v.scanId(),
+            assertNotEquals(
+                    firstId,
+                    v.scanId(),
                     "the same object must now report the second scan -- this is the aliasing the "
                             + "javadoc warns about, and materialize() is the way around it");
         }
@@ -146,11 +162,14 @@ class SpectraStreamContractTest {
     void spectraStreamIsDeliberatelyNotAnIterator() {
         // Naming only. Extending Iterator<ScanView> would make StreamSupport.stream(...).toList() a
         // legal, compiling, silently WRONG way to collect N aliases of one mutable object -- every
-        // element reporting the last scan. Keeping the type outside the Iterator hierarchy makes that
+        // element reporting the last scan. Keeping the type outside the Iterator hierarchy makes
+        // that
         // unreachable rather than merely discouraged.
-        assertFalse(Iterator.class.isAssignableFrom(SpectraStream.class),
+        assertFalse(
+                Iterator.class.isAssignableFrom(SpectraStream.class),
                 "SpectraStream must not be an Iterator -- see the interface javadoc for why");
-        assertFalse(Iterable.class.isAssignableFrom(SpectraStream.class),
+        assertFalse(
+                Iterable.class.isAssignableFrom(SpectraStream.class),
                 "and not Iterable either, which would enable for-each and the same collect hazard");
     }
 
@@ -161,7 +180,9 @@ class SpectraStreamContractTest {
     void usingAClosedStreamFailsRatherThanReturningNothing(String f) {
         SpectraStream s = SpectraFile.open(fixture(f));
         s.close();
-        assertThrows(edu.ucsd.idekerlab.massql.MassqlException.class, s::hasNext,
+        assertThrows(
+                edu.ucsd.idekerlab.massql.MassqlException.class,
+                s::hasNext,
                 "a closed stream reporting 'no more scans' would read as an empty file");
     }
 }

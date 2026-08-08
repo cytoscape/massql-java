@@ -21,15 +21,20 @@ public class MassqlParseException extends MassqlException {
     public MassqlParseException(String construct, String message, int position, Throwable cause) {
         super(message, cause);
         if (construct == null || construct.isBlank()) {
-            throw new IllegalArgumentException("construct is mandatory: see MassqlParseException javadoc");
+            throw new IllegalArgumentException(
+                    "construct is mandatory: see MassqlParseException javadoc");
         }
         this.construct = construct;
         this.position = position;
     }
 
     /** The offending construct, e.g. "scansum" or "FILTER". Never null or blank. */
-    public String construct() { return construct; }
+    public String construct() {
+        return construct;
+    }
 
     /** 1-based character offset in the query text, or -1 if not localizable. */
-    public int position() { return position; }
+    public int position() {
+        return position;
+    }
 }

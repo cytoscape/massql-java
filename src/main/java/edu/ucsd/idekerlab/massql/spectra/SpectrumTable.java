@@ -1,6 +1,5 @@
 package edu.ucsd.idekerlab.massql.spectra;
 
-
 import java.util.Arrays;
 
 /**
@@ -27,16 +26,24 @@ public final class SpectrumTable {
     // Parallel arrays, all of length rowCount. No boxing, no per-peak objects.
     private final double[] mz;
     private final double[] i;
-    private final double[] iNorm;      // i / max(i in scan)
-    private final double[] iTicNorm;   // i / sum(i in scan)
-    private final int[] scan;          // non-decreasing
-    private final float[] rt;          // minutes; cheap row-level filtering only -- see ScanIndex
+    private final double[] iNorm; // i / max(i in scan)
+    private final double[] iTicNorm; // i / sum(i in scan)
+    private final int[] scan; // non-decreasing
+    private final float[] rt; // minutes; cheap row-level filtering only -- see ScanIndex
     private final byte[] polarity;
     private final byte msLevel;
     private final ScanIndex index;
 
-    SpectrumTable(double[] mz, double[] i, double[] iNorm, double[] iTicNorm,
-                  int[] scan, float[] rt, byte[] polarity, byte msLevel, ScanIndex index) {
+    SpectrumTable(
+            double[] mz,
+            double[] i,
+            double[] iNorm,
+            double[] iTicNorm,
+            int[] scan,
+            float[] rt,
+            byte[] polarity,
+            byte msLevel,
+            ScanIndex index) {
         this.mz = mz;
         this.i = i;
         this.iNorm = iNorm;
@@ -53,17 +60,45 @@ public final class SpectrumTable {
         return new SpectrumTableBuilder(msLevel).build();
     }
 
-    public int rowCount() { return mz.length; }
-    public byte msLevel() { return msLevel; }
-    public ScanIndex index() { return index; }
-    public boolean isEmpty() { return mz.length == 0; }
+    public int rowCount() {
+        return mz.length;
+    }
 
-    public double mz(int row)        { return mz[row]; }
-    public double intensity(int row) { return i[row]; }
-    public double iNorm(int row)     { return iNorm[row]; }
-    public double iTicNorm(int row)  { return iTicNorm[row]; }
-    public int scanId(int row)       { return scan[row]; }
-    public byte polarity(int row)    { return polarity[row]; }
+    public byte msLevel() {
+        return msLevel;
+    }
+
+    public ScanIndex index() {
+        return index;
+    }
+
+    public boolean isEmpty() {
+        return mz.length == 0;
+    }
+
+    public double mz(int row) {
+        return mz[row];
+    }
+
+    public double intensity(int row) {
+        return i[row];
+    }
+
+    public double iNorm(int row) {
+        return iNorm[row];
+    }
+
+    public double iTicNorm(int row) {
+        return iTicNorm[row];
+    }
+
+    public int scanId(int row) {
+        return scan[row];
+    }
+
+    public byte polarity(int row) {
+        return polarity[row];
+    }
 
     /**
      * Row-level retention time, at <b>float</b> precision.
@@ -71,7 +106,9 @@ public final class SpectrumTable {
      * <p>For cheap RT filtering only. Anything that reaches the result JSON must use
      * {@link ScanIndex#rtOf}, which is an exact double — see that class's note.
      */
-    public float rtOfRow(int row) { return rt[row]; }
+    public float rtOfRow(int row) {
+        return rt[row];
+    }
 
     public double value(int row, Column c) {
         return switch (c) {
@@ -167,7 +204,8 @@ public final class SpectrumTable {
         int lo = from, hi = to;
         while (lo < hi) {
             int mid = (lo + hi) >>> 1;
-            if (mz[mid] < key) lo = mid + 1; else hi = mid;
+            if (mz[mid] < key) lo = mid + 1;
+            else hi = mid;
         }
         return lo;
     }
@@ -177,16 +215,25 @@ public final class SpectrumTable {
         int lo = from, hi = to;
         while (lo < hi) {
             int mid = (lo + hi) >>> 1;
-            if (mz[mid] <= key) lo = mid + 1; else hi = mid;
+            if (mz[mid] <= key) lo = mid + 1;
+            else hi = mid;
         }
         return lo;
     }
 
     /** Every row, as a fresh all-set mask. */
-    public RowMask allRows() { return RowMask.all(rowCount()); }
+    public RowMask allRows() {
+        return RowMask.all(rowCount());
+    }
 
-    @Override public String toString() {
-        return "SpectrumTable[msLevel=" + msLevel + ", scans=" + index.scanCount()
-                + ", peaks=" + mz.length + "]";
+    @Override
+    public String toString() {
+        return "SpectrumTable[msLevel="
+                + msLevel
+                + ", scans="
+                + index.scanCount()
+                + ", peaks="
+                + mz.length
+                + "]";
     }
 }

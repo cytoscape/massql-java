@@ -1,8 +1,8 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -19,6 +19,8 @@ import java.util.zip.GZIPInputStream;
 
 import org.junit.jupiter.api.Test;
 
+import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
+
 /**
  * {@code MzxmlReader} against the oracle, cross-checked <b>inside Step 7</b> rather than deferred.
  *
@@ -28,7 +30,7 @@ import org.junit.jupiter.api.Test;
  */
 class MzxmlReaderTest {
 
-    private record DumpScan(int scan, int mslevel, int peakCount) { }
+    private record DumpScan(int scan, int mslevel, int peakCount) {}
 
     private static List<DumpScan> loadDump(Path gz) {
         String json;
@@ -39,13 +41,17 @@ class MzxmlReaderTest {
         }
         // Light regex extraction rather than a JSON dependency: Jackson finds modules via
         // ServiceLoader, banned by DEPENDENCY_POLICY constraint 1. Step 8 needs the digests too.
-        Pattern p = Pattern.compile(
-                "\"scan\":\\s*(\\d+),\\s*\"mslevel\":\\s*(\\d+),\\s*\"peak_count\":\\s*(\\d+)");
+        Pattern p =
+                Pattern.compile(
+                        "\"scan\":\\s*(\\d+),\\s*\"mslevel\":\\s*(\\d+),\\s*\"peak_count\":\\s*(\\d+)");
         Matcher m = p.matcher(json);
         List<DumpScan> out = new ArrayList<>();
         while (m.find()) {
-            out.add(new DumpScan(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)),
-                                 Integer.parseInt(m.group(3))));
+            out.add(
+                    new DumpScan(
+                            Integer.parseInt(m.group(1)),
+                            Integer.parseInt(m.group(2)),
+                            Integer.parseInt(m.group(3))));
         }
         return out;
     }
@@ -55,11 +61,12 @@ class MzxmlReaderTest {
         Path mzxml = Fixtures.require("data/small.mzXML");
         Path dump = Fixtures.require("goldens/loader-parity/small.mzXML.json.gz");
 
-        Map<Integer, Integer> expected = new LinkedHashMap<>();   // scan id -> peak count
+        Map<Integer, Integer> expected = new LinkedHashMap<>(); // scan id -> peak count
         int expMs1 = 0, expMs2 = 0;
         for (DumpScan d : loadDump(dump)) {
             expected.put(d.scan(), d.peakCount());
-            if (d.mslevel() == 1) expMs1++; else expMs2++;
+            if (d.mslevel() == 1) expMs1++;
+            else expMs2++;
         }
         assertEquals(48, expected.size(), "sanity: the dump itself should describe 48 scans");
 
@@ -68,11 +75,17 @@ class MzxmlReaderTest {
         try (SpectraStream s = SpectraFile.open(mzxml)) {
             while (s.hasNext()) {
                 ScanView v = s.next();
-                if (v.msLevel() == 1) ms1++; else { ms2++; ms1scanOf.put(v.scanId(), v.ms1scan()); }
+                if (v.msLevel() == 1) ms1++;
+                else {
+                    ms2++;
+                    ms1scanOf.put(v.scanId(), v.ms1scan());
+                }
                 SpectrumTable t = v.materialize();
                 Integer want = expected.get(v.scanId());
-                assertNotNull(want, "reader produced scan " + v.scanId() + ", absent from the dump");
-                assertEquals(want.intValue(), t.rowCount(), "peak count differs for scan " + v.scanId());
+                assertNotNull(
+                        want, "reader produced scan " + v.scanId() + ", absent from the dump");
+                assertEquals(
+                        want.intValue(), t.rowCount(), "peak count differs for scan " + v.scanId());
             }
         }
 
@@ -81,39 +94,66 @@ class MzxmlReaderTest {
         assertEquals(14, ms1);
         assertEquals(34, ms2);
 
-        // small.mzXML carries 34 precursorScanNum attributes and every one must be ignored. For this
+        // small.mzXML carries 34 precursorScanNum attributes and every one must be ignored. For
+        // this
         // file document order and precursorScanNum coincide, so the assertion below cannot DETECT a
-        // precursorScanNum-resolving reader -- that is what Ms1ScanDocumentOrderIT on the Ewing file
+        // precursorScanNum-resolving reader -- that is what Ms1ScanDocumentOrderIT on the Ewing
+        // file
         // is for. Here we only require internal consistency.
-        ms1scanOf.forEach((ms2Scan, linked) ->
-                assertTrue(linked > 0 && linked < ms2Scan,
-                        "scan " + ms2Scan + " links to " + linked + ", which does not precede it"));
+        ms1scanOf.forEach(
+                (ms2Scan, linked) ->
+                        assertTrue(
+                                linked > 0 && linked < ms2Scan,
+                                "scan "
+                                        + ms2Scan
+                                        + " links to "
+                                        + linked
+                                        + ", which does not precede it"));
     }
 
     @Test
     void bothScanLayoutsProduceIdenticalResults() {
         // The nested-layout requirement, stated as an equivalence rather than a magic number:
         // micro.mzXML is flat, micro_nested.mzXML nests MS2 inside its parent MS1, and the two hold
-        // the SAME spectra. A flat-only walk treats </scan> as a spectrum boundary and mis-associates
+        // the SAME spectra. A flat-only walk treats </scan> as a spectrum boundary and
+        // mis-associates
         // every nested child, so the two would disagree.
         //
         // Confirmed against MassQL's own loader: both give ms1scan {1:0, 3:2, 5:2}.
-        record Row(int scan, int level, int ms1scan, double rt, double precmz, int charge,
-                   int polarity, int peaks, double firstMz) { }
+        record Row(
+                int scan,
+                int level,
+                int ms1scan,
+                double rt,
+                double precmz,
+                int charge,
+                int polarity,
+                int peaks,
+                double firstMz) {}
 
-        java.util.function.Function<String, List<Row>> read = name -> {
-            List<Row> out = new ArrayList<>();
-            try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/" + name))) {
-                while (s.hasNext()) {
-                    ScanView v = s.next();
-                    SpectrumTable t = v.materialize();
-                    out.add(new Row(v.scanId(), v.msLevel(), v.ms1scan(), v.rt(), v.precmz(),
-                            v.charge(), v.polarity(), t.rowCount(),
-                            t.rowCount() == 0 ? Double.NaN : t.mz(0)));
-                }
-            }
-            return out;
-        };
+        java.util.function.Function<String, List<Row>> read =
+                name -> {
+                    List<Row> out = new ArrayList<>();
+                    try (SpectraStream s =
+                            SpectraFile.open(Fixtures.require("fixtures/micro/" + name))) {
+                        while (s.hasNext()) {
+                            ScanView v = s.next();
+                            SpectrumTable t = v.materialize();
+                            out.add(
+                                    new Row(
+                                            v.scanId(),
+                                            v.msLevel(),
+                                            v.ms1scan(),
+                                            v.rt(),
+                                            v.precmz(),
+                                            v.charge(),
+                                            v.polarity(),
+                                            t.rowCount(),
+                                            t.rowCount() == 0 ? Double.NaN : t.mz(0)));
+                        }
+                    }
+                    return out;
+                };
 
         List<Row> flat = read.apply("micro.mzXML");
         List<Row> nested = read.apply("micro_nested.mzXML");
@@ -125,7 +165,9 @@ class MzxmlReaderTest {
         // And the specific linkage, so the equivalence above cannot pass with both sides wrong.
         Map<Integer, Integer> links = new LinkedHashMap<>();
         for (Row r : nested) if (r.level() == 2) links.put(r.scan(), r.ms1scan());
-        assertEquals(Map.of(1, 0, 3, 2, 5, 2), links,
+        assertEquals(
+                Map.of(1, 0, 3, 2, 5, 2),
+                links,
                 "scan 5 must link to 2 -- scan 4 is a zero-peak MS1 and is invisible to the chain (C27b)");
     }
 
@@ -142,7 +184,9 @@ class MzxmlReaderTest {
             throw new UncheckedIOException(e);
         }
         int occurrences = head.split("precursorScanNum", -1).length - 1;
-        assertEquals(34, occurrences,
+        assertEquals(
+                34,
+                occurrences,
                 "fixture no longer carries precursorScanNum; this test would be vacuous");
 
         int previousMs1 = 0;
@@ -152,8 +196,12 @@ class MzxmlReaderTest {
                 if (v.msLevel() == 1) {
                     if (v.peakCount() > 0) previousMs1 = v.scanId();
                 } else {
-                    assertEquals(previousMs1, v.ms1scan(),
-                            "scan " + v.scanId() + " must link by document order, not precursorScanNum");
+                    assertEquals(
+                            previousMs1,
+                            v.ms1scan(),
+                            "scan "
+                                    + v.scanId()
+                                    + " must link by document order, not precursorScanNum");
                 }
             }
         }
@@ -161,8 +209,10 @@ class MzxmlReaderTest {
 
     @Test
     void chargeAbsentIsZeroNotOne() {
-        // The cross-format trap: mzXML's absent precursorCharge is 0 (msql_fileloading.py:451), while
-        // MGF's absent CHARGE is 1 (Correction C6). micro scans 1 and 3 omit it; scan 5 has charge 2.
+        // The cross-format trap: mzXML's absent precursorCharge is 0 (msql_fileloading.py:451),
+        // while
+        // MGF's absent CHARGE is 1 (Correction C6). micro scans 1 and 3 omit it; scan 5 has charge
+        // 2.
         Map<Integer, Integer> charges = new LinkedHashMap<>();
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mzXML"))) {
             while (s.hasNext()) {
@@ -178,14 +228,18 @@ class MzxmlReaderTest {
         // attribute is absent. If this ever matches mzXML, one of the two rules has been broken.
         Map<Integer, Integer> mgfCharges = new LinkedHashMap<>();
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mgf"))) {
-            while (s.hasNext()) { ScanView v = s.next(); mgfCharges.put(v.scanId(), v.charge()); }
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                mgfCharges.put(v.scanId(), v.charge());
+            }
         }
         assertEquals(1, mgfCharges.get(1), "MGF's absent CHARGE is 1 (C6) -- deliberately NOT 0");
     }
 
     @Test
     void zeroPeakScanIsYieldedAndMaterialisesEmpty() {
-        // peaksCount="0" must not throw, and must not be dropped (Tech_Step7 §4). Scan 4 of the micro
+        // peaksCount="0" must not throw, and must not be dropped (Tech_Step7 §4). Scan 4 of the
+        // micro
         // table is the empty MS1.
         boolean saw = false;
         int scans = 0;
@@ -196,7 +250,9 @@ class MzxmlReaderTest {
                 if (v.scanId() == 4) {
                     saw = true;
                     assertEquals(0, v.peakCount());
-                    assertEquals(0, v.materialize().rowCount(),
+                    assertEquals(
+                            0,
+                            v.materialize().rowCount(),
                             "an empty scan materialises to an empty table, not an error");
                 }
             }

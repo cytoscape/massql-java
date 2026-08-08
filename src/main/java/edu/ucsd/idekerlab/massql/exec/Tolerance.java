@@ -1,9 +1,9 @@
 package edu.ucsd.idekerlab.massql.exec;
 
+import java.util.List;
+
 import edu.ucsd.idekerlab.massql.lang.ast.Qualifier;
 import edu.ucsd.idekerlab.massql.lang.ast.QualifierType;
-
-import java.util.List;
 
 /**
  * The m/z tolerance window, computed in exactly one place.
@@ -34,7 +34,7 @@ public final class Tolerance {
     /** The source's default when no tolerance qualifier is present (`:7`, `:16`). */
     public static final double DEFAULT_DA = 0.1;
 
-    private Tolerance() { }
+    private Tolerance() {}
 
     /**
      * Half-width of the window around {@code target}, in Da.

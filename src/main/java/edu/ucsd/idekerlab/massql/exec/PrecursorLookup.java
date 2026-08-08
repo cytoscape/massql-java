@@ -25,7 +25,7 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
  */
 public final class PrecursorLookup {
 
-    private PrecursorLookup() { }
+    private PrecursorLookup() {}
 
     /** The three looked-up values. Any may be null; see the class notes. */
     public record Result(Double ms1I, Double ms1Precmz, Double ms1BasePeakI) {
@@ -40,26 +40,34 @@ public final class PrecursorLookup {
      * @param precmz      the scan's {@code precmz}, carrying the raw {@code 0} sentinel
      * @param tolPpm      {@code MassqlOptions.precursorTolPpm} — <b>not</b> the query's own TOLERANCEPPM
      */
-    public static Result lookup(SpectrumTable retainedMs1, int ms1scan, double precmz, double tolPpm) {
+    public static Result lookup(
+            SpectrumTable retainedMs1, int ms1scan, double precmz, double tolPpm) {
         // The raw 0 sentinel is what tells us there is no linked scan, which is why Tech_Step10 §4
         // converts sentinels to null only AFTER this runs. Converting earlier loses the signal.
         if (ms1scan == 0 || retainedMs1 == null || retainedMs1.isEmpty()) return Result.NONE;
 
         // Tech_Step10 §3's C22 note: the stream retains exactly the linked MS1 scan, because the
-        // document-order rule guarantees ms1scan is always the most recent PRECEDING MS1. If this ever
-        // disagrees, the rule has been broken upstream and the lookup would silently read a different
+        // document-order rule guarantees ms1scan is always the most recent PRECEDING MS1. If this
+        // ever
+        // disagrees, the rule has been broken upstream and the lookup would silently read a
+        // different
         // scan's peaks -- so assert rather than trust.
         int retainedId = retainedMs1.index().scanIdAt(0);
         if (retainedId != ms1scan) {
             throw new IllegalStateException(
-                    "retained MS1 scan " + retainedId + " is not the linked ms1scan " + ms1scan
+                    "retained MS1 scan "
+                            + retainedId
+                            + " is not the linked ms1scan "
+                            + ms1scan
                             + "; the document-order rule has been broken upstream (Tech_Step10 §3, C22)");
         }
 
-        // Rule 2: computed across the WHOLE scan, before and independently of any window search, so a
+        // Rule 2: computed across the WHOLE scan, before and independently of any window search, so
+        // a
         // tolerance miss below leaves it populated.
         int topRow = Reductions.argmax(retainedMs1, 0, Column.I);
-        // argmax returns -1 on an empty scan; guarded above, but Reductions' contract allows it and a
+        // argmax returns -1 on an empty scan; guarded above, but Reductions' contract allows it and
+        // a
         // NaN from Reductions.max would otherwise reach the JSON as a null for the wrong reason.
         Double ms1BasePeakI = topRow < 0 ? null : retainedMs1.intensity(topRow);
 
@@ -106,7 +114,10 @@ public final class PrecursorLookup {
         double bestDist = Math.abs(ms1.mz(best) - precmz);
         for (int r = cand.start() + 1; r < cand.end(); r++) {
             double d = Math.abs(ms1.mz(r) - precmz);
-            if (d < bestDist) { best = r; bestDist = d; }
+            if (d < bestDist) {
+                best = r;
+                bestDist = d;
+            }
         }
         return best;
     }

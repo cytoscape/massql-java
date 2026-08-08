@@ -1,9 +1,8 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import edu.ucsd.idekerlab.massql.MassqlException;
-import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -13,6 +12,9 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
+import edu.ucsd.idekerlab.massql.MassqlException;
+import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
 
 /**
  * MGF rules, all derived from {@code _load_data_mgf_pyteomics} (`msql_fileloading.py:155-244`) rather
@@ -27,16 +29,31 @@ class MgfReaderTest {
         return p;
     }
 
-    private record Row(int scan, double rt, double precmz, int charge, int ms1scan,
-                       int msLevel, int polarity, int peaks) { }
+    private record Row(
+            int scan,
+            double rt,
+            double precmz,
+            int charge,
+            int ms1scan,
+            int msLevel,
+            int polarity,
+            int peaks) {}
 
     private static List<Row> readAll(Path p) {
         List<Row> out = new ArrayList<>();
         try (SpectraStream s = SpectraFile.open(p)) {
             while (s.hasNext()) {
                 ScanView v = s.next();
-                out.add(new Row(v.scanId(), v.rt(), v.precmz(), v.charge(), v.ms1scan(),
-                                v.msLevel(), v.polarity(), v.materialize().rowCount()));
+                out.add(
+                        new Row(
+                                v.scanId(),
+                                v.rt(),
+                                v.precmz(),
+                                v.charge(),
+                                v.ms1scan(),
+                                v.msLevel(),
+                                v.polarity(),
+                                v.materialize().rowCount()));
             }
         }
         return out;
@@ -44,11 +61,16 @@ class MgfReaderTest {
 
     @Test
     void absentChargeIsOneNotZero(@TempDir Path dir) throws IOException {
-        // ⚠ Correction C6. SPIKE.md §3 says MGF charge is "null if absent"; the live pyteomics loader
+        // ⚠ Correction C6. SPIKE.md §3 says MGF charge is "null if absent"; the live pyteomics
+        // loader
         // uses params.get('charge', [1]) with `except: charge = 1`. Since only 0 is null-converted
         // (Step 10 §4), MGF charge is NEVER null -- a genuine 1+ and an absent CHARGE are
         // indistinguishable. The golden agrees: {1: 653, 2: 10, 3: 1}, zero nulls.
-        Path p = write(dir, "a.mgf", """
+        Path p =
+                write(
+                        dir,
+                        "a.mgf",
+                        """
                 BEGIN IONS
                 TITLE=no charge here
                 PEPMASS=500.5
@@ -60,7 +82,11 @@ class MgfReaderTest {
 
     @Test
     void chargeStripsTrailingSign(@TempDir Path dir) throws IOException {
-        Path p = write(dir, "a.mgf", """
+        Path p =
+                write(
+                        dir,
+                        "a.mgf",
+                        """
                 BEGIN IONS
                 PEPMASS=500.5
                 CHARGE=2+
@@ -86,7 +112,11 @@ class MgfReaderTest {
     @Test
     void pepmassIgnoresATrailingIntensityToken(@TempDir Path dir) throws IOException {
         // Real MGF: "PEPMASS=491.555664 3058030.0000" -- the second token is precursor intensity.
-        Path p = write(dir, "a.mgf", """
+        Path p =
+                write(
+                        dir,
+                        "a.mgf",
+                        """
                 BEGIN IONS
                 PEPMASS=491.555664 3058030.0000
                 100.0 10.0
@@ -98,14 +128,20 @@ class MgfReaderTest {
                 """);
         List<Row> r = readAll(p);
         assertEquals(491.555664, r.get(0).precmz());
-        assertEquals(r.get(1).precmz(), r.get(0).precmz(), "the trailing token must not change precmz");
+        assertEquals(
+                r.get(1).precmz(), r.get(0).precmz(), "the trailing token must not change precmz");
     }
 
     @Test
-    void retentionTimeIsSecondsOver60AndAbsentMeansZeroNotNull(@TempDir Path dir) throws IOException {
+    void retentionTimeIsSecondsOver60AndAbsentMeansZeroNotNull(@TempDir Path dir)
+            throws IOException {
         // 0.0 is a REAL value here, not a missing one. plusrise_results.json has rt: 0.0 on all 664
         // records, so an over-eager null conversion would fail 664 rows at once (Step 10 §4).
-        Path p = write(dir, "a.mgf", """
+        Path p =
+                write(
+                        dir,
+                        "a.mgf",
+                        """
                 BEGIN IONS
                 PEPMASS=500.5
                 RTINSECONDS=90
@@ -125,7 +161,11 @@ class MgfReaderTest {
     void scanIdIsScansWhenPresentElseTheOneBasedBlockIndex(@TempDir Path dir) throws IOException {
         // Correction C7. Getting this wrong shifts every row's identity and makes the Step 12
         // differential fail in a way that looks like a filtering bug.
-        Path withScans = write(dir, "s.mgf", """
+        Path withScans =
+                write(
+                        dir,
+                        "s.mgf",
+                        """
                 BEGIN IONS
                 PEPMASS=1.0
                 SCANS=576
@@ -140,7 +180,11 @@ class MgfReaderTest {
         assertEquals(576, readAll(withScans).get(0).scan());
         assertEquals(999, readAll(withScans).get(1).scan());
 
-        Path without = write(dir, "n.mgf", """
+        Path without =
+                write(
+                        dir,
+                        "n.mgf",
+                        """
                 BEGIN IONS
                 PEPMASS=1.0
                 100.0 10.0
@@ -156,7 +200,11 @@ class MgfReaderTest {
 
     @Test
     void everyScanIsMs2WithMs1scanZeroAndPositivePolarity(@TempDir Path dir) throws IOException {
-        Path p = write(dir, "a.mgf", """
+        Path p =
+                write(
+                        dir,
+                        "a.mgf",
+                        """
                 BEGIN IONS
                 PEPMASS=500.5
                 100.0 10.0
@@ -166,24 +214,33 @@ class MgfReaderTest {
         assertEquals(2, r.msLevel(), "MGF is an MS2-only peak list");
         assertEquals(0, r.ms1scan(), "hardcoded 0 (msql_fileloading.py:394) -> null downstream");
 
-        // ⚠ Correction C33 -- this assertion used to require 0, citing C8 ("polarity is not read on the
-        // live path"). C8's premise is right (no MGF header carries polarity) but its conclusion was
+        // ⚠ Correction C33 -- this assertion used to require 0, citing C8 ("polarity is not read on
+        // the
+        // live path"). C8's premise is right (no MGF header carries polarity) but its conclusion
+        // was
         // wrong: both MGF loaders write `"polarity": 1  # Default` into every peak dict
-        // (msql_fileloading.py:67 and :86), so MassQL reports POSITIVE for every MGF row. Measured across
-        // all three MGF fixtures -- 7 + 107,178 + 758,544 rows -- the distribution is {1: all}, not one 0.
+        // (msql_fileloading.py:67 and :86), so MassQL reports POSITIVE for every MGF row. Measured
+        // across
+        // all three MGF fixtures -- 7 + 107,178 + 758,544 rows -- the distribution is {1: all}, not
+        // one 0.
         //
         // Caught by ReaderParityIT, the Step 8 gate. Returning 0 would have failed the Step 12
         // differential on the polarity column for EVERY MGF row, where it would have looked like a
         // collation bug rather than a reader default.
-        assertEquals(1, r.polarity(),
+        assertEquals(
+                1,
+                r.polarity(),
                 "MGF polarity is a hardcoded 1 (positive), not 0 -- C33 corrects C8");
     }
 
     @Test
     void toleratesCrlfBlankLinesCommentsAndTabSeparatedPeaks(@TempDir Path dir) throws IOException {
-        Path p = write(dir, "a.mgf",
-                "# a comment\r\n\r\nBEGIN IONS\r\nPEPMASS=500.5\r\n\r\n"
-                + "100.0\t10.0\r\n; another comment\r\n200.0  20.0\r\nEND IONS\r\n");
+        Path p =
+                write(
+                        dir,
+                        "a.mgf",
+                        "# a comment\r\n\r\nBEGIN IONS\r\nPEPMASS=500.5\r\n\r\n"
+                                + "100.0\t10.0\r\n; another comment\r\n200.0  20.0\r\nEND IONS\r\n");
         List<Row> r = readAll(p);
         assertEquals(1, r.size());
         assertEquals(2, r.get(0).peaks());
@@ -191,10 +248,15 @@ class MgfReaderTest {
 
     @Test
     void zeroPeakBlocksAreEmittedAsEmptyScans(@TempDir Path dir) throws IOException {
-        // Not hypothetical: 12,571 of PlusRise.mgf's 34,513 blocks have no peak lines. They are real
+        // Not hypothetical: 12,571 of PlusRise.mgf's 34,513 blocks have no peak lines. They are
+        // real
         // spectra and the reader must yield them; MassQL's dataframe simply has no ROWS for them,
         // which is why it reports 21,942 unique scans. Step 8's parity must expect that asymmetry.
-        Path p = write(dir, "a.mgf", """
+        Path p =
+                write(
+                        dir,
+                        "a.mgf",
+                        """
                 BEGIN IONS
                 PEPMASS=500.5
                 END IONS
@@ -213,7 +275,11 @@ class MgfReaderTest {
     void malformedPeakLineThrowsRatherThanSkipping(@TempDir Path dir) throws IOException {
         // Silently dropping a peak would change tic and base_peak and surface at Step 8 as a
         // decoder bug with no obvious cause.
-        Path p = write(dir, "a.mgf", """
+        Path p =
+                write(
+                        dir,
+                        "a.mgf",
+                        """
                 BEGIN IONS
                 PEPMASS=500.5
                 100.0 10.0
@@ -226,7 +292,11 @@ class MgfReaderTest {
 
     @Test
     void truncatedBlockThrowsWithNoPartialResult(@TempDir Path dir) throws IOException {
-        Path p = write(dir, "a.mgf", """
+        Path p =
+                write(
+                        dir,
+                        "a.mgf",
+                        """
                 BEGIN IONS
                 PEPMASS=500.5
                 100.0 10.0
@@ -237,7 +307,11 @@ class MgfReaderTest {
 
     @Test
     void materializeProducesAUsableSingleScanTable(@TempDir Path dir) throws IOException {
-        Path p = write(dir, "a.mgf", """
+        Path p =
+                write(
+                        dir,
+                        "a.mgf",
+                        """
                 BEGIN IONS
                 PEPMASS=500.5
                 CHARGE=2+
@@ -252,7 +326,8 @@ class MgfReaderTest {
             assertTrue(s.hasNext());
             ScanView v = s.next();
             SpectrumTable t = v.materialize();
-            assertEquals(1, t.index().scanCount(), "exactly one scan -- this is the streaming unit");
+            assertEquals(
+                    1, t.index().scanCount(), "exactly one scan -- this is the streaming unit");
             assertEquals(7, t.index().scanIdAt(0));
             assertEquals(1.5, t.index().rtOf(0));
             assertEquals(500.5, t.index().precmzOf(0));

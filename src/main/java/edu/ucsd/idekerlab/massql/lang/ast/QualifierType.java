@@ -9,6 +9,9 @@ package edu.ucsd.idekerlab.massql.lang.ast;
  * (which is a qualifier taking a {@code massdefect(min=…,max=…)} call, not a plain value).
  */
 public enum QualifierType {
-    TOLERANCEMZ, TOLERANCEPPM,
-    INTENSITYPERCENT, INTENSITYTICPERCENT, INTENSITYVALUE
+    TOLERANCEMZ,
+    TOLERANCEPPM,
+    INTENSITYPERCENT,
+    INTENSITYTICPERCENT,
+    INTENSITYVALUE
 }

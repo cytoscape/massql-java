@@ -1,9 +1,11 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import edu.ucsd.idekerlab.massql.MassqlException;
-import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -21,6 +23,9 @@ import java.util.zip.GZIPInputStream;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+
+import edu.ucsd.idekerlab.massql.MassqlException;
+import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
 
 class MzmlReaderTest {
 
@@ -42,15 +47,15 @@ class MzmlReaderTest {
     void anIdWithNoScanNumberFailsByName() {
         // MassQL raises ValueError here; we throw a named MassqlException. Documented deviation --
         // a clean error either way, but ours says which id.
-        MassqlException e = assertThrows(MassqlException.class,
-                () -> MzmlReader.scanIdFrom("spectrum=abc"));
+        MassqlException e =
+                assertThrows(MassqlException.class, () -> MzmlReader.scanIdFrom("spectrum=abc"));
         assertTrue(e.getMessage().contains("spectrum=abc"), e.getMessage());
     }
 
     // ------------------------------------------------------------------ the oracle cross-check
 
     /** One scan's worth of the Step 2 parity dump. */
-    private record DumpScan(int scan, int mslevel, int peakCount) { }
+    private record DumpScan(int scan, int mslevel, int peakCount) {}
 
     private static List<DumpScan> loadDump(Path gz) {
         String json;
@@ -62,13 +67,17 @@ class MzmlReaderTest {
         // Light regex extraction rather than a JSON dependency: Jackson finds modules via
         // ServiceLoader, banned by DEPENDENCY_POLICY constraint 1. Step 8 needs the digests too and
         // can invest in a fuller reader; Step 6 only needs counts.
-        Pattern p = Pattern.compile(
-                "\"scan\":\\s*(\\d+),\\s*\"mslevel\":\\s*(\\d+),\\s*\"peak_count\":\\s*(\\d+)");
+        Pattern p =
+                Pattern.compile(
+                        "\"scan\":\\s*(\\d+),\\s*\"mslevel\":\\s*(\\d+),\\s*\"peak_count\":\\s*(\\d+)");
         Matcher m = p.matcher(json);
         List<DumpScan> out = new ArrayList<>();
         while (m.find()) {
-            out.add(new DumpScan(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)),
-                                 Integer.parseInt(m.group(3))));
+            out.add(
+                    new DumpScan(
+                            Integer.parseInt(m.group(1)),
+                            Integer.parseInt(m.group(2)),
+                            Integer.parseInt(m.group(3))));
         }
         return out;
     }
@@ -85,27 +94,33 @@ class MzmlReaderTest {
         Path mzml = Fixtures.require("data/small.mzML");
         Path dump = Fixtures.require("goldens/loader-parity/small.mzML.json.gz");
 
-        Map<Integer, Integer> expected = new LinkedHashMap<>();   // scan id -> peak count
+        Map<Integer, Integer> expected = new LinkedHashMap<>(); // scan id -> peak count
         int expMs1 = 0, expMs2 = 0;
         for (DumpScan d : loadDump(dump)) {
             expected.put(d.scan(), d.peakCount());
-            if (d.mslevel() == 1) expMs1++; else expMs2++;
+            if (d.mslevel() == 1) expMs1++;
+            else expMs2++;
         }
         assertEquals(48, expected.size(), "sanity: the dump itself should describe 48 scans");
 
         int ms1 = 0, ms2 = 0;
         long peaks = 0;
-        Map<Integer, Integer> ms1scanOf = new LinkedHashMap<>();   // MS2 scan id -> its ms1scan
+        Map<Integer, Integer> ms1scanOf = new LinkedHashMap<>(); // MS2 scan id -> its ms1scan
         try (SpectraStream s = SpectraFile.open(mzml)) {
             while (s.hasNext()) {
                 ScanView v = s.next();
-                if (v.msLevel() == 1) ms1++; else { ms2++; ms1scanOf.put(v.scanId(), v.ms1scan()); }
+                if (v.msLevel() == 1) ms1++;
+                else {
+                    ms2++;
+                    ms1scanOf.put(v.scanId(), v.ms1scan());
+                }
                 SpectrumTable t = v.materialize();
                 peaks += t.rowCount();
                 Integer want = expected.get(v.scanId());
-                assertNotNull(want, "reader produced scan " + v.scanId() + ", absent from the dump");
-                assertEquals(want.intValue(), t.rowCount(),
-                        "peak count differs for scan " + v.scanId());
+                assertNotNull(
+                        want, "reader produced scan " + v.scanId() + ", absent from the dump");
+                assertEquals(
+                        want.intValue(), t.rowCount(), "peak count differs for scan " + v.scanId());
             }
         }
 
@@ -115,28 +130,48 @@ class MzmlReaderTest {
         assertEquals(34, ms2);
         assertEquals(305_214L, peaks, "total peaks across both levels");
 
-        // The six rows in output/small_mzml_results.json, asserted as an explicit MS2 -> MS1 mapping.
+        // The six rows in output/small_mzml_results.json, asserted as an explicit MS2 -> MS1
+        // mapping.
         //
-        // NOT as "the distinct ms1scan values in the file": those six are only the scans that matched
-        // test_mzml.massql, and the file legitimately references others (30, from MS2 scans the query
-        // rejected). Asserting the distinct set conflates the golden's filtered subset with the whole
+        // NOT as "the distinct ms1scan values in the file": those six are only the scans that
+        // matched
+        // test_mzml.massql, and the file legitimately references others (30, from MS2 scans the
+        // query
+        // rejected). Asserting the distinct set conflates the golden's filtered subset with the
+        // whole
         // file and fails for a reason that has nothing to do with the reader.
         Map<Integer, Integer> goldenLinkage = new LinkedHashMap<>();
-        goldenLinkage.put(3, 2);  goldenLinkage.put(10, 9);  goldenLinkage.put(17, 16);
-        goldenLinkage.put(24, 23); goldenLinkage.put(37, 36); goldenLinkage.put(44, 43);
-        goldenLinkage.forEach((ms2Scan, wantMs1) ->
-                assertEquals(wantMs1, ms1scanOf.get(ms2Scan),
-                        "ms1scan for MS2 scan " + ms2Scan + " (document order, not spectrumRef)"));
+        goldenLinkage.put(3, 2);
+        goldenLinkage.put(10, 9);
+        goldenLinkage.put(17, 16);
+        goldenLinkage.put(24, 23);
+        goldenLinkage.put(37, 36);
+        goldenLinkage.put(44, 43);
+        goldenLinkage.forEach(
+                (ms2Scan, wantMs1) ->
+                        assertEquals(
+                                wantMs1,
+                                ms1scanOf.get(ms2Scan),
+                                "ms1scan for MS2 scan "
+                                        + ms2Scan
+                                        + " (document order, not spectrumRef)"));
 
         // Every MS2 scan must link to an MS1 scan that genuinely precedes it.
-        ms1scanOf.forEach((ms2Scan, linked) ->
-                assertTrue(linked > 0 && linked < ms2Scan,
-                        "scan " + ms2Scan + " links to " + linked + ", which does not precede it"));
+        ms1scanOf.forEach(
+                (ms2Scan, linked) ->
+                        assertTrue(
+                                linked > 0 && linked < ms2Scan,
+                                "scan "
+                                        + ms2Scan
+                                        + " links to "
+                                        + linked
+                                        + ", which does not precede it"));
     }
 
     @Test
     void scanThreeMatchesTheGoldenRecordFieldForField() {
-        // output/small_mzml_results.json's first record. rt is asserted BIT-exact: the value does not
+        // output/small_mzml_results.json's first record. rt is asserted BIT-exact: the value does
+        // not
         // survive a float round-trip, which is why ScanIndex carries rt as a double (Step 5 §1).
         Path mzml = Fixtures.require("data/small.mzML");
         try (SpectraStream s = SpectraFile.open(mzml)) {
@@ -148,14 +183,18 @@ class MzmlReaderTest {
                 assertEquals(2, v.ms1scan(), "document order, not spectrumRef");
                 assertEquals(0, v.charge(), "not recorded -> 0 sentinel; Step 10 converts to null");
                 assertEquals(1, v.polarity());
-                assertEquals(Double.doubleToLongBits(0.011218333333333334),
-                             Double.doubleToLongBits(v.rt()), "rt must be bit-exact");
+                assertEquals(
+                        Double.doubleToLongBits(0.011218333333333334),
+                        Double.doubleToLongBits(v.rt()),
+                        "rt must be bit-exact");
                 SpectrumTable t = v.materialize();
                 assertEquals(485, t.rowCount());
                 // First decoded m/z, bit-exact. small.mzML stores m/z as 64-bit, so this value must
                 // survive in full precision -- a 32-bit path would give 231.38883972167970's float.
-                assertEquals(Double.doubleToLongBits(231.38883972167969),
-                             Double.doubleToLongBits(t.mz(0)), "first m/z of scan 3");
+                assertEquals(
+                        Double.doubleToLongBits(231.38883972167969),
+                        Double.doubleToLongBits(t.mz(0)),
+                        "first m/z of scan 3");
                 return;
             }
             fail("scan 3 not found");
@@ -198,16 +237,22 @@ class MzmlReaderTest {
 
     @Test
     void truncatedMzmlThrowsWithNoPartialResult(@TempDir Path dir) throws IOException {
-        // Cut a real file mid-spectrum. A reader that returned the scans it managed to read would be
+        // Cut a real file mid-spectrum. A reader that returned the scans it managed to read would
+        // be
         // worse than one that fails: 40 of 48 scans looks like a filtering bug downstream.
         byte[] all = Files.readAllBytes(Fixtures.require("data/small.mzML"));
         Path cut = dir.resolve("truncated.mzML");
         Files.write(cut, java.util.Arrays.copyOf(all, all.length / 3));
 
-        assertThrows(MassqlException.class, () -> {
-            try (SpectraStream s = SpectraFile.open(cut)) {
-                while (s.hasNext()) { ScanView v = s.next(); v.materialize(); }
-            }
-        });
+        assertThrows(
+                MassqlException.class,
+                () -> {
+                    try (SpectraStream s = SpectraFile.open(cut)) {
+                        while (s.hasNext()) {
+                            ScanView v = s.next();
+                            v.materialize();
+                        }
+                    }
+                });
     }
 }

@@ -1,6 +1,7 @@
 package edu.ucsd.idekerlab.massql.spectra;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -24,7 +25,10 @@ class ReductionsTest {
         assertEquals(100.0, Reductions.min(t, 0, Column.I));
         assertEquals(4, Reductions.count(t, 0));
         assertEquals(250.0, Reductions.first(t, 0, Column.I));
-        assertEquals(100.0, Reductions.first(t, 0, Column.MZ), "first is lowest m/z, per the sort invariant");
+        assertEquals(
+                100.0,
+                Reductions.first(t, 0, Column.MZ),
+                "first is lowest m/z, per the sort invariant");
     }
 
     @Test

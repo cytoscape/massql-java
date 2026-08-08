@@ -17,8 +17,16 @@ public record IntRange(int start, int end) {
         if (end < start) throw new IllegalArgumentException("end " + end + " < start " + start);
     }
 
-    public int size() { return end - start; }
-    public boolean isEmpty() { return end == start; }
+    public int size() {
+        return end - start;
+    }
 
-    @Override public String toString() { return "[" + start + "," + end + ")"; }
+    public boolean isEmpty() {
+        return end == start;
+    }
+
+    @Override
+    public String toString() {
+        return "[" + start + "," + end + ")";
+    }
 }

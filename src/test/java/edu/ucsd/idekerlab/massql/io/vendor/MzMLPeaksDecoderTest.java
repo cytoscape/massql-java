@@ -1,6 +1,8 @@
 package edu.ucsd.idekerlab.massql.io.vendor;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -50,17 +52,18 @@ class MzMLPeaksDecoderTest {
         return Base64.getEncoder().encode(out.toByteArray());
     }
 
-    private static double[] decode(byte[] base64, int n, MzMLBitLength bits, MzMLCompressionType comp)
-            throws Exception {
+    private static double[] decode(
+            byte[] base64, int n, MzMLBitLength bits, MzMLCompressionType comp) throws Exception {
         MzMLBinaryDataInfo info = new MzMLBinaryDataInfo(base64.length, n);
         info.setBitLength(bits);
         info.setCompressionType(comp);
         info.setArrayType(MzMLArrayType.MZ);
-        return MzMLPeaksDecoder.decodeToDouble(new ByteArrayInputStream(base64), info, new double[n]);
+        return MzMLPeaksDecoder.decodeToDouble(
+                new ByteArrayInputStream(base64), info, new double[n]);
     }
 
     private static final double[] VALUES = {
-        200.00018816645022,   // a real m/z from small.mzML -- NOT float32-exact
+        200.00018816645022, // a real m/z from small.mzML -- NOT float32-exact
         810.79,
         123.456789012345,
         0.0,
@@ -69,10 +72,16 @@ class MzMLPeaksDecoderTest {
 
     @Test
     void sixtyFourBitUncompressedRoundTripsExactly() throws Exception {
-        double[] got = decode(encode64(VALUES, false), VALUES.length,
-                MzMLBitLength.SIXTY_FOUR_BIT_FLOAT, MzMLCompressionType.NO_COMPRESSION);
+        double[] got =
+                decode(
+                        encode64(VALUES, false),
+                        VALUES.length,
+                        MzMLBitLength.SIXTY_FOUR_BIT_FLOAT,
+                        MzMLCompressionType.NO_COMPRESSION);
         for (int i = 0; i < VALUES.length; i++) {
-            assertEquals(Double.doubleToLongBits(VALUES[i]), Double.doubleToLongBits(got[i]),
+            assertEquals(
+                    Double.doubleToLongBits(VALUES[i]),
+                    Double.doubleToLongBits(got[i]),
                     "64-bit must be bit-exact at index " + i);
         }
     }
@@ -82,13 +91,25 @@ class MzMLPeaksDecoderTest {
         // THE bit-identity rule. A 32-bit array must decode to (double)(float)raw. Reading 8
         // bytes, or treating the bits as a double, produces values that are *nearly* right --
         // exactly the confusing near-miss Step 8 is built to catch.
-        double[] got = decode(encode32(VALUES, false), VALUES.length,
-                MzMLBitLength.THIRTY_TWO_BIT_FLOAT, MzMLCompressionType.NO_COMPRESSION);
+        double[] got =
+                decode(
+                        encode32(VALUES, false),
+                        VALUES.length,
+                        MzMLBitLength.THIRTY_TWO_BIT_FLOAT,
+                        MzMLCompressionType.NO_COMPRESSION);
         for (int i = 0; i < VALUES.length; i++) {
             double expected = (double) (float) VALUES[i];
-            assertEquals(Double.doubleToLongBits(expected), Double.doubleToLongBits(got[i]),
-                    "index " + i + ": expected (double)(float)" + VALUES[i] + " = " + expected
-                            + " but got " + got[i]);
+            assertEquals(
+                    Double.doubleToLongBits(expected),
+                    Double.doubleToLongBits(got[i]),
+                    "index "
+                            + i
+                            + ": expected (double)(float)"
+                            + VALUES[i]
+                            + " = "
+                            + expected
+                            + " but got "
+                            + got[i]);
         }
     }
 
@@ -96,10 +117,18 @@ class MzMLPeaksDecoderTest {
     void the32BitAnd64BitDecodesGenuinelyDiffer() throws Exception {
         // Guards the test above from being vacuous: if the sample values happened to be
         // float32-exact, the previous test would pass under a wrong implementation too.
-        double[] as64 = decode(encode64(VALUES, false), VALUES.length,
-                MzMLBitLength.SIXTY_FOUR_BIT_FLOAT, MzMLCompressionType.NO_COMPRESSION);
-        double[] as32 = decode(encode32(VALUES, false), VALUES.length,
-                MzMLBitLength.THIRTY_TWO_BIT_FLOAT, MzMLCompressionType.NO_COMPRESSION);
+        double[] as64 =
+                decode(
+                        encode64(VALUES, false),
+                        VALUES.length,
+                        MzMLBitLength.SIXTY_FOUR_BIT_FLOAT,
+                        MzMLCompressionType.NO_COMPRESSION);
+        double[] as32 =
+                decode(
+                        encode32(VALUES, false),
+                        VALUES.length,
+                        MzMLBitLength.THIRTY_TWO_BIT_FLOAT,
+                        MzMLCompressionType.NO_COMPRESSION);
         assertNotEquals(as64[0], as32[0], "200.00018816645022 must not survive float32");
         assertNotEquals(as64[2], as32[2], "123.456789012345 must not survive float32");
         assertEquals(as64[3], as32[3], "0.0 is exact in both");
@@ -108,23 +137,43 @@ class MzMLPeaksDecoderTest {
 
     @Test
     void zlibCompressedDecodesIdenticallyToUncompressed() throws Exception {
-        double[] plain = decode(encode64(VALUES, false), VALUES.length,
-                MzMLBitLength.SIXTY_FOUR_BIT_FLOAT, MzMLCompressionType.NO_COMPRESSION);
-        double[] zipped = decode(encode64(VALUES, true), VALUES.length,
-                MzMLBitLength.SIXTY_FOUR_BIT_FLOAT, MzMLCompressionType.ZLIB);
+        double[] plain =
+                decode(
+                        encode64(VALUES, false),
+                        VALUES.length,
+                        MzMLBitLength.SIXTY_FOUR_BIT_FLOAT,
+                        MzMLCompressionType.NO_COMPRESSION);
+        double[] zipped =
+                decode(
+                        encode64(VALUES, true),
+                        VALUES.length,
+                        MzMLBitLength.SIXTY_FOUR_BIT_FLOAT,
+                        MzMLCompressionType.ZLIB);
         assertArrayEquals(plain, zipped);
 
-        double[] plain32 = decode(encode32(VALUES, false), VALUES.length,
-                MzMLBitLength.THIRTY_TWO_BIT_FLOAT, MzMLCompressionType.NO_COMPRESSION);
-        double[] zipped32 = decode(encode32(VALUES, true), VALUES.length,
-                MzMLBitLength.THIRTY_TWO_BIT_FLOAT, MzMLCompressionType.ZLIB);
+        double[] plain32 =
+                decode(
+                        encode32(VALUES, false),
+                        VALUES.length,
+                        MzMLBitLength.THIRTY_TWO_BIT_FLOAT,
+                        MzMLCompressionType.NO_COMPRESSION);
+        double[] zipped32 =
+                decode(
+                        encode32(VALUES, true),
+                        VALUES.length,
+                        MzMLBitLength.THIRTY_TWO_BIT_FLOAT,
+                        MzMLCompressionType.ZLIB);
         assertArrayEquals(plain32, zipped32);
     }
 
     @Test
     void anEmptyArrayDecodesToAnEmptyResult() throws Exception {
-        double[] got = decode(encode64(new double[0], false), 0,
-                MzMLBitLength.SIXTY_FOUR_BIT_FLOAT, MzMLCompressionType.NO_COMPRESSION);
+        double[] got =
+                decode(
+                        encode64(new double[0], false),
+                        0,
+                        MzMLBitLength.SIXTY_FOUR_BIT_FLOAT,
+                        MzMLCompressionType.NO_COMPRESSION);
         assertEquals(0, got.length);
     }
 

@@ -12,7 +12,10 @@ public sealed interface Expr {
 
     /** A numeric literal. The grammar's {@code FLOAT} carries no sign; see {@link Unary}. */
     record Literal(double value) implements Expr {
-        @Override public String toString() { return Double.toString(value); }
+        @Override
+        public String toString() {
+            return Double.toString(value);
+        }
     }
 
     /** Binary arithmetic. Precedence is already resolved by the parser. */
@@ -22,7 +25,11 @@ public sealed interface Expr {
                 throw new IllegalArgumentException("Binary operands and operator are required");
             }
         }
-        @Override public String toString() { return "(" + left + " " + op.symbol() + " " + right + ")"; }
+
+        @Override
+        public String toString() {
+            return "(" + left + " " + op.symbol() + " " + right + ")";
+        }
     }
 
     /**
@@ -40,6 +47,10 @@ public sealed interface Expr {
             }
             if (operand == null) throw new IllegalArgumentException("operand is required");
         }
-        @Override public String toString() { return "(" + op.symbol() + operand + ")"; }
+
+        @Override
+        public String toString() {
+            return "(" + op.symbol() + operand + ")";
+        }
     }
 }

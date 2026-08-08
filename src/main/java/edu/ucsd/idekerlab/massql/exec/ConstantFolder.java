@@ -22,7 +22,7 @@ import edu.ucsd.idekerlab.massql.lang.ast.Op;
  */
 public final class ConstantFolder {
 
-    private ConstantFolder() { }
+    private ConstantFolder() {}
 
     /**
      * Folds {@code e} to its double value.
@@ -38,11 +38,14 @@ public final class ConstantFolder {
         if (e instanceof Expr.Literal l) return l.value();
 
         if (e instanceof Expr.Unary u) {
-            if (u.op() == Op.ADD) return fold(u.operand());     // unary plus is identity
+            if (u.op() == Op.ADD) return fold(u.operand()); // unary plus is identity
             if (u.op() == Op.SUB) return -fold(u.operand());
-            // Unreachable: Expr.Unary's constructor already rejects anything but ADD/SUB, which makes
-            // the invalid state unrepresentable rather than merely unevaluatable. Kept as a belt-and-braces
-            // guard so a future relaxation of that constructor fails here rather than silently returning 0.
+            // Unreachable: Expr.Unary's constructor already rejects anything but ADD/SUB, which
+            // makes
+            // the invalid state unrepresentable rather than merely unevaluatable. Kept as a
+            // belt-and-braces
+            // guard so a future relaxation of that constructor fails here rather than silently
+            // returning 0.
             throw new MassqlException("unary " + u.op() + " is not a meaningful operator");
         }
 
@@ -58,8 +61,8 @@ public final class ConstantFolder {
             case ADD -> l + r;
             case SUB -> l - r;
             case MUL -> l * r;
-            // Deliberately NOT guarded: l/0.0 is Infinity (or NaN for 0.0/0.0), and a condition
-            // built on that matches nothing. See the class note.
+                // Deliberately NOT guarded: l/0.0 is Infinity (or NaN for 0.0/0.0), and a condition
+                // built on that matches nothing. See the class note.
             case DIV -> l / r;
         };
     }

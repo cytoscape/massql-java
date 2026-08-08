@@ -21,7 +21,7 @@ public final class MassqlOptions {
     private MassqlOptions(double precursorTolPpm) {
         if (!(precursorTolPpm > 0.0) || !Double.isFinite(precursorTolPpm)) {
             throw new IllegalArgumentException(
-                "precursorTolPpm must be finite and > 0, got " + precursorTolPpm);
+                    "precursorTolPpm must be finite and > 0, got " + precursorTolPpm);
         }
         this.precursorTolPpm = precursorTolPpm;
     }
@@ -30,13 +30,16 @@ public final class MassqlOptions {
         return new MassqlOptions(DEFAULT_PRECURSOR_TOL_PPM);
     }
 
-    public double precursorTolPpm() { return precursorTolPpm; }
+    public double precursorTolPpm() {
+        return precursorTolPpm;
+    }
 
     public MassqlOptions withPrecursorTolPpm(double ppm) {
         return new MassqlOptions(ppm);
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
         return "MassqlOptions[precursorTolPpm=" + precursorTolPpm + "]";
     }
 }

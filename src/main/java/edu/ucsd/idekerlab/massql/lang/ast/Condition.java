@@ -21,7 +21,8 @@ public sealed interface Condition {
      * (Tech_Step9). A plain {@code MS2PROD=226.18} yields a single-element list, so the
      * engine has one code path rather than two.
      */
-    record Value(ConditionType type, List<Expr> values, List<Qualifier> qualifiers) implements Condition {
+    record Value(ConditionType type, List<Expr> values, List<Qualifier> qualifiers)
+            implements Condition {
         public Value {
             if (type == null) throw new IllegalArgumentException("condition type is required");
             if (values == null || values.isEmpty()) {
@@ -30,10 +31,17 @@ public sealed interface Condition {
             values = List.copyOf(values);
             qualifiers = qualifiers == null ? List.of() : List.copyOf(qualifiers);
         }
-        @Override public String toString() {
+
+        @Override
+        public String toString() {
             StringBuilder b = new StringBuilder(type.toString()).append('=');
-            b.append(values.size() == 1 ? values.get(0).toString()
-                                        : values.stream().map(Object::toString).reduce((x, y) -> x + " OR " + y).orElse(""));
+            b.append(
+                    values.size() == 1
+                            ? values.get(0).toString()
+                            : values.stream()
+                                    .map(Object::toString)
+                                    .reduce((x, y) -> x + " OR " + y)
+                                    .orElse(""));
             qualifiers.forEach(q -> b.append(':').append(q));
             return b.toString();
         }
@@ -45,7 +53,9 @@ public sealed interface Condition {
             if (polarity == null) throw new IllegalArgumentException("polarity is required");
             qualifiers = qualifiers == null ? List.of() : List.copyOf(qualifiers);
         }
-        @Override public String toString() {
+
+        @Override
+        public String toString() {
             StringBuilder b = new StringBuilder("POLARITY=").append(polarity);
             qualifiers.forEach(q -> b.append(':').append(q));
             return b.toString();

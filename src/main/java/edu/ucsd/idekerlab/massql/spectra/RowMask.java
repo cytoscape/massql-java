@@ -1,8 +1,8 @@
 package edu.ucsd.idekerlab.massql.spectra;
 
-import edu.ucsd.idekerlab.massql.MassqlException;
-
 import java.util.BitSet;
+
+import edu.ucsd.idekerlab.massql.MassqlException;
 
 /**
  * An immutable set of selected rows.
@@ -35,10 +35,21 @@ public final class RowMask {
         return new RowMask(new BitSet(length), length);
     }
 
-    public int length() { return length; }
-    public boolean get(int row) { return bits.get(row); }
-    public int cardinality() { return bits.cardinality(); }
-    public boolean isEmpty() { return bits.isEmpty(); }
+    public int length() {
+        return length;
+    }
+
+    public boolean get(int row) {
+        return bits.get(row);
+    }
+
+    public int cardinality() {
+        return bits.cardinality();
+    }
+
+    public boolean isEmpty() {
+        return bits.isEmpty();
+    }
 
     public RowMask and(RowMask other) {
         BitSet b = copyBits();
@@ -90,7 +101,9 @@ public final class RowMask {
         return scans;
     }
 
-    private BitSet copyBits() { return (BitSet) bits.clone(); }
+    private BitSet copyBits() {
+        return (BitSet) bits.clone();
+    }
 
     private RowMask requireSameLength(RowMask other) {
         if (other.length != length) {
@@ -99,7 +112,8 @@ public final class RowMask {
         return other;
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
         return "RowMask[" + cardinality() + "/" + length + "]";
     }
 }

@@ -16,6 +16,13 @@ package edu.ucsd.idekerlab.massql.lang.ast;
  * </ul>
  */
 public enum ConditionType {
-    MS2PROD, MS2PREC, MS2NL, MS1MZ,
-    RTMIN, RTMAX, SCANMIN, SCANMAX, CHARGE
+    MS2PROD,
+    MS2PREC,
+    MS2NL,
+    MS1MZ,
+    RTMIN,
+    RTMAX,
+    SCANMIN,
+    SCANMAX,
+    CHARGE
 }

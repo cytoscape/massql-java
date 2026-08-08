@@ -1,14 +1,23 @@
 package edu.ucsd.idekerlab.massql.lang;
 
-import edu.ucsd.idekerlab.massql.MassqlParseException;
-import edu.ucsd.idekerlab.massql.lang.ast.*;
-import edu.ucsd.idekerlab.massql.lang.ast.Comparator;
-
 import java.util.ArrayList;
 import java.util.List;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
+
+import edu.ucsd.idekerlab.massql.MassqlParseException;
+import edu.ucsd.idekerlab.massql.lang.ast.Comparator;
+import edu.ucsd.idekerlab.massql.lang.ast.Condition;
+import edu.ucsd.idekerlab.massql.lang.ast.ConditionType;
+import edu.ucsd.idekerlab.massql.lang.ast.DataSource;
+import edu.ucsd.idekerlab.massql.lang.ast.Expr;
+import edu.ucsd.idekerlab.massql.lang.ast.MassqlQuery;
+import edu.ucsd.idekerlab.massql.lang.ast.Op;
+import edu.ucsd.idekerlab.massql.lang.ast.Polarity;
+import edu.ucsd.idekerlab.massql.lang.ast.Qualifier;
+import edu.ucsd.idekerlab.massql.lang.ast.QualifierType;
+import edu.ucsd.idekerlab.massql.lang.ast.QueryFunction;
 
 /**
  * Walks the ANTLR parse tree and builds the typed AST, rejecting every construct that is
@@ -31,7 +40,8 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
             // ANTLR columns are 0-based; MassqlParseException.position() is documented 1-based.
             pos = where.getStart().getCharPositionInLine() + 1;
         }
-        return new MassqlParseException(construct, UnsupportedConstructs.message(construct), pos, null);
+        return new MassqlParseException(
+                construct, UnsupportedConstructs.message(construct), pos, null);
     }
 
     // ---------------------------------------------------------------- statement
@@ -40,20 +50,22 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
         MassqlParser.QueryContext ctx = stmt.query();
         QueryTypeInfo qt = queryType(ctx.queryType());
 
-        List<Condition> where = ctx.whereClause() == null
-                ? List.of()
-                : conditions(ctx.whereClause().whereConditionList().fullCondition());
+        List<Condition> where =
+                ctx.whereClause() == null
+                        ? List.of()
+                        : conditions(ctx.whereClause().whereConditionList().fullCondition());
 
         // FILTER evaluates exactly like WHERE (Tech_Step9 §2); it is kept as a separate
         // list only so the AST round-trips the source query.
-        List<Condition> filter = ctx.filterClause() == null
-                ? List.of()
-                : conditions(ctx.filterClause().filterConditionList().fullCondition());
+        List<Condition> filter =
+                ctx.filterClause() == null
+                        ? List.of()
+                        : conditions(ctx.filterClause().filterConditionList().fullCondition());
 
         return new MassqlQuery(qt.function(), qt.source(), where, filter);
     }
 
-    private record QueryTypeInfo(QueryFunction function, DataSource source) { }
+    private record QueryTypeInfo(QueryFunction function, DataSource source) {}
 
     private QueryTypeInfo queryType(MassqlParser.QueryTypeContext ctx) {
         if (ctx instanceof MassqlParser.BareDataTypeContext bare) {
@@ -117,12 +129,15 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
 
     private Condition condition(MassqlParser.ConditionContext ctx, List<Qualifier> quals) {
         if (ctx instanceof MassqlParser.ValueConditionContext v) {
-            return new Condition.Value(conditionType(v.conditionField()),
-                                       List.of(expr(v.numericalExpression())), quals);
+            return new Condition.Value(
+                    conditionType(v.conditionField()),
+                    List.of(expr(v.numericalExpression())),
+                    quals);
         }
         if (ctx instanceof MassqlParser.OrListConditionContext or) {
             List<Expr> values = new ArrayList<>();
-            for (MassqlParser.NumericalExpressionContext e : or.numericalExpressionWithOr().numericalExpression()) {
+            for (MassqlParser.NumericalExpressionContext e :
+                    or.numericalExpressionWithOr().numericalExpression()) {
                 values.add(expr(e));
             }
             return new Condition.Value(conditionType(or.conditionField()), values, quals);
@@ -139,12 +154,13 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
             throw reject("ANY", w);
         }
         if (ctx instanceof MassqlParser.VariableRangeConditionContext vr) {
-            throw reject(vr.VARIABLE().getText(), vr);   // X=range(...) / X=massdefect(...)
+            throw reject(vr.VARIABLE().getText(), vr); // X=range(...) / X=massdefect(...)
         }
         if (ctx instanceof MassqlParser.MobilityCondContext mob) {
             throw reject("MOBILITY", mob);
         }
-        throw new IllegalStateException("unhandled condition alternative: " + ctx.getClass().getSimpleName());
+        throw new IllegalStateException(
+                "unhandled condition alternative: " + ctx.getClass().getSimpleName());
     }
 
     private ConditionType conditionType(MassqlParser.ConditionFieldContext ctx) {
@@ -159,13 +175,22 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
 
     private Qualifier qualifier(MassqlParser.QualifierContext ctx) {
         if (ctx instanceof MassqlParser.QualifierEqContext q) {
-            return new Qualifier(qualifierType(q.qualifierField()), Comparator.EQ, expr(q.numericalExpression()));
+            return new Qualifier(
+                    qualifierType(q.qualifierField()),
+                    Comparator.EQ,
+                    expr(q.numericalExpression()));
         }
         if (ctx instanceof MassqlParser.QualifierGtContext q) {
-            return new Qualifier(qualifierType(q.qualifierField()), Comparator.GT, expr(q.numericalExpression()));
+            return new Qualifier(
+                    qualifierType(q.qualifierField()),
+                    Comparator.GT,
+                    expr(q.numericalExpression()));
         }
         if (ctx instanceof MassqlParser.QualifierLtContext q) {
-            return new Qualifier(qualifierType(q.qualifierField()), Comparator.LT, expr(q.numericalExpression()));
+            return new Qualifier(
+                    qualifierType(q.qualifierField()),
+                    Comparator.LT,
+                    expr(q.numericalExpression()));
         }
         if (ctx instanceof MassqlParser.QualifierIntensityMatchReferenceContext r) {
             throw reject("INTENSITYMATCHREFERENCE", r);
@@ -177,12 +202,13 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
             throw reject("MASSDEFECT", m);
         }
         if (ctx instanceof MassqlParser.QualifierCardinalityContext c) {
-            throw reject(c.cardinality().getText(), c);   // CARDINALITY or MATCHCOUNT
+            throw reject(c.cardinality().getText(), c); // CARDINALITY or MATCHCOUNT
         }
         if (ctx instanceof MassqlParser.QualifierOtherScanContext o) {
             throw reject("OTHERSCAN", o);
         }
-        throw new IllegalStateException("unhandled qualifier alternative: " + ctx.getClass().getSimpleName());
+        throw new IllegalStateException(
+                "unhandled qualifier alternative: " + ctx.getClass().getSimpleName());
     }
 
     private QualifierType qualifierType(MassqlParser.QualifierFieldContext ctx) {
@@ -204,17 +230,20 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
             return expr(p.numericalExpression());
         }
         if (ctx instanceof MassqlParser.MulDivContext md) {
-            return new Expr.Binary(expr(md.numericalExpression(0)),
-                                   md.MULTIPLY() != null ? Op.MUL : Op.DIV,
-                                   expr(md.numericalExpression(1)));
+            return new Expr.Binary(
+                    expr(md.numericalExpression(0)),
+                    md.MULTIPLY() != null ? Op.MUL : Op.DIV,
+                    expr(md.numericalExpression(1)));
         }
         if (ctx instanceof MassqlParser.AddSubContext as) {
-            return new Expr.Binary(expr(as.numericalExpression(0)),
-                                   as.PLUS() != null ? Op.ADD : Op.SUB,
-                                   expr(as.numericalExpression(1)));
+            return new Expr.Binary(
+                    expr(as.numericalExpression(0)),
+                    as.PLUS() != null ? Op.ADD : Op.SUB,
+                    expr(as.numericalExpression(1)));
         }
         if (ctx instanceof MassqlParser.UnaryContext u) {
-            return new Expr.Unary(u.PLUS() != null ? Op.ADD : Op.SUB, expr(u.numericalExpression()));
+            return new Expr.Unary(
+                    u.PLUS() != null ? Op.ADD : Op.SUB, expr(u.numericalExpression()));
         }
         if (ctx instanceof MassqlParser.VariableRefContext v) {
             throw reject(v.VARIABLE().getText(), v);
@@ -228,15 +257,18 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
         if (ctx instanceof MassqlParser.PeptideCallContext p) {
             throw reject("peptide()", p);
         }
-        throw new IllegalStateException("unhandled expression alternative: " + ctx.getClass().getSimpleName());
+        throw new IllegalStateException(
+                "unhandled expression alternative: " + ctx.getClass().getSimpleName());
     }
 
     /** Unused: every node is reached through the typed methods above. */
-    @Override protected Object aggregateResult(Object aggregate, Object nextResult) {
+    @Override
+    protected Object aggregateResult(Object aggregate, Object nextResult) {
         return nextResult;
     }
 
-    @Override public Object visitChildren(org.antlr.v4.runtime.tree.RuleNode node) {
+    @Override
+    public Object visitChildren(org.antlr.v4.runtime.tree.RuleNode node) {
         Object r = null;
         for (int i = 0; i < node.getChildCount(); i++) {
             ParseTree c = node.getChild(i);

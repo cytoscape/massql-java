@@ -5,6 +5,11 @@ package edu.ucsd.idekerlab.massql;
 public class MassqlException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
-    public MassqlException(String message) { super(message); }
-    public MassqlException(String message, Throwable cause) { super(message, cause); }
+    public MassqlException(String message) {
+        super(message);
+    }
+
+    public MassqlException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

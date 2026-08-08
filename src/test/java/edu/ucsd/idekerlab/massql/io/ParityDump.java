@@ -1,6 +1,8 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -44,18 +46,37 @@ import java.util.zip.GZIPInputStream;
 final class ParityDump {
 
     /** One scan's worth of MassQL's loaded state. Hex fields are kept raw and parsed on demand. */
-    record Scan(int scan, int mslevel, int peakCount, String iSumHex, String iSha256, String mzSha256,
-                List<String> iHexFirst8, List<String> mzHexFirst8, String rtHex, int polarity) {
+    record Scan(
+            int scan,
+            int mslevel,
+            int peakCount,
+            String iSumHex,
+            String iSha256,
+            String mzSha256,
+            List<String> iHexFirst8,
+            List<String> mzHexFirst8,
+            String rtHex,
+            int polarity) {
 
         /** The composite key. See the class note: scan id alone is unsafe. */
-        Key key() { return new Key(mslevel, scan); }
+        Key key() {
+            return new Key(mslevel, scan);
+        }
 
-        double rt() { return parseHex(rtHex); }
-        double iSum() { return parseHex(iSumHex); }
+        double rt() {
+            return parseHex(rtHex);
+        }
+
+        double iSum() {
+            return parseHex(iSumHex);
+        }
     }
 
     record Key(int mslevel, int scan) {
-        @Override public String toString() { return "MS" + mslevel + " scan " + scan; }
+        @Override
+        public String toString() {
+            return "MS" + mslevel + " scan " + scan;
+        }
     }
 
     private final String fixture;
@@ -72,11 +93,25 @@ final class ParityDump {
         this.scans = scans;
     }
 
-    String fixture() { return fixture; }
-    int ms1ScanCount() { return ms1ScanCount; }
-    int ms2ScanCount() { return ms2ScanCount; }
-    long peakRows() { return peakRows; }
-    Map<Key, Scan> scans() { return scans; }
+    String fixture() {
+        return fixture;
+    }
+
+    int ms1ScanCount() {
+        return ms1ScanCount;
+    }
+
+    int ms2ScanCount() {
+        return ms2ScanCount;
+    }
+
+    long peakRows() {
+        return peakRows;
+    }
+
+    Map<Key, Scan> scans() {
+        return scans;
+    }
 
     /** Loads the dump for a fixture name, e.g. {@code "small.mzML"}. Fails if absent (C26). */
     static ParityDump of(String fixtureName) {
@@ -91,28 +126,39 @@ final class ParityDump {
         Map<Key, Scan> byKey = new LinkedHashMap<>();
         Matcher m = SCAN.matcher(json);
         while (m.find()) {
-            Scan s = new Scan(
-                    Integer.parseInt(m.group(1)),
-                    Integer.parseInt(m.group(2)),
-                    Integer.parseInt(m.group(3)),
-                    m.group(4), m.group(5), m.group(6),
-                    hexList(m.group(7)), hexList(m.group(8)),
-                    m.group(9),
-                    Integer.parseInt(m.group(10)));
+            Scan s =
+                    new Scan(
+                            Integer.parseInt(m.group(1)),
+                            Integer.parseInt(m.group(2)),
+                            Integer.parseInt(m.group(3)),
+                            m.group(4),
+                            m.group(5),
+                            m.group(6),
+                            hexList(m.group(7)),
+                            hexList(m.group(8)),
+                            m.group(9),
+                            Integer.parseInt(m.group(10)));
             Scan clash = byKey.put(s.key(), s);
-            // A duplicate key would mean the dump itself is malformed, or that our key is too weak --
-            // the failure mode C32a is about. Better to know here than to silently drop half the file.
+            // A duplicate key would mean the dump itself is malformed, or that our key is too weak
+            // --
+            // the failure mode C32a is about. Better to know here than to silently drop half the
+            // file.
             assertNull(clash, "duplicate key " + s.key() + " in dump " + fixtureName);
         }
 
         // A dump that failed to parse must FAIL, not yield an empty map that every later assertion
         // vacuously satisfies. This is the "vacuous pass" trap in Tech_Step8's Known traps.
-        assertFalse(byKey.isEmpty(),
-                "no scans parsed from " + gz + " -- the dump format changed and every parity assertion "
+        assertFalse(
+                byKey.isEmpty(),
+                "no scans parsed from "
+                        + gz
+                        + " -- the dump format changed and every parity assertion "
                         + "built on it would now pass vacuously");
 
-        return new ParityDump(fixtureName,
-                intField(json, "ms1_scan_count"), intField(json, "ms2_scan_count"),
+        return new ParityDump(
+                fixtureName,
+                intField(json, "ms1_scan_count"),
+                intField(json, "ms2_scan_count"),
                 (long) intField(json, "ms1_peak_rows") + intField(json, "ms2_peak_rows"),
                 byKey);
     }
@@ -141,8 +187,9 @@ final class ParityDump {
         try {
             byte[] d = MessageDigest.getInstance("SHA-256").digest(b.array());
             StringBuilder sb = new StringBuilder(64);
-            for (byte x : d) sb.append(Character.forDigit((x >> 4) & 0xF, 16))
-                               .append(Character.forDigit(x & 0xF, 16));
+            for (byte x : d)
+                sb.append(Character.forDigit((x >> 4) & 0xF, 16))
+                        .append(Character.forDigit(x & 0xF, 16));
             return sb.toString();
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 is required by the JDK", e);
@@ -152,17 +199,18 @@ final class ParityDump {
     // ------------------------------------------------------------------ parsing
 
     /** Field order is fixed by the generator, so one regex covers the whole record. */
-    private static final Pattern SCAN = Pattern.compile(
-            "\"scan\":\\s*\"?(-?\\d+)\"?,\\s*"
-                    + "\"mslevel\":\\s*(\\d+),\\s*"
-                    + "\"peak_count\":\\s*(\\d+),\\s*"
-                    + "\"i_sum_hex\":\\s*\"([^\"]*)\",\\s*"
-                    + "\"i_sha256\":\\s*\"([0-9a-f]*)\",\\s*"
-                    + "\"mz_sha256\":\\s*\"([0-9a-f]*)\",\\s*"
-                    + "\"i_hex_first8\":\\s*\\[([^\\]]*)\\],\\s*"
-                    + "\"mz_hex_first8\":\\s*\\[([^\\]]*)\\],\\s*"
-                    + "\"rt_hex\":\\s*\"([^\"]*)\",\\s*"
-                    + "\"polarity\":\\s*(-?\\d+)");
+    private static final Pattern SCAN =
+            Pattern.compile(
+                    "\"scan\":\\s*\"?(-?\\d+)\"?,\\s*"
+                            + "\"mslevel\":\\s*(\\d+),\\s*"
+                            + "\"peak_count\":\\s*(\\d+),\\s*"
+                            + "\"i_sum_hex\":\\s*\"([^\"]*)\",\\s*"
+                            + "\"i_sha256\":\\s*\"([0-9a-f]*)\",\\s*"
+                            + "\"mz_sha256\":\\s*\"([0-9a-f]*)\",\\s*"
+                            + "\"i_hex_first8\":\\s*\\[([^\\]]*)\\],\\s*"
+                            + "\"mz_hex_first8\":\\s*\\[([^\\]]*)\\],\\s*"
+                            + "\"rt_hex\":\\s*\"([^\"]*)\",\\s*"
+                            + "\"polarity\":\\s*(-?\\d+)");
 
     private static List<String> hexList(String body) {
         List<String> out = new ArrayList<>(8);

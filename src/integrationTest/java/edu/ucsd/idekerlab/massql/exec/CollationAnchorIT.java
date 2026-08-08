@@ -1,12 +1,8 @@
 package edu.ucsd.idekerlab.massql.exec;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import edu.ucsd.idekerlab.massql.Massql;
-import edu.ucsd.idekerlab.massql.MassqlOptions;
-import edu.ucsd.idekerlab.massql.io.SpectraFile;
-import edu.ucsd.idekerlab.massql.io.SpectraStream;
-import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -17,6 +13,12 @@ import java.nio.file.Paths;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+
+import edu.ucsd.idekerlab.massql.Massql;
+import edu.ucsd.idekerlab.massql.MassqlOptions;
+import edu.ucsd.idekerlab.massql.io.SpectraFile;
+import edu.ucsd.idekerlab.massql.io.SpectraStream;
+import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
 
 /**
  * The anchor: {@code small.mzML}'s first golden record, reproduced field by field at <b>both</b>
@@ -40,8 +42,10 @@ class CollationAnchorIT {
     private static Path resource(String relative) {
         var url = CollationAnchorIT.class.getClassLoader().getResource(relative);
         if (url == null) {
-            throw new AssertionError("fixture missing from src/test/resources: " + relative
-                    + " -- fixtures are committed in-repo (C26); restore it rather than skipping");
+            throw new AssertionError(
+                    "fixture missing from src/test/resources: "
+                            + relative
+                            + " -- fixtures are committed in-repo (C26); restore it rather than skipping");
         }
         try {
             return Paths.get(url.toURI());
@@ -78,7 +82,10 @@ class CollationAnchorIT {
      * {@code max()}/lookup <i>selections</i> with no accumulation, and are bit-identical.
      */
     private static void assertTicClose(double expected, double actual) {
-        assertEquals(expected, actual, Math.abs(expected) * 1e-6,
+        assertEquals(
+                expected,
+                actual,
+                Math.abs(expected) * 1e-6,
                 "tic is a float32 accumulation on the reference side (C34); relative 1e-6");
     }
 
@@ -89,10 +96,13 @@ class CollationAnchorIT {
         assertEquals(3, r.scan());
         assertEquals(810.79, r.precmz());
         assertEquals(2, r.ms1scan());
-        // Bit-identical, and it CANNOT survive a float round-trip -- this is why ScanIndex.rtOf is a
+        // Bit-identical, and it CANNOT survive a float round-trip -- this is why ScanIndex.rtOf is
+        // a
         // double rather than the per-peak float column.
         assertEquals(0.011218333333333334, r.rt());
-        assertEquals(Double.doubleToLongBits(0.011218333333333334), Double.doubleToLongBits(r.rt()),
+        assertEquals(
+                Double.doubleToLongBits(0.011218333333333334),
+                Double.doubleToLongBits(r.rt()),
                 "rt must be bit-identical, not merely close");
         assertNull(r.charge(), "small.mzML records no charge state -> 0 sentinel -> null");
         assertTicClose(586278.875, r.tic());
@@ -102,11 +112,14 @@ class CollationAnchorIT {
         assertEquals(161140.859375, r.basePeakI());
         assertEquals(736.6370849609375, r.basePeakMz());
 
-        // THE tolerance-miss case: the nearest MS1 peak is 34.8 ppm from precmz, so at 20 ppm the match
+        // THE tolerance-miss case: the nearest MS1 peak is 34.8 ppm from precmz, so at 20 ppm the
+        // match
         // fails -- but the base peak of the linked MS1 scan is known regardless.
         assertNull(r.ms1I(), "34.8 ppm away, so no match at 20 ppm");
         assertNull(r.ms1Precmz());
-        assertEquals(183838.71875, r.ms1BasePeakI(),
+        assertEquals(
+                183838.71875,
+                r.ms1BasePeakI(),
                 "ms1_base_peak_i SURVIVES the tolerance miss (Tech_Step10 §3.2) -- if this is null, the "
                         + "lookup is nulling it along with the match");
     }
@@ -117,9 +130,14 @@ class CollationAnchorIT {
 
         assertEquals(3, r.scan(), "same row, same query -- only the flag differs");
         assertEquals(131528.0625, r.ms1I());
-        assertEquals(810.8182000219822, r.ms1Precmz(),
+        assertEquals(
+                810.8182000219822,
+                r.ms1Precmz(),
                 "the MEASURED centroid, ~34.8 ppm off the reported precmz of 810.79");
-        assertEquals(183838.71875, r.ms1BasePeakI(), "unchanged by the tolerance -- it never depended on it");
+        assertEquals(
+                183838.71875,
+                r.ms1BasePeakI(),
+                "unchanged by the tolerance -- it never depended on it");
 
         // And the columns the tolerance must NOT touch are identical across the two runs.
         ScanInfoResult at20 = run(20.0).get(0);
@@ -132,25 +150,30 @@ class CollationAnchorIT {
 
     @Test
     void theTwoRunsSelectTheSameSixScansBecauseTheKnobsAreSeparate() {
-        // precursorTolPpm matches a peak WITHIN an already-selected scan; it must not change WHICH scans
+        // precursorTolPpm matches a peak WITHIN an already-selected scan; it must not change WHICH
+        // scans
         // qualify. Conflating it with the query's own TOLERANCEPPM would change the row count here.
         List<Integer> at20 = run(20.0).stream().map(ScanInfoResult::scan).toList();
         List<Integer> at60 = run(60.0).stream().map(ScanInfoResult::scan).toList();
         assertEquals(6, at20.size(), "small_mzml_results.json has 6 records");
-        assertEquals(at20, at60, "the precursor tolerance is a separate knob from the query tolerance");
+        assertEquals(
+                at20, at60, "the precursor tolerance is a separate knob from the query tolerance");
     }
 
     @Test
     void fourOfTheSixRowsAreToleranceMissesAtTwentyPpmAndNoneAreAtSixty() {
-        // The distribution the golden records, asserted as a shape rather than row by row -- and the
+        // The distribution the golden records, asserted as a shape rather than row by row -- and
+        // the
         // reason the 20 ppm golden exists at all (C10): it supplies the only golden coverage of the
         // "a miss nulls ms1_i but not ms1_base_peak_i" rule.
         long missesAt20 = run(20.0).stream().filter(r -> r.ms1I() == null).count();
         assertEquals(4, missesAt20, "4 of 6 rows miss at 20 ppm");
-        assertEquals(0, run(60.0).stream().filter(r -> r.ms1I() == null).count(), "none miss at 60 ppm");
+        assertEquals(
+                0, run(60.0).stream().filter(r -> r.ms1I() == null).count(), "none miss at 60 ppm");
 
         // Every row keeps its ms1_base_peak_i either way -- that is the invariant under test.
-        assertTrue(run(20.0).stream().allMatch(r -> r.ms1BasePeakI() != null),
+        assertTrue(
+                run(20.0).stream().allMatch(r -> r.ms1BasePeakI() != null),
                 "ms1_base_peak_i is populated whenever the linked MS1 scan exists, miss or not");
     }
 

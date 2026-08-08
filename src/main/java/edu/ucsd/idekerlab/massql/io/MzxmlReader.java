@@ -1,11 +1,5 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import edu.ucsd.idekerlab.massql.MassqlException;
-import edu.ucsd.idekerlab.massql.io.vendor.ByteBufferInputStream;
-import edu.ucsd.idekerlab.massql.io.vendor.FileMemoryMapper;
-import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
-import edu.ucsd.idekerlab.massql.spectra.SpectrumTableBuilder;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -18,6 +12,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
+
+import edu.ucsd.idekerlab.massql.MassqlException;
+import edu.ucsd.idekerlab.massql.io.vendor.ByteBufferInputStream;
+import edu.ucsd.idekerlab.massql.io.vendor.FileMemoryMapper;
+import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
+import edu.ucsd.idekerlab.massql.spectra.SpectrumTableBuilder;
 
 import javolution.text.CharArray;
 import javolution.xml.internal.stream.XMLStreamReaderImpl;
@@ -92,23 +92,35 @@ final class MzxmlReader extends AbstractSpectraStream {
     public List<String> diagnostics() {
         List<String> out = new ArrayList<>(diagnostics);
         if (skippedHighMsLevel > 0) {
-            out.add("skipped " + skippedHighMsLevel + " scans with ms level > 2 (out of scope for scaninfo)");
+            out.add(
+                    "skipped "
+                            + skippedHighMsLevel
+                            + " scans with ms level > 2 (out of scope for scaninfo)");
         }
         if (skippedNoMsLevel > 0) {
             // C27a: MassQL drops these too -- pyteomics yields msLevel None and neither the ==1 nor
             // the ==2 branch fires. Reported rather than silent, because "48 scans became 40" needs
             // an explanation at the point of use.
-            out.add("skipped " + skippedNoMsLevel + " scans with a missing or empty msLevel attribute"
-                    + " (MassQL drops these: pyteomics yields None, which matches neither ms level)");
+            out.add(
+                    "skipped "
+                            + skippedNoMsLevel
+                            + " scans with a missing or empty msLevel attribute"
+                            + " (MassQL drops these: pyteomics yields None, which matches neither ms level)");
         }
         if (skippedNotASpectrum > 0) {
-            out.add("skipped " + skippedNotASpectrum + " <scan> elements with no <peaks> child"
-                    + " (msql_fileloading.py:424 treats these as \"not a mass spectrum\")");
+            out.add(
+                    "skipped "
+                            + skippedNotASpectrum
+                            + " <scan> elements with no <peaks> child"
+                            + " (msql_fileloading.py:424 treats these as \"not a mass spectrum\")");
         }
         return Collections.unmodifiableList(out);
     }
 
-    @Override protected ScanView view() { return scan; }
+    @Override
+    protected ScanView view() {
+        return scan;
+    }
 
     @Override
     protected boolean advance() {
@@ -123,20 +135,20 @@ final class MzxmlReader extends AbstractSpectraStream {
                 if (ev == XMLStreamConstants.END_ELEMENT) {
                     CharArray n = xml.getLocalName();
                     if (eq(n, "msRun") || eq(n, "mzXML")) sawRootEnd = true;
-                    continue;                       // </scan> is deliberately NOT a boundary
+                    continue; // </scan> is deliberately NOT a boundary
                 }
                 if (ev != XMLStreamConstants.START_ELEMENT) continue;
 
                 CharArray name = xml.getLocalName();
                 if (eq(name, "scan")) {
-                    dropUnfinishedScan();           // a <scan> with no <peaks> of its own
+                    dropUnfinishedScan(); // a <scan> with no <peaks> of its own
                     startScan();
                 } else if (eq(name, "precursorMz") && scanStarted) {
                     readPrecursorMz();
                 } else if (eq(name, "peaks") && scanStarted) {
                     readPeaks();
                     scanStarted = false;
-                    if (admit()) {                  // false = dropped (bad/absent/high ms level)
+                    if (admit()) { // false = dropped (bad/absent/high ms level)
                         return true;
                     }
                 }
@@ -156,7 +168,7 @@ final class MzxmlReader extends AbstractSpectraStream {
      * for a level-1 scan that survived it.
      */
     private boolean admit() {
-        if (scan.msLevel == 0) {                    // absent or empty msLevel -- C27a
+        if (scan.msLevel == 0) { // absent or empty msLevel -- C27a
             skippedNoMsLevel++;
             return false;
         }
@@ -194,8 +206,10 @@ final class MzxmlReader extends AbstractSpectraStream {
         // partial result is worse than an error -- the shortfall would surface later as an
         // inexplicable filtering bug.
         if (!sawRootEnd) {
-            throw new MassqlException("truncated mzXML: " + path
-                    + " ends without closing </msRun>; refusing to return a partial result");
+            throw new MassqlException(
+                    "truncated mzXML: "
+                            + path
+                            + " ends without closing </msRun>; refusing to return a partial result");
         }
         dropUnfinishedScan();
     }
@@ -203,7 +217,7 @@ final class MzxmlReader extends AbstractSpectraStream {
     private void startScan() {
         scan.reset();
         scan.scanId = scanNum(attr("num"));
-        scan.msLevel = parseInt(attr("msLevel"), 0);     // absent/empty -> 0 -> dropped in admit()
+        scan.msLevel = parseInt(attr("msLevel"), 0); // absent/empty -> 0 -> dropped in admit()
         scan.declaredPeaks = parseInt(attr("peaksCount"), -1);
         scan.rt = retentionTimeMinutes(attr("retentionTime"));
         scan.polarity = polarityOf(attr("polarity"));
@@ -211,11 +225,13 @@ final class MzxmlReader extends AbstractSpectraStream {
     }
 
     private void readPrecursorMz() throws XMLStreamException {
-        // precursorCharge is optional; absent -> 0. NOTE this is mzXML's default, unlike MGF where an
+        // precursorCharge is optional; absent -> 0. NOTE this is mzXML's default, unlike MGF where
+        // an
         // absent CHARGE is 1 (Correction C6). Three formats, three charge defaults.
         int charge = parseInt(attr("precursorCharge"), 0);
         // getElementText() consumes through </precursorMz>. The VALUE is element text, not an
-        // attribute -- which is why a bare <precursorMz> with no attributes, the Step 2 finding that
+        // attribute -- which is why a bare <precursorMz> with no attributes, the Step 2 finding
+        // that
         // crashes pyteomics/MassQL, costs us nothing.
         CharArray text = xml.getElementText();
         double mz = parseDouble(text == null ? null : text.toString(), 0.0);
@@ -237,14 +253,17 @@ final class MzxmlReader extends AbstractSpectraStream {
         // reported rather than silently mis-decoded: a wrong byte order yields plausible garbage.
         scan.bigEndian = order == null || "network".equalsIgnoreCase(order.trim());
         if (!scan.bigEndian) {
-            diagnostics.add("scan " + scan.scanId + ": byteOrder=\"" + order
-                    + "\" is not \"network\"; decoding as little-endian");
+            diagnostics.add(
+                    "scan "
+                            + scan.scanId
+                            + ": byteOrder=\""
+                            + order
+                            + "\" is not \"network\"; decoding as little-endian");
         }
         String comp = attr("compressionType");
         // Upstream's check is `!= null && != "none"`, so an ABSENT attribute means uncompressed --
         // which is what all three primary fixtures rely on. Verified, not assumed.
-        scan.zlib = comp != null && !comp.trim().isEmpty()
-                && !"none".equalsIgnoreCase(comp.trim());
+        scan.zlib = comp != null && !comp.trim().isEmpty() && !"none".equalsIgnoreCase(comp.trim());
 
         CharArray text = xml.getElementText();
         scan.base64 = text == null ? "" : text.toString().trim();
@@ -274,7 +293,8 @@ final class MzxmlReader extends AbstractSpectraStream {
         // _determine_scan_polarity_mzXML (:517-523) initialises 0 and tests "+" then "-", so
         // present-but-other -> 0 IS parity. But it reads spec["polarity"] UNGUARDED, so an ABSENT
         // attribute raises KeyError -- MassQL produces nothing and no golden can exist. Our 0 there
-        // is our own contract (Correction C27c); micro_nopolarity.mzXML pins it and MzxmlPolarityTest
+        // is our own contract (Correction C27c); micro_nopolarity.mzXML pins it and
+        // MzxmlPolarityTest
         // keeps the two cases apart so a pass cannot imply parity we do not have.
         if (polarity == null) return 0;
         String p = polarity.trim();
@@ -318,34 +338,40 @@ final class MzxmlReader extends AbstractSpectraStream {
         if (s.isEmpty()) return 0.0;
 
         if (!s.startsWith("P")) {
-            // pyteomics: `unitfloat(s, 'duration')`, else `unitstr(s, 'duration')`. A bare number is
+            // pyteomics: `unitfloat(s, 'duration')`, else `unitstr(s, 'duration')`. A bare number
+            // is
             // used as-is; anything else becomes a STRING that MassQL would carry as rt (verified:
             // "-PT90S" comes back as the literal string). We refuse rather than invent a number --
             // a documented deviation, and a clean error beats a silently wrong retention time.
             try {
                 return Double.parseDouble(s);
             } catch (NumberFormatException e) {
-                throw new MassqlException("cannot read mzXML retentionTime \"" + rt
-                        + "\": not an ISO-8601 duration and not a number. pyteomics returns the raw"
-                        + " string here, which MassQL would carry as a non-numeric rt", e);
+                throw new MassqlException(
+                        "cannot read mzXML retentionTime \""
+                                + rt
+                                + "\": not an ISO-8601 duration and not a number. pyteomics returns the raw"
+                                + " string here, which MassQL would carry as a non-numeric rt",
+                        e);
             }
         }
 
         Matcher m = DURATION.matcher(s);
-        if (!m.find()) return 0.0;                       // pyteomics returns the string; unreachable
+        if (!m.find()) return 0.0; // pyteomics returns the string; unreachable
         double hours = group(m, 5);
         double minutes = group(m, 6);
         double seconds = group(m, 7);
-        // Groups 2/3/4 are years/months/days: matched so that P1M is read as MONTHS, then discarded.
+        // Groups 2/3/4 are years/months/days: matched so that P1M is read as MONTHS, then
+        // discarded.
         minutes += hours * 60.0;
         minutes += (seconds / 60.0);
         return minutes;
     }
 
     /** Mirrors pyteomics' `_duration_parser` exactly, including the unused sign/Y/M/D groups. */
-    private static final Pattern DURATION = Pattern.compile(
-            "(-?)P(?:(\\d+\\.?\\d*)Y)?(?:(\\d+\\.?\\d*)M)?(?:(\\d+\\.?\\d*)D)?"
-                    + "(?:T(?:(\\d+\\.?\\d*)H)?(?:(\\d+\\.?\\d*)M)?(?:(\\d+\\.?\\d*)S)?)?");
+    private static final Pattern DURATION =
+            Pattern.compile(
+                    "(-?)P(?:(\\d+\\.?\\d*)Y)?(?:(\\d+\\.?\\d*)M)?(?:(\\d+\\.?\\d*)D)?"
+                            + "(?:T(?:(\\d+\\.?\\d*)H)?(?:(\\d+\\.?\\d*)M)?(?:(\\d+\\.?\\d*)S)?)?");
 
     private static double group(Matcher m, int i) {
         String g = m.group(i);
@@ -354,29 +380,49 @@ final class MzxmlReader extends AbstractSpectraStream {
 
     // ------------------------------------------------------------------ helpers
 
-    private String attr(String name) { return str(xml.getAttributeValue(null, name)); }
+    private String attr(String name) {
+        return str(xml.getAttributeValue(null, name));
+    }
 
-    private static String str(CharArray c) { return c == null ? null : c.toString(); }
+    private static String str(CharArray c) {
+        return c == null ? null : c.toString();
+    }
 
-    private static boolean eq(CharArray c, String s) { return c != null && c.equals(s); }
+    private static boolean eq(CharArray c, String s) {
+        return c != null && c.equals(s);
+    }
 
     private static int parseInt(String s, int fallback) {
         if (s == null || s.trim().isEmpty()) return fallback;
-        try { return Integer.parseInt(s.trim()); } catch (NumberFormatException e) { return fallback; }
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
     }
 
     private static double parseDouble(String s, double fallback) {
         if (s == null || s.trim().isEmpty()) return fallback;
-        try { return Double.parseDouble(s.trim()); } catch (NumberFormatException e) { return fallback; }
+        try {
+            return Double.parseDouble(s.trim());
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
     }
 
     private void closeQuietly() {
-        try { mapped.close(); } catch (IOException ignored) { }
+        try {
+            mapped.close();
+        } catch (IOException ignored) {
+        }
     }
 
     @Override
     protected void releaseResources() {
-        try { xml.close(); } catch (XMLStreamException ignored) { }
+        try {
+            xml.close();
+        } catch (XMLStreamException ignored) {
+        }
         closeQuietly();
     }
 
@@ -390,22 +436,27 @@ final class MzxmlReader extends AbstractSpectraStream {
         int ms1scan;
         int charge;
         int peakCount;
-        int declaredPeaks;      // the peaksCount attribute, or -1
+        int declaredPeaks; // the peaksCount attribute, or -1
         int precision = 32;
         boolean bigEndian = true;
         boolean zlib = false;
         String base64 = "";
-        boolean precursorSeen;   // C31: only the FIRST <precursorMz> counts
+        boolean precursorSeen; // C31: only the FIRST <precursorMz> counts
 
         void reset() {
-            scanId = 0; msLevel = 0; rt = 0.0; polarity = 0;
-            precmz = 0.0;    // 0 sentinel -- Step 10 converts, not us. Also our non-parity value
-                             // for an MS2 with no <precursorMz> at all (C27c).
-            ms1scan = 0;     // 0 = no preceding MS1; the origin of the sentinel
-            charge = 0;      // mzXML default -- NOT MGF's 1 (C6)
+            scanId = 0;
+            msLevel = 0;
+            rt = 0.0;
+            polarity = 0;
+            precmz = 0.0; // 0 sentinel -- Step 10 converts, not us. Also our non-parity value
+            // for an MS2 with no <precursorMz> at all (C27c).
+            ms1scan = 0; // 0 = no preceding MS1; the origin of the sentinel
+            charge = 0; // mzXML default -- NOT MGF's 1 (C6)
             peakCount = 0;
             declaredPeaks = -1;
-            precision = 32; bigEndian = true; zlib = false;
+            precision = 32;
+            bigEndian = true;
+            zlib = false;
             base64 = "";
             precursorSeen = false;
         }
@@ -421,20 +472,51 @@ final class MzxmlReader extends AbstractSpectraStream {
         int resolvePeakCount() {
             if (declaredPeaks >= 0) return declaredPeaks;
             if (base64.isEmpty()) return 0;
-            if (zlib) return 0;              // cannot know without inflating; capacity hint only
+            if (zlib) return 0; // cannot know without inflating; capacity hint only
             int bytes = base64Bytes(base64);
-            int width = 2 * (precision == 64 ? 8 : 4);     // an interleaved m/z-intensity PAIR
+            int width = 2 * (precision == 64 ? 8 : 4); // an interleaved m/z-intensity PAIR
             return width == 0 ? 0 : bytes / width;
         }
 
-        @Override public int scanId()    { return scanId; }
-        @Override public int msLevel()   { return msLevel; }
-        @Override public double rt()     { return rt; }
-        @Override public int polarity()  { return polarity; }
-        @Override public double precmz() { return precmz; }
-        @Override public int ms1scan()   { return ms1scan; }
-        @Override public int charge()    { return charge; }
-        @Override public int peakCount() { return peakCount; }
+        @Override
+        public int scanId() {
+            return scanId;
+        }
+
+        @Override
+        public int msLevel() {
+            return msLevel;
+        }
+
+        @Override
+        public double rt() {
+            return rt;
+        }
+
+        @Override
+        public int polarity() {
+            return polarity;
+        }
+
+        @Override
+        public double precmz() {
+            return precmz;
+        }
+
+        @Override
+        public int ms1scan() {
+            return ms1scan;
+        }
+
+        @Override
+        public int charge() {
+            return charge;
+        }
+
+        @Override
+        public int peakCount() {
+            return peakCount;
+        }
 
         @Override
         public SpectrumTable materialize() {
@@ -459,41 +541,67 @@ final class MzxmlReader extends AbstractSpectraStream {
          * give {@code 123.456787109375} where {@code micro_p64.mzXML} gives {@code 123.456789012345}.
          */
         private double[][] decode() {
-            if (base64.isEmpty()) return new double[][]{new double[0], new double[0]};
+            if (base64.isEmpty()) return new double[][] {new double[0], new double[0]};
 
             byte[] raw;
             try {
-                raw = Base64.getMimeDecoder().decode(base64);   // MIME: tolerates embedded newlines
+                raw = Base64.getMimeDecoder().decode(base64); // MIME: tolerates embedded newlines
             } catch (IllegalArgumentException e) {
-                throw new MassqlException("scan " + scanId + " in " + path
-                        + ": <peaks> is not valid base64: " + e.getMessage(), e);
+                throw new MassqlException(
+                        "scan "
+                                + scanId
+                                + " in "
+                                + path
+                                + ": <peaks> is not valid base64: "
+                                + e.getMessage(),
+                        e);
             }
             if (zlib) raw = inflate(raw);
 
             int width = precision == 64 ? 8 : 4;
             if (precision != 32 && precision != 64) {
-                throw new MassqlException("scan " + scanId + " in " + path
-                        + ": unsupported peaks precision=\"" + precision + "\" (expected 32 or 64)");
+                throw new MassqlException(
+                        "scan "
+                                + scanId
+                                + " in "
+                                + path
+                                + ": unsupported peaks precision=\""
+                                + precision
+                                + "\" (expected 32 or 64)");
             }
-            ByteBuffer buf = ByteBuffer.wrap(raw)
-                    .order(bigEndian ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN);
+            ByteBuffer buf =
+                    ByteBuffer.wrap(raw)
+                            .order(bigEndian ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN);
 
             int pairs = raw.length / (2 * width);
             if (raw.length % (2 * width) != 0) {
-                // An odd tail means the array is not whole m/z-intensity pairs. Report it rather than
+                // An odd tail means the array is not whole m/z-intensity pairs. Report it rather
+                // than
                 // dropping a value silently, which would change tic and base_peak.
-                diagnostics.add("scan " + scanId + ": <peaks> holds " + raw.length
-                        + " bytes, not a whole number of " + (2 * width) + "-byte pairs; ignoring the tail");
+                diagnostics.add(
+                        "scan "
+                                + scanId
+                                + ": <peaks> holds "
+                                + raw.length
+                                + " bytes, not a whole number of "
+                                + (2 * width)
+                                + "-byte pairs; ignoring the tail");
             }
             double[] mz = new double[pairs];
             double[] in = new double[pairs];
             if (precision == 64) {
-                for (int i = 0; i < pairs; i++) { mz[i] = buf.getDouble(); in[i] = buf.getDouble(); }
+                for (int i = 0; i < pairs; i++) {
+                    mz[i] = buf.getDouble();
+                    in[i] = buf.getDouble();
+                }
             } else {
                 // getFloat() into a double[] IS the (double)(float) widening. Do not "fix" this.
-                for (int i = 0; i < pairs; i++) { mz[i] = buf.getFloat(); in[i] = buf.getFloat(); }
+                for (int i = 0; i < pairs; i++) {
+                    mz[i] = buf.getFloat();
+                    in[i] = buf.getFloat();
+                }
             }
-            return new double[][]{mz, in};
+            return new double[][] {mz, in};
         }
 
         private byte[] inflate(byte[] compressed) {
@@ -512,9 +620,14 @@ final class MzxmlReader extends AbstractSpectraStream {
                     out.write(chunk, 0, got);
                 }
             } catch (DataFormatException e) {
-                throw new MassqlException("scan " + scanId + " in " + path
-                        + ": <peaks> declares compressionType=\"zlib\" but does not inflate: "
-                        + e.getMessage(), e);
+                throw new MassqlException(
+                        "scan "
+                                + scanId
+                                + " in "
+                                + path
+                                + ": <peaks> declares compressionType=\"zlib\" but does not inflate: "
+                                + e.getMessage(),
+                        e);
             } finally {
                 inf.end();
             }

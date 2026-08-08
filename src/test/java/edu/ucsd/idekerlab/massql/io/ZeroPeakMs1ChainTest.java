@@ -1,6 +1,7 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -52,9 +53,12 @@ class ZeroPeakMs1ChainTest {
         Path mzml = Fixtures.require("fixtures/micro/micro.mzML");
         Map<Integer, Integer> links = ms2Links(mzml);
 
-        assertEquals(2, links.get(5),
+        assertEquals(
+                2,
+                links.get(5),
                 "scan 4 is an MS1 with zero peaks, so MassQL never assigns it to previous_ms1_scan; "
-                        + "scan 5 must link back to scan 2. Got " + links.get(5)
+                        + "scan 5 must link back to scan 2. Got "
+                        + links.get(5)
                         + " -- the reader is updating the chain on empty scans (C27b).");
 
         // The other two links, so a reader that returned a constant 2 cannot pass vacuously.
@@ -79,7 +83,9 @@ class ZeroPeakMs1ChainTest {
                     sawEmptyMs1 = true;
                     assertEquals(1, v.msLevel());
                     assertEquals(0, v.peakCount(), "scan 4 is the zero-peak MS1");
-                    assertEquals(0, v.materialize().rowCount(),
+                    assertEquals(
+                            0,
+                            v.materialize().rowCount(),
                             "materialising an empty scan yields an empty table, not an error");
                 }
             }

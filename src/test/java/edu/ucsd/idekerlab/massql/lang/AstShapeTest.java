@@ -1,14 +1,24 @@
 package edu.ucsd.idekerlab.massql.lang;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import edu.ucsd.idekerlab.massql.Massql;
-import edu.ucsd.idekerlab.massql.lang.ast.*;
-import edu.ucsd.idekerlab.massql.lang.ast.Comparator;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
+
+import edu.ucsd.idekerlab.massql.Massql;
+import edu.ucsd.idekerlab.massql.lang.ast.Comparator;
+import edu.ucsd.idekerlab.massql.lang.ast.Condition;
+import edu.ucsd.idekerlab.massql.lang.ast.ConditionType;
+import edu.ucsd.idekerlab.massql.lang.ast.DataSource;
+import edu.ucsd.idekerlab.massql.lang.ast.Expr;
+import edu.ucsd.idekerlab.massql.lang.ast.MassqlQuery;
+import edu.ucsd.idekerlab.massql.lang.ast.Op;
+import edu.ucsd.idekerlab.massql.lang.ast.Polarity;
+import edu.ucsd.idekerlab.massql.lang.ast.QualifierType;
 
 /** Pins the AST decisions Tech_Step9 depends on. */
 class AstShapeTest {
@@ -20,10 +30,15 @@ class AstShapeTest {
     @Test
     void ms2mzIsCollapsedToMs2prod() {
         // One ConditionType, not two spellings, so the engine has a single code path.
-        assertEquals(ConditionType.MS2PROD, firstValue("QUERY scaninfo(MS2DATA) WHERE MS2MZ=100").type());
-        assertEquals(ConditionType.MS2PROD, firstValue("QUERY scaninfo(MS2DATA) WHERE MS2PROD=100").type());
-        assertEquals(Massql.parse("QUERY scaninfo(MS2DATA) WHERE MS2MZ=100").canonical(),
-                     Massql.parse("QUERY scaninfo(MS2DATA) WHERE MS2PROD=100").canonical());
+        assertEquals(
+                ConditionType.MS2PROD,
+                firstValue("QUERY scaninfo(MS2DATA) WHERE MS2MZ=100").type());
+        assertEquals(
+                ConditionType.MS2PROD,
+                firstValue("QUERY scaninfo(MS2DATA) WHERE MS2PROD=100").type());
+        assertEquals(
+                Massql.parse("QUERY scaninfo(MS2DATA) WHERE MS2MZ=100").canonical(),
+                Massql.parse("QUERY scaninfo(MS2DATA) WHERE MS2PROD=100").canonical());
     }
 
     @Test
@@ -77,7 +92,9 @@ class AstShapeTest {
 
     @Test
     void orListCollapsesToASingleConditionWithManyValues() {
-        Condition.Value v = firstValue("QUERY scaninfo(MS2DATA) WHERE MS2PROD=(58.06513 OR 60.04439 OR 70.06513)");
+        Condition.Value v =
+                firstValue(
+                        "QUERY scaninfo(MS2DATA) WHERE MS2PROD=(58.06513 OR 60.04439 OR 70.06513)");
         assertEquals(3, v.values().size());
         assertEquals(new Expr.Literal(58.06513), v.values().get(0));
         assertEquals(new Expr.Literal(70.06513), v.values().get(2));
@@ -91,28 +108,35 @@ class AstShapeTest {
 
     @Test
     void qualifiersKeepTheirComparator() {
-        Condition.Value v = firstValue(
-                "QUERY scaninfo(MS2DATA) WHERE MS2PROD=184.0739:TOLERANCEMZ=0.01:INTENSITYPERCENT>30");
+        Condition.Value v =
+                firstValue(
+                        "QUERY scaninfo(MS2DATA) WHERE MS2PROD=184.0739:TOLERANCEMZ=0.01:INTENSITYPERCENT>30");
         assertEquals(2, v.qualifiers().size());
         assertEquals(QualifierType.TOLERANCEMZ, v.qualifiers().get(0).type());
         assertEquals(Comparator.EQ, v.qualifiers().get(0).comparator());
         assertEquals(QualifierType.INTENSITYPERCENT, v.qualifiers().get(1).type());
-        assertEquals(Comparator.GT, v.qualifiers().get(1).comparator(),
+        assertEquals(
+                Comparator.GT,
+                v.qualifiers().get(1).comparator(),
                 "'>' must survive as GT; Tech_Step9 treats '=' and '>' differently");
     }
 
     @Test
     void polarityIsItsOwnConditionShape() {
-        Condition c = Massql.parse("QUERY scaninfo(MS1DATA) WHERE POLARITY=Negative").where().get(0);
-        Condition.PolarityIs p = assertInstanceOf(Condition.PolarityIs.class, c,
-                "polarity carries an enum, not a numeric expression");
+        Condition c =
+                Massql.parse("QUERY scaninfo(MS1DATA) WHERE POLARITY=Negative").where().get(0);
+        Condition.PolarityIs p =
+                assertInstanceOf(
+                        Condition.PolarityIs.class,
+                        c,
+                        "polarity carries an enum, not a numeric expression");
         assertEquals(Polarity.NEGATIVE, p.polarity());
     }
 
     @Test
     void whereAndFilterAreKeptSeparate() {
-        MassqlQuery q = Massql.parse(
-                "QUERY scaninfo(MS2DATA) WHERE MS2PROD=100 FILTER MS2PREC=200");
+        MassqlQuery q =
+                Massql.parse("QUERY scaninfo(MS2DATA) WHERE MS2PROD=100 FILTER MS2PREC=200");
         assertEquals(1, q.where().size());
         assertEquals(1, q.filter().size());
         assertEquals(2, q.allConditions().size());
@@ -122,8 +146,8 @@ class AstShapeTest {
 
     @Test
     void multipleAndConditionsPreserveSourceOrder() {
-        MassqlQuery q = Massql.parse(
-                "QUERY scaninfo(MS2DATA) WHERE MS2PROD=660.2 AND MS2PROD=468.2");
+        MassqlQuery q =
+                Massql.parse("QUERY scaninfo(MS2DATA) WHERE MS2PROD=660.2 AND MS2PROD=468.2");
         assertEquals(2, q.where().size());
         assertEquals(new Expr.Literal(660.2), ((Condition.Value) q.where().get(0)).values().get(0));
         assertEquals(new Expr.Literal(468.2), ((Condition.Value) q.where().get(1)).values().get(0));
@@ -131,11 +155,15 @@ class AstShapeTest {
 
     @Test
     void dataSourceIsNormalisedAcrossCaseVariants() {
-        for (String v : new String[]{"MS1DATA", "ms1data", "Ms1Data"}) {
-            assertEquals(DataSource.MS1DATA, Massql.parse("QUERY scaninfo(" + v + ") WHERE MS1MZ=1").source());
+        for (String v : new String[] {"MS1DATA", "ms1data", "Ms1Data"}) {
+            assertEquals(
+                    DataSource.MS1DATA,
+                    Massql.parse("QUERY scaninfo(" + v + ") WHERE MS1MZ=1").source());
         }
-        for (String v : new String[]{"MS2DATA", "ms2data", "Ms2Data"}) {
-            assertEquals(DataSource.MS2DATA, Massql.parse("QUERY scaninfo(" + v + ") WHERE MS2PROD=1").source());
+        for (String v : new String[] {"MS2DATA", "ms2data", "Ms2Data"}) {
+            assertEquals(
+                    DataSource.MS2DATA,
+                    Massql.parse("QUERY scaninfo(" + v + ") WHERE MS2PROD=1").source());
         }
     }
 
@@ -144,7 +172,8 @@ class AstShapeTest {
         MassqlQuery q = Massql.parse("QUERY scaninfo(MS2DATA) WHERE MS2PROD=(1 OR 2)");
         assertThrows(UnsupportedOperationException.class, () -> q.where().add(null));
         Condition.Value v = (Condition.Value) q.where().get(0);
-        assertThrows(UnsupportedOperationException.class, () -> v.values().add(new Expr.Literal(3)));
+        assertThrows(
+                UnsupportedOperationException.class, () -> v.values().add(new Expr.Literal(3)));
         assertThrows(UnsupportedOperationException.class, () -> v.qualifiers().add(null));
     }
 
@@ -158,14 +187,21 @@ class AstShapeTest {
 
     @Test
     void comparatorHasExactlyThreeConstantsAndNoNONE() {
-        // Correction C18 removed Comparator.NONE. Tech_Step4's AstShapeTest row previously required the
+        // Correction C18 removed Comparator.NONE. Tech_Step4's AstShapeTest row previously required
+        // the
         // OPPOSITE -- "Comparator.NONE survives when the source omits a comparator" -- so the spec
-        // contradicted the code for five steps and C35(a) rediscovered the same fact from scratch at
-        // Step 9. Asserting the enum's arity directly is what makes reintroducing NONE fail HERE, rather
+        // contradicted the code for five steps and C35(a) rediscovered the same fact from scratch
+        // at
+        // Step 9. Asserting the enum's arity directly is what makes reintroducing NONE fail HERE,
+        // rather
         // than in whatever downstream switch forgets to handle it.
-        assertEquals(3, Comparator.values().length,
+        assertEquals(
+                3,
+                Comparator.values().length,
                 "expected exactly {EQ, GT, LT} but found " + Arrays.toString(Comparator.values()));
-        assertThrows(IllegalArgumentException.class, () -> Comparator.valueOf("NONE"),
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> Comparator.valueOf("NONE"),
                 "NONE models a state the grammar cannot produce -- see C18");
     }
 }

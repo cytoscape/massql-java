@@ -1,16 +1,22 @@
 package edu.ucsd.idekerlab.massql.lang;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import edu.ucsd.idekerlab.massql.Massql;
-import edu.ucsd.idekerlab.massql.MassqlParseException;
-import edu.ucsd.idekerlab.massql.lang.ast.MassqlQuery;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+
+import edu.ucsd.idekerlab.massql.Massql;
+import edu.ucsd.idekerlab.massql.MassqlParseException;
+import edu.ucsd.idekerlab.massql.lang.ast.MassqlQuery;
 
 /**
  * The parser conformance suite: every reference parse either builds an AST or rejects with
@@ -25,13 +31,17 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 class ParseConformanceTest {
 
-    static List<Corpus.Entry> corpus() { return Corpus.load(); }
+    static List<Corpus.Entry> corpus() {
+        return Corpus.load();
+    }
 
     @Test
     void corpusIsPresentAndTheExpectedSize() {
         List<Corpus.Entry> all = Corpus.load();
         // A missing or truncated corpus must FAIL, not vacuously pass with zero cases.
-        assertEquals(Corpus.EXPECTED_SIZE, all.size(),
+        assertEquals(
+                Corpus.EXPECTED_SIZE,
+                all.size(),
                 "reference corpus size changed; the pinned SHA has 46 files (SPIKE.md's 47 is wrong)");
         assertEquals(Corpus.EXPECTED_PARSE, all.stream().filter(Corpus.Entry::shouldParse).count());
         assertEquals(Corpus.EXPECTED_REJECT, all.stream().filter(e -> !e.shouldParse()).count());
@@ -41,23 +51,35 @@ class ParseConformanceTest {
     @MethodSource("corpus")
     void everyGoldenEitherParsesOrRejectsCleanly(Corpus.Entry e) {
         if (e.shouldParse()) {
-            MassqlQuery q = assertDoesNotThrow(() -> Massql.parse(e.query()),
-                    () -> "expected to parse: " + e.query());
+            MassqlQuery q =
+                    assertDoesNotThrow(
+                            () -> Massql.parse(e.query()), () -> "expected to parse: " + e.query());
             assertNotNull(q.canonical());
             assertFalse(q.canonical().isBlank());
         } else {
-            MassqlParseException ex = assertThrows(MassqlParseException.class,
-                    () -> Massql.parse(e.query()),
-                    () -> "expected rejection of " + e.candidates() + " in: " + e.query());
+            MassqlParseException ex =
+                    assertThrows(
+                            MassqlParseException.class,
+                            () -> Massql.parse(e.query()),
+                            () -> "expected rejection of " + e.candidates() + " in: " + e.query());
             // The parser names the FIRST out-of-scope construct in source order. Asserting a
             // specific one would pin traversal order, which has no user-visible meaning --
             // what matters is that the construct named is genuinely present and unsupported.
-            assertTrue(e.candidates().contains(ex.construct()),
-                    () -> "reported construct " + ex.construct() + " is not among the "
-                          + "unsupported constructs present " + e.candidates() + " in: " + e.query());
-            assertTrue(ex.getMessage().contains(ex.construct()),
+            assertTrue(
+                    e.candidates().contains(ex.construct()),
+                    () ->
+                            "reported construct "
+                                    + ex.construct()
+                                    + " is not among the "
+                                    + "unsupported constructs present "
+                                    + e.candidates()
+                                    + " in: "
+                                    + e.query());
+            assertTrue(
+                    ex.getMessage().contains(ex.construct()),
                     () -> "message must name the construct, got: " + ex.getMessage());
-            assertTrue(UnsupportedConstructs.isUnsupported(ex.construct()),
+            assertTrue(
+                    UnsupportedConstructs.isUnsupported(ex.construct()),
                     () -> ex.construct() + " must be listed in UnsupportedConstructs");
         }
     }
@@ -85,7 +107,12 @@ class ParseConformanceTest {
             } catch (MassqlParseException ok) {
                 // expected for the reject set
             } catch (RuntimeException bad) {
-                fail("non-MassqlParseException " + bad.getClass().getName() + " for: " + e.query(), bad);
+                fail(
+                        "non-MassqlParseException "
+                                + bad.getClass().getName()
+                                + " for: "
+                                + e.query(),
+                        bad);
             }
         }
     }

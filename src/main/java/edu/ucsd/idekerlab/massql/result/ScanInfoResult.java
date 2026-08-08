@@ -26,19 +26,19 @@ package edu.ucsd.idekerlab.massql.result;
  * because a survey scan plainly has a base peak.
  */
 public record ScanInfoResult(
-        Integer scan,           // never null
-        Double  precmz,         // null: no precursor recorded, or an MS1 row
-        Integer ms1scan,        // null: no linked MS1 survey scan, or an MS1 row
-        Double  rt,             // never null -- 0.0 is a real retention time
-        Integer charge,         // null: not recorded, or an MS1 row
-        Double  tic,            // never null
-        Integer mslevel,        // never null: 1 or 2. THE discriminator.
-        Double  basePeakI,      // never null -- including on an MS1 row (C40)
-        Double  basePeakMz,     // never null -- including on an MS1 row (C40)
-        Double  ms1I,           // null: no MS1 data, tolerance miss, or an MS1 row
-        Double  ms1Precmz,      // null: same conditions as ms1I
-        Double  ms1BasePeakI    // null: no linked MS1 scan, or an MS1 row
-) {
+        Integer scan, // never null
+        Double precmz, // null: no precursor recorded, or an MS1 row
+        Integer ms1scan, // null: no linked MS1 survey scan, or an MS1 row
+        Double rt, // never null -- 0.0 is a real retention time
+        Integer charge, // null: not recorded, or an MS1 row
+        Double tic, // never null
+        Integer mslevel, // never null: 1 or 2. THE discriminator.
+        Double basePeakI, // never null -- including on an MS1 row (C40)
+        Double basePeakMz, // never null -- including on an MS1 row (C40)
+        Double ms1I, // null: no MS1 data, tolerance miss, or an MS1 row
+        Double ms1Precmz, // null: same conditions as ms1I
+        Double ms1BasePeakI // null: no linked MS1 scan, or an MS1 row
+        ) {
 
     /**
      * The frozen key order, as serialized. Package-visible so {@link ResultJson} and the contract test
@@ -49,7 +49,17 @@ public record ScanInfoResult(
      * than decorative.
      */
     static final String[] KEYS = {
-            "scan", "precmz", "ms1scan", "rt", "charge", "tic", "mslevel",
-            "base_peak_i", "base_peak_mz", "ms1_i", "ms1_precmz", "ms1_base_peak_i"
+        "scan",
+        "precmz",
+        "ms1scan",
+        "rt",
+        "charge",
+        "tic",
+        "mslevel",
+        "base_peak_i",
+        "base_peak_mz",
+        "ms1_i",
+        "ms1_precmz",
+        "ms1_base_peak_i"
     };
 }

@@ -1,8 +1,7 @@
 package edu.ucsd.idekerlab.massql.io.vendor;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import edu.ucsd.idekerlab.massql.TestPaths;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -13,6 +12,8 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
+
+import edu.ucsd.idekerlab.massql.TestPaths;
 
 /**
  * Makes the vendoring obligation a <b>build-enforced fact rather than a convention</b>.
@@ -58,8 +59,12 @@ class VendoredProvenanceTest {
             assertFalse(out.isEmpty(), "no vendored sources found under " + dir);
             // Guard the guard: if a refactor ever marked everything "Not vendored", the loop above
             // would pass vacuously. 11 upstream files today; the assertion is a floor, not a pin.
-            assertTrue(out.size() >= 10,
-                    "only " + out.size() + " vendored file(s) detected under " + dir
+            assertTrue(
+                    out.size() >= 10,
+                    "only "
+                            + out.size()
+                            + " vendored file(s) detected under "
+                            + dir
                             + " -- expected at least 10; has something been marked 'Not vendored' wrongly?");
             return out;
         } catch (IOException e) {
@@ -81,14 +86,16 @@ class VendoredProvenanceTest {
      */
     private static Path projectRoot() {
         Path root = TestPaths.repositoryRoot();
-        assertTrue(Files.isDirectory(root.resolve("src/main/java")),
+        assertTrue(
+                Files.isDirectory(root.resolve("src/main/java")),
                 "expected the project root at " + root);
         return root;
     }
 
     private static String head(Path p) {
         try {
-            // The header is at the top; reading 4 KB avoids matching the string somewhere in the body.
+            // The header is at the top; reading 4 KB avoids matching the string somewhere in the
+            // body.
             String all = Files.readString(p);
             return all.length() > 4096 ? all.substring(0, 4096) : all;
         } catch (IOException e) {
@@ -101,9 +108,11 @@ class VendoredProvenanceTest {
         for (Path p : vendoredSources()) {
             String h = head(p);
             String name = p.getFileName().toString();
-            assertTrue(h.contains("VENDORED from"),
+            assertTrue(
+                    h.contains("VENDORED from"),
                     name + " has no 'VENDORED from' provenance header");
-            assertTrue(h.contains("github.com/msdk/msdk"),
+            assertTrue(
+                    h.contains("github.com/msdk/msdk"),
                     name + " does not name its upstream repository");
             assertTrue(h.contains("path:"), name + " does not record its upstream path");
         }
@@ -115,19 +124,23 @@ class VendoredProvenanceTest {
         // which one we took leaves the obligation unresolved.
         for (Path p : vendoredSources()) {
             String h = head(p);
-            assertTrue(h.contains("EPL-1.0"),
-                    p.getFileName() + " does not record the EPL-1.0 election (MSDK is dual-licensed; "
+            assertTrue(
+                    h.contains("EPL-1.0"),
+                    p.getFileName()
+                            + " does not record the EPL-1.0 election (MSDK is dual-licensed; "
                             + "a vendored file that omits the election leaves the obligation open)");
         }
     }
 
     @Test
     void everyVendoredFilePinsTheUpstreamCommit() {
-        // Without a commit, "byte-identical to upstream" is unverifiable and a future re-sync has no
+        // Without a commit, "byte-identical to upstream" is unverifiable and a future re-sync has
+        // no
         // baseline to diff against.
         for (Path p : vendoredSources()) {
             String h = head(p);
-            assertTrue(h.matches("(?s).*commit:\\s*[0-9a-f]{40}.*"),
+            assertTrue(
+                    h.matches("(?s).*commit:\\s*[0-9a-f]{40}.*"),
                     p.getFileName() + " does not pin a 40-character upstream commit SHA");
         }
     }
@@ -138,28 +151,36 @@ class VendoredProvenanceTest {
         // enumerated. An unstated modification is how a local fix silently becomes permanent.
         for (Path p : vendoredSources()) {
             String h = head(p);
-            assertTrue(h.contains("Modified:"),
-                    p.getFileName() + " does not state its modifications");
-            assertTrue(h.contains("docs/VENDORED.md"),
+            assertTrue(
+                    h.contains("Modified:"), p.getFileName() + " does not state its modifications");
+            assertTrue(
+                    h.contains("docs/VENDORED.md"),
                     p.getFileName() + " does not point at docs/VENDORED.md for the full list");
         }
     }
 
     @Test
     void theProvenanceDocumentExistsAndListsEveryVendoredFile() {
-        // Every vendored header says "See docs/VENDORED.md for the rationale and the full modification
-        // list". That document DID NOT EXIST until C38 -- it was a Step 6 deliverable, Step 7 ticked
-        // "docs/VENDORED.md unchanged", and Step 13 lists it as a review artifact, while eleven files
+        // Every vendored header says "See docs/VENDORED.md for the rationale and the full
+        // modification
+        // list". That document DID NOT EXIST until C38 -- it was a Step 6 deliverable, Step 7
+        // ticked
+        // "docs/VENDORED.md unchanged", and Step 13 lists it as a review artifact, while eleven
+        // files
         // pointed at nothing. This assertion is why it exists now.
         Path doc = projectRoot().resolve("docs/VENDORED.md");
-        assertTrue(Files.exists(doc),
-                "docs/VENDORED.md is missing, and every vendored file's header points readers at it: " + doc);
+        assertTrue(
+                Files.exists(doc),
+                "docs/VENDORED.md is missing, and every vendored file's header points readers at it: "
+                        + doc);
 
         String text = readAll(doc);
         for (Path p : vendoredSources()) {
             String stem = p.getFileName().toString().replace(".java", "");
-            assertTrue(text.contains(stem),
-                    "docs/VENDORED.md does not mention the vendored file " + p.getFileName()
+            assertTrue(
+                    text.contains(stem),
+                    "docs/VENDORED.md does not mention the vendored file "
+                            + p.getFileName()
                             + " -- the per-file headers and the central record have drifted apart, "
                             + "which is C38's own failure shape one layer down");
         }

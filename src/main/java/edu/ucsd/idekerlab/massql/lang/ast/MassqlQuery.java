@@ -10,10 +10,8 @@ import java.util.List;
  * unsupported construct before an instance can be built, so the engine (Tech_Step9) never
  * needs defensive handling for {@code MOBILITY}, variables, {@code formula()} and the rest.
  */
-public record MassqlQuery(QueryFunction function,
-                          DataSource source,
-                          List<Condition> where,
-                          List<Condition> filter) {
+public record MassqlQuery(
+        QueryFunction function, DataSource source, List<Condition> where, List<Condition> filter) {
 
     public MassqlQuery {
         if (function == null) throw new IllegalArgumentException("function is required");
@@ -59,5 +57,8 @@ public record MassqlQuery(QueryFunction function,
         return b.toString();
     }
 
-    @Override public String toString() { return canonical(); }
+    @Override
+    public String toString() {
+        return canonical();
+    }
 }

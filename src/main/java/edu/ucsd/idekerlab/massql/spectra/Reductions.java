@@ -11,7 +11,7 @@ package edu.ucsd.idekerlab.massql.spectra;
  */
 public final class Reductions {
 
-    private Reductions() { }
+    private Reductions() {}
 
     public static double sum(SpectrumTable t, int scanOrdinal, Column c) {
         return sum(t, scanOrdinal, c, null);
@@ -46,7 +46,10 @@ public final class Reductions {
         for (int r = idx.rowStart(scanOrdinal); r < idx.rowEnd(scanOrdinal); r++) {
             if (mask != null && !mask.get(r)) continue;
             double v = t.value(r, c);
-            if (!any || v < m) { m = v; any = true; }
+            if (!any || v < m) {
+                m = v;
+                any = true;
+            }
         }
         return any ? m : Double.NaN;
     }
@@ -76,7 +79,10 @@ public final class Reductions {
             if (mask != null && !mask.get(r)) continue;
             double v = t.value(r, c);
             // Strict '>' is what makes ties resolve to the lowest row index.
-            if (best < 0 || v > bestV) { best = r; bestV = v; }
+            if (best < 0 || v > bestV) {
+                best = r;
+                bestV = v;
+            }
         }
         return best;
     }

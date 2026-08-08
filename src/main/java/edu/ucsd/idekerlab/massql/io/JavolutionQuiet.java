@@ -32,7 +32,7 @@ import javolution.context.LogContext;
  */
 final class JavolutionQuiet {
 
-    private JavolutionQuiet() { }
+    private JavolutionQuiet() {}
 
     private static volatile boolean applied = false;
 
@@ -43,7 +43,8 @@ final class JavolutionQuiet {
             LogContext.LEVEL.reconfigure(LogContext.Level.WARNING);
         } catch (RuntimeException | LinkageError e) {
             // Never let log configuration break a read. If a future javolution refuses the
-            // reconfigure, the worst case is stray INFO lines -- which StdoutCleanlinessTest catches
+            // reconfigure, the worst case is stray INFO lines -- which StdoutCleanlinessTest
+            // catches
             // at the SDK layer (constraint 2), before the Java CLI's payload is ever involved.
         }
     }

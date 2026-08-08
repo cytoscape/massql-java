@@ -32,7 +32,7 @@ import java.util.List;
  */
 public final class ResultJson {
 
-    private ResultJson() { }
+    private ResultJson() {}
 
     /**
      * Renders {@code rows} as a JSON array.
@@ -53,16 +53,30 @@ public final class ResultJson {
     }
 
     private static void writeRow(StringBuilder sb, ScanInfoResult r) {
-        // Values are emitted in ScanInfoResult.KEYS order -- the same array the contract test checks
-        // against docs/RESULT_SCHEMA.md, so there is one key list in the codebase rather than two that
+        // Values are emitted in ScanInfoResult.KEYS order -- the same array the contract test
+        // checks
+        // against docs/RESULT_SCHEMA.md, so there is one key list in the codebase rather than two
+        // that
         // can drift.
         Object[] values = {
-                r.scan(), r.precmz(), r.ms1scan(), r.rt(), r.charge(), r.tic(), r.mslevel(),
-                r.basePeakI(), r.basePeakMz(), r.ms1I(), r.ms1Precmz(), r.ms1BasePeakI()
+            r.scan(),
+            r.precmz(),
+            r.ms1scan(),
+            r.rt(),
+            r.charge(),
+            r.tic(),
+            r.mslevel(),
+            r.basePeakI(),
+            r.basePeakMz(),
+            r.ms1I(),
+            r.ms1Precmz(),
+            r.ms1BasePeakI()
         };
         if (values.length != ScanInfoResult.KEYS.length) {
-            // Unreachable unless someone adds a field to the record without adding it here -- which is
-            // exactly the mistake worth failing loudly on, since the alternative is a silently truncated
+            // Unreachable unless someone adds a field to the record without adding it here -- which
+            // is
+            // exactly the mistake worth failing loudly on, since the alternative is a silently
+            // truncated
             // published contract.
             throw new IllegalStateException(
                     "value count " + values.length + " != key count " + ScanInfoResult.KEYS.length);
@@ -90,18 +104,24 @@ public final class ResultJson {
         } else if (v instanceof Integer n) {
             sb.append(n.intValue());
         } else if (v instanceof Double d) {
-            // Non-finite values must already have been converted to null by ScaninfoCollation; if one
-            // reaches here it would emit `NaN`, which is not valid JSON and which the reference forbids
+            // Non-finite values must already have been converted to null by ScaninfoCollation; if
+            // one
+            // reaches here it would emit `NaN`, which is not valid JSON and which the reference
+            // forbids
             // via allow_nan=False. Fail rather than write a document no parser accepts.
             if (d.isNaN() || d.isInfinite()) {
                 throw new IllegalStateException(
-                        "non-finite value " + d + " reached the serializer; ScaninfoCollation must "
+                        "non-finite value "
+                                + d
+                                + " reached the serializer; ScaninfoCollation must "
                                 + "convert NaN and infinity to null first (Tech_Step10 §4)");
             }
             sb.append(d.doubleValue());
         } else {
-            throw new IllegalStateException("unsupported value type " + v.getClass().getName()
-                    + "; this contract is numbers and nulls only, and a string column would need escaping");
+            throw new IllegalStateException(
+                    "unsupported value type "
+                            + v.getClass().getName()
+                            + "; this contract is numbers and nulls only, and a string column would need escaping");
         }
     }
 }

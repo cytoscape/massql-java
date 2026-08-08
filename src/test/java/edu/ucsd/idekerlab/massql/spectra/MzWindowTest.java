@@ -1,6 +1,7 @@
 package edu.ucsd.idekerlab.massql.spectra;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -39,42 +40,61 @@ class MzWindowTest {
     void exclusiveWindowRejectsPeaksExactlyOnEitherBound() {
         SpectrumTable t = simple();
         // THE assertion that distinguishes the two methods. Rows are 100, 200, 300, 400.
-        assertEquals(new IntRange(2, 3), t.mzWindowExclusive(0, 200.0, 400.0),
+        assertEquals(
+                new IntRange(2, 3),
+                t.mzWindowExclusive(0, 200.0, 400.0),
                 "200.0 and 400.0 sit exactly on the bounds and must BOTH be excluded, leaving only 300.0");
-        assertEquals(new IntRange(1, 4), t.mzWindow(0, 200.0, 400.0),
+        assertEquals(
+                new IntRange(1, 4),
+                t.mzWindow(0, 200.0, 400.0),
                 "the inclusive method keeps them -- this pair is what makes the difference visible");
     }
 
     @Test
     void exclusiveWindowKeepsStrictlyInteriorPeaks() {
         SpectrumTable t = simple();
-        assertEquals(new IntRange(1, 3), t.mzWindowExclusive(0, 150.0, 350.0), "200 and 300 are interior");
-        assertEquals(new IntRange(0, 4), t.mzWindowExclusive(0, 99.0, 401.0), "all four are interior");
+        assertEquals(
+                new IntRange(1, 3),
+                t.mzWindowExclusive(0, 150.0, 350.0),
+                "200 and 300 are interior");
+        assertEquals(
+                new IntRange(0, 4), t.mzWindowExclusive(0, 99.0, 401.0), "all four are interior");
     }
 
     @Test
     void exclusiveWindowIsEmptyWhenOnlyTheBoundsWouldMatch() {
         SpectrumTable t = simple();
-        assertEquals(IntRange.EMPTY, t.mzWindowExclusive(0, 200.0, 300.0),
+        assertEquals(
+                IntRange.EMPTY,
+                t.mzWindowExclusive(0, 200.0, 300.0),
                 "nothing lies strictly between adjacent peaks 200 and 300");
-        assertEquals(IntRange.EMPTY, t.mzWindowExclusive(0, 200.0, 200.0), "lo == hi contains nothing");
+        assertEquals(
+                IntRange.EMPTY, t.mzWindowExclusive(0, 200.0, 200.0), "lo == hi contains nothing");
         assertEquals(IntRange.EMPTY, t.mzWindowExclusive(0, 300.0, 200.0), "hi < lo");
     }
 
     @Test
     void exclusiveWindowHandlesDuplicateMzOnABound() {
-        // Duplicate m/z occur in real centroided data. If lo equals a duplicated value, EVERY copy must be
-        // excluded -- which is why this uses upperBound/lowerBound rather than shifting an index by one.
+        // Duplicate m/z occur in real centroided data. If lo equals a duplicated value, EVERY copy
+        // must be
+        // excluded -- which is why this uses upperBound/lowerBound rather than shifting an index by
+        // one.
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
         b.startScan(1, 0.5, 1);
         b.addPeak(100.0, 1).addPeak(200.0, 2).addPeak(200.0, 3).addPeak(200.0, 4).addPeak(300.0, 5);
         SpectrumTable t = b.build();
 
-        assertEquals(IntRange.EMPTY, t.mzWindowExclusive(0, 200.0, 300.0),
+        assertEquals(
+                IntRange.EMPTY,
+                t.mzWindowExclusive(0, 200.0, 300.0),
                 "all three copies of 200.0 sit on the lower bound and must be excluded");
-        assertEquals(new IntRange(1, 4), t.mzWindow(0, 200.0, 200.0),
+        assertEquals(
+                new IntRange(1, 4),
+                t.mzWindow(0, 200.0, 200.0),
                 "the inclusive method returns all three copies -- the contrast");
-        assertEquals(new IntRange(1, 4), t.mzWindowExclusive(0, 150.0, 250.0),
+        assertEquals(
+                new IntRange(1, 4),
+                t.mzWindowExclusive(0, 150.0, 250.0),
                 "when 200.0 is strictly interior, all three copies are kept");
     }
 
@@ -83,14 +103,20 @@ class MzWindowTest {
         SpectrumTable t = simple();
         // A peak exactly ON either bound is IN the window.
         //
-        // ⚠ Correction C37: the justification here USED to read "Tech_Step9 computes the bounds from a
-        // tolerance, so an exclusive bound here would silently narrow every tolerance." That reasoning is
-        // backwards -- Tech_Step9's condition windows are STRICT in MassQL, verified by execution. This
+        // ⚠ Correction C37: the justification here USED to read "Tech_Step9 computes the bounds
+        // from a
+        // tolerance, so an exclusive bound here would silently narrow every tolerance." That
+        // reasoning is
+        // backwards -- Tech_Step9's condition windows are STRICT in MassQL, verified by execution.
+        // This
         // inclusive method exists for Tech_Step10's PRECURSOR LOOKUP, which really is inclusive
         // (massql_query.py:101-103 uses >=/<=, also verified). Step 9 uses mzWindowExclusive.
         assertEquals(new IntRange(1, 3), t.mzWindow(0, 200.0, 300.0));
         assertEquals(new IntRange(0, 4), t.mzWindow(0, 100.0, 400.0));
-        assertEquals(new IntRange(1, 2), t.mzWindow(0, 200.0, 200.0), "a zero-width window still matches");
+        assertEquals(
+                new IntRange(1, 2),
+                t.mzWindow(0, 200.0, 200.0),
+                "a zero-width window still matches");
     }
 
     @Test
@@ -145,8 +171,8 @@ class MzWindowTest {
     @Test
     void emptyAndSinglePeakScans() {
         SpectrumTableBuilder b = new SpectrumTableBuilder(1);
-        b.startScan(1, 0.0, 1);                       // empty
-        b.startScan(2, 0.1, 1).addPeak(150.0, 5);     // single peak
+        b.startScan(1, 0.0, 1); // empty
+        b.startScan(2, 0.1, 1).addPeak(150.0, 5); // single peak
         SpectrumTable t = b.build();
 
         assertTrue(t.mzWindow(0, 0.0, 1000.0).isEmpty());

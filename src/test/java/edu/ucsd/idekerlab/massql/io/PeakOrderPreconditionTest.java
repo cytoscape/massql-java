@@ -1,13 +1,13 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+
+import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
 
 /**
  * The precondition that makes {@code ReaderParityIT}'s digest comparison valid.
@@ -35,13 +35,17 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 class PeakOrderPreconditionTest {
 
-    static List<String> fixtures() { return ParityFixtures.fixtures(); }
+    static List<String> fixtures() {
+        return ParityFixtures.fixtures();
+    }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("fixtures")
     void massqlsOwnPeakOrderIsAscending(String fixture) {
-        // The informative half. mz_hex_first8 is MassQL's array in FILE order, untouched by our builder.
-        // A descending pair here means the fixture stores peaks out of m/z order, our builder would sort
+        // The informative half. mz_hex_first8 is MassQL's array in FILE order, untouched by our
+        // builder.
+        // A descending pair here means the fixture stores peaks out of m/z order, our builder would
+        // sort
         // it, and ReaderParityIT's digests would no longer be comparing like with like.
         ParityDump dump = ParityDump.of(fixture);
         for (ParityDump.Scan s : dump.scans().values()) {
@@ -49,9 +53,18 @@ class PeakOrderPreconditionTest {
             for (int i = 1; i < hex.size(); i++) {
                 double prev = ParityDump.parseHex(hex.get(i - 1));
                 double cur = ParityDump.parseHex(hex.get(i));
-                assertTrue(cur >= prev,
-                        fixture + " " + s.key() + ": MassQL's m/z array DESCENDS at index " + i
-                                + " (" + prev + " -> " + cur + ").\n"
+                assertTrue(
+                        cur >= prev,
+                        fixture
+                                + " "
+                                + s.key()
+                                + ": MassQL's m/z array DESCENDS at index "
+                                + i
+                                + " ("
+                                + prev
+                                + " -> "
+                                + cur
+                                + ").\n"
                                 + "  SpectrumTableBuilder sorts unsorted scans by m/z, so our array order "
                                 + "would no longer match MassQL's file order, and ReaderParityIT's "
                                 + "ORDER-SENSITIVE digest comparison is no longer valid for this fixture.\n"
@@ -64,18 +77,33 @@ class PeakOrderPreconditionTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("fixtures")
     void ourMaterialisedPeaksAreAscending(String fixture) {
-        // The complement. True by construction today (the builder sorts), so on its own it proves little --
-        // but it would catch a future change that emitted peaks unsorted, which would break the mz-window
+        // The complement. True by construction today (the builder sorts), so on its own it proves
+        // little --
+        // but it would catch a future change that emitted peaks unsorted, which would break the
+        // mz-window
         // binary search in Step 5 as well as the digests.
-        try (SpectraStream s = SpectraFile.open(
-                Fixtures.require(fixture.startsWith("micro") ? "fixtures/micro/" + fixture : "data/" + fixture))) {
+        try (SpectraStream s =
+                SpectraFile.open(
+                        Fixtures.require(
+                                fixture.startsWith("micro")
+                                        ? "fixtures/micro/" + fixture
+                                        : "data/" + fixture))) {
             while (s.hasNext()) {
                 ScanView v = s.next();
                 SpectrumTable t = v.materialize();
                 for (int i = 1; i < t.rowCount(); i++) {
-                    assertTrue(t.mz(i) >= t.mz(i - 1),
-                            fixture + " scan " + v.scanId() + ": m/z descends at row " + i
-                                    + " (" + t.mz(i - 1) + " -> " + t.mz(i) + "); the mz-window binary "
+                    assertTrue(
+                            t.mz(i) >= t.mz(i - 1),
+                            fixture
+                                    + " scan "
+                                    + v.scanId()
+                                    + ": m/z descends at row "
+                                    + i
+                                    + " ("
+                                    + t.mz(i - 1)
+                                    + " -> "
+                                    + t.mz(i)
+                                    + "); the mz-window binary "
                                     + "search requires ascending order");
                 }
             }

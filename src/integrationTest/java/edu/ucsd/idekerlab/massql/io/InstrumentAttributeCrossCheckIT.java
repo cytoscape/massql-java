@@ -1,8 +1,8 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -17,6 +17,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
+
+import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
 
 /**
  * A free correctness check with <b>no Python in the loop</b>: the instrument's own summary attributes.
@@ -49,7 +51,7 @@ class InstrumentAttributeCrossCheckIT {
     /** Relative tolerance. Measured worst case is 4.9e-6; this sits just above it. */
     private static final double TOL = 1e-5;
 
-    private record Declared(int num, double tic, double basePeakI, double basePeakMz) { }
+    private record Declared(int num, double tic, double basePeakI, double basePeakMz) {}
 
     private static List<Declared> declaredAttributes(Path p) {
         String raw;
@@ -66,8 +68,12 @@ class InstrumentAttributeCrossCheckIT {
             String bpi = attr(a, "basePeakIntensity");
             String bpm = attr(a, "basePeakMz");
             if (tic == null || bpi == null || bpm == null) continue;
-            out.add(new Declared(Integer.parseInt(attr(a, "num")), Double.parseDouble(tic),
-                    Double.parseDouble(bpi), Double.parseDouble(bpm)));
+            out.add(
+                    new Declared(
+                            Integer.parseInt(attr(a, "num")),
+                            Double.parseDouble(tic),
+                            Double.parseDouble(bpi),
+                            Double.parseDouble(bpm)));
         }
         return out;
     }
@@ -87,14 +93,16 @@ class InstrumentAttributeCrossCheckIT {
         Path mzxml = Fixtures.require("data/DP00570_F02.mzxml");
 
         List<Declared> declared = declaredAttributes(mzxml);
-        assertEquals(916, declared.size(),
+        assertEquals(
+                916,
+                declared.size(),
                 "every scan should declare all three attributes; if not, this check is weaker than it looks");
         Map<Integer, Declared> byNum = new LinkedHashMap<>();
         declared.forEach(d -> byNum.put(d.num(), d));
 
         double worstTic = 0, worstBpi = 0, worstBpm = 0;
         int worstTicScan = 0, worstBpiScan = 0, worstBpmScan = 0;
-        int signedTicHigh = 0, signedTicLow = 0;      // for the systematic-bias check
+        int signedTicHigh = 0, signedTicLow = 0; // for the systematic-bias check
         int compared = 0;
 
         try (SpectraStream s = SpectraFile.open(mzxml)) {
@@ -109,35 +117,69 @@ class InstrumentAttributeCrossCheckIT {
                 double tic = 0, maxI = Double.NEGATIVE_INFINITY, bpMz = Double.NaN;
                 for (int i = 0; i < t.rowCount(); i++) {
                     tic += t.intensity(i);
-                    if (t.intensity(i) > maxI) { maxI = t.intensity(i); bpMz = t.mz(i); }
+                    if (t.intensity(i) > maxI) {
+                        maxI = t.intensity(i);
+                        bpMz = t.mz(i);
+                    }
                 }
 
-                double rTic = rel(tic, d.tic()), rBpi = rel(maxI, d.basePeakI()), rBpm = rel(bpMz, d.basePeakMz());
-                if (rTic > worstTic) { worstTic = rTic; worstTicScan = v.scanId(); }
-                if (rBpi > worstBpi) { worstBpi = rBpi; worstBpiScan = v.scanId(); }
-                if (rBpm > worstBpm) { worstBpm = rBpm; worstBpmScan = v.scanId(); }
-                if (tic > d.tic()) signedTicHigh++; else if (tic < d.tic()) signedTicLow++;
+                double rTic = rel(tic, d.tic()),
+                        rBpi = rel(maxI, d.basePeakI()),
+                        rBpm = rel(bpMz, d.basePeakMz());
+                if (rTic > worstTic) {
+                    worstTic = rTic;
+                    worstTicScan = v.scanId();
+                }
+                if (rBpi > worstBpi) {
+                    worstBpi = rBpi;
+                    worstBpiScan = v.scanId();
+                }
+                if (rBpm > worstBpm) {
+                    worstBpm = rBpm;
+                    worstBpmScan = v.scanId();
+                }
+                if (tic > d.tic()) signedTicHigh++;
+                else if (tic < d.tic()) signedTicLow++;
                 compared++;
             }
         }
 
-        System.out.printf("  instrument cross-check over %d scans: worst rel delta"
+        System.out.printf(
+                "  instrument cross-check over %d scans: worst rel delta"
                         + " tic=%.3e (scan %d), basePeakI=%.3e (scan %d), basePeakMz=%.3e (scan %d)%n",
                 compared, worstTic, worstTicScan, worstBpi, worstBpiScan, worstBpm, worstBpmScan);
 
         assertEquals(916, compared, "every scan should have been compared");
-        assertTrue(worstTic < TOL, "totIonCurrent drifted " + worstTic + " at scan " + worstTicScan
-                + " -- beyond float noise, this is a decode bug");
-        assertTrue(worstBpi < TOL, "basePeakIntensity drifted " + worstBpi + " at scan " + worstBpiScan);
-        assertTrue(worstBpm < TOL, "basePeakMz drifted " + worstBpm + " at scan " + worstBpmScan
-                + " -- a wrong argmax picks a different peak entirely, so this would be large, not small");
+        assertTrue(
+                worstTic < TOL,
+                "totIonCurrent drifted "
+                        + worstTic
+                        + " at scan "
+                        + worstTicScan
+                        + " -- beyond float noise, this is a decode bug");
+        assertTrue(
+                worstBpi < TOL,
+                "basePeakIntensity drifted " + worstBpi + " at scan " + worstBpiScan);
+        assertTrue(
+                worstBpm < TOL,
+                "basePeakMz drifted "
+                        + worstBpm
+                        + " at scan "
+                        + worstBpmScan
+                        + " -- a wrong argmax picks a different peak entirely, so this would be large, not small");
 
-        // The drift must be NOISE, not BIAS. Rounded decimal text should land either side of our sum
-        // roughly evenly; an overwhelmingly one-sided result would mean we are systematically dropping
+        // The drift must be NOISE, not BIAS. Rounded decimal text should land either side of our
+        // sum
+        // roughly evenly; an overwhelmingly one-sided result would mean we are systematically
+        // dropping
         // or double-counting a peak, which a small worst-case delta alone would not reveal.
         int minSide = Math.min(signedTicHigh, signedTicLow);
-        assertTrue(minSide > compared / 20,
-                "tic differences are one-sided (" + signedTicHigh + " high vs " + signedTicLow
+        assertTrue(
+                minSide > compared / 20,
+                "tic differences are one-sided ("
+                        + signedTicHigh
+                        + " high vs "
+                        + signedTicLow
                         + " low) -- that is systematic bias, not rounding noise");
     }
 
@@ -150,11 +192,13 @@ class InstrumentAttributeCrossCheckIT {
         int checked = 0;
         double smallestGap = Double.POSITIVE_INFINITY;
         try (SpectraStream s = SpectraFile.open(mzxml)) {
-            while (s.hasNext() && checked < 50) { ScanView v = s.next();
+            while (s.hasNext() && checked < 50) {
+                ScanView v = s.next();
                 SpectrumTable t = v.materialize();
                 if (t.rowCount() < 2) continue;
                 int best = 0, second = -1;
-                for (int i = 1; i < t.rowCount(); i++) if (t.intensity(i) > t.intensity(best)) best = i;
+                for (int i = 1; i < t.rowCount(); i++)
+                    if (t.intensity(i) > t.intensity(best)) best = i;
                 for (int i = 0; i < t.rowCount(); i++) {
                     if (i == best) continue;
                     if (second < 0 || t.intensity(i) > t.intensity(second)) second = i;
@@ -165,8 +209,11 @@ class InstrumentAttributeCrossCheckIT {
             }
         }
         assertTrue(checked > 0, "no multi-peak scans examined");
-        assertTrue(smallestGap > TOL * 10,
-                "the runner-up peak's m/z is within " + smallestGap + " of the base peak's, so a wrong "
+        assertTrue(
+                smallestGap > TOL * 10,
+                "the runner-up peak's m/z is within "
+                        + smallestGap
+                        + " of the base peak's, so a wrong "
                         + "argmax could hide inside the tolerance; this check is weaker than assumed");
     }
 }

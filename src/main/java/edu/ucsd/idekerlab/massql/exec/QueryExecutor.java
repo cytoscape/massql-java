@@ -1,5 +1,8 @@
 package edu.ucsd.idekerlab.massql.exec;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import edu.ucsd.idekerlab.massql.MassqlException;
 import edu.ucsd.idekerlab.massql.MassqlOptions;
 import edu.ucsd.idekerlab.massql.io.ScanView;
@@ -8,9 +11,6 @@ import edu.ucsd.idekerlab.massql.lang.ast.Condition;
 import edu.ucsd.idekerlab.massql.lang.ast.DataSource;
 import edu.ucsd.idekerlab.massql.lang.ast.MassqlQuery;
 import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Streams a file once, evaluates every condition per scan, and hands each qualifying scan to a consumer.
@@ -48,7 +48,7 @@ import java.util.List;
  */
 public final class QueryExecutor {
 
-    private QueryExecutor() { }
+    private QueryExecutor() {}
 
     /**
      * Runs {@code q} over {@code stream}, invoking {@code out} for each qualifying scan in document order.
@@ -56,8 +56,8 @@ public final class QueryExecutor {
      * @param opts may be null, meaning {@link MassqlOptions#defaults()}
      * @throws MassqlException if the query names a function or source this step cannot execute
      */
-    public static ExecutionSummary execute(MassqlQuery q, SpectraStream stream, MassqlOptions opts,
-                                           QualifyingScanConsumer out) {
+    public static ExecutionSummary execute(
+            MassqlQuery q, SpectraStream stream, MassqlOptions opts, QualifyingScanConsumer out) {
         if (q == null) throw new MassqlException("query is required");
         if (stream == null) throw new MassqlException("stream is required");
         if (out == null) throw new MassqlException("consumer is required");
@@ -70,7 +70,8 @@ public final class QueryExecutor {
         List<Condition> scanLevel = new ArrayList<>();
         List<Condition> peakLevel = new ArrayList<>();
         for (Condition c : conditions) {
-            if (ConditionFilters.isScanLevel(c)) scanLevel.add(c); else peakLevel.add(c);
+            if (ConditionFilters.isScanLevel(c)) scanLevel.add(c);
+            else peakLevel.add(c);
         }
 
         List<String> diagnostics = new ArrayList<>();
@@ -91,7 +92,8 @@ public final class QueryExecutor {
                 continue;
             }
 
-            // (2) Retain the most recent non-empty MS1, for MS1MZ here and the precursor lookup in Step 10.
+            // (2) Retain the most recent non-empty MS1, for MS1MZ here and the precursor lookup in
+            // Step 10.
             if (v.msLevel() == 1) retainedMs1 = v.materialize();
 
             if (v.msLevel() != wantedLevel) continue;
@@ -99,24 +101,33 @@ public final class QueryExecutor {
             // (3) Metadata-only conditions, before paying for peaks.
             boolean rejected = false;
             for (Condition c : scanLevel) {
-                if (!ConditionFilters.scanLevelHolds(c, v)) { rejected = true; break; }
+                if (!ConditionFilters.scanLevelHolds(c, v)) {
+                    rejected = true;
+                    break;
+                }
             }
             if (rejected) continue;
 
-            // An MS1MZ condition needs the linked MS1. If none precedes this scan, it cannot hold --
-            // worth counting, because "0 results" on an MS1MZ query over an MGF has this exact cause.
+            // An MS1MZ condition needs the linked MS1. If none precedes this scan, it cannot hold
+            // --
+            // worth counting, because "0 results" on an MS1MZ query over an MGF has this exact
+            // cause.
             if (retainedMs1 == null && hasMs1Condition(peakLevel)) {
                 missingMs1++;
                 continue;
             }
 
             // (4) Peak-level conditions on the materialised scan.
-            SpectrumTable scan = (wantedLevel == 1 && retainedMs1 != null && v.msLevel() == 1)
-                    ? retainedMs1               // already materialised at (2); do not decode twice
-                    : v.materialize();
+            SpectrumTable scan =
+                    (wantedLevel == 1 && retainedMs1 != null && v.msLevel() == 1)
+                            ? retainedMs1 // already materialised at (2); do not decode twice
+                            : v.materialize();
 
             for (Condition c : peakLevel) {
-                if (!ConditionFilters.peakLevelHolds(c, scan, v, retainedMs1)) { rejected = true; break; }
+                if (!ConditionFilters.peakLevelHolds(c, scan, v, retainedMs1)) {
+                    rejected = true;
+                    break;
+                }
             }
             if (rejected) continue;
 
@@ -124,19 +135,29 @@ public final class QueryExecutor {
             out.accept(v, scan, retainedMs1);
         }
 
-        // Diagnostics: an empty result is a valid answer, but a SILENT empty result is a poor one (§5).
+        // Diagnostics: an empty result is a valid answer, but a SILENT empty result is a poor one
+        // (§5).
         diagnostics.addAll(stream.diagnostics());
         if (skippedEmpty > 0) {
-            diagnostics.add("skipped " + skippedEmpty + " zero-peak scan(s); MassQL's loaders drop these, "
-                    + "so they cannot qualify (Correction C35c)");
+            diagnostics.add(
+                    "skipped "
+                            + skippedEmpty
+                            + " zero-peak scan(s); MassQL's loaders drop these, "
+                            + "so they cannot qualify (Correction C35c)");
         }
         if (missingMs1 > 0) {
-            diagnostics.add(missingMs1 + " scan(s) had an MS1MZ condition but no preceding MS1 scan, so they "
-                    + "could not qualify. MGF has no survey scans at all, which makes MS1MZ unsatisfiable there");
+            diagnostics.add(
+                    missingMs1
+                            + " scan(s) had an MS1MZ condition but no preceding MS1 scan, so they "
+                            + "could not qualify. MGF has no survey scans at all, which makes MS1MZ unsatisfiable there");
         }
         if (qualifying == 0 && examined > 0) {
-            diagnostics.add("no scans matched: " + examined + " scan(s) examined, "
-                    + conditions.size() + " condition(s) applied");
+            diagnostics.add(
+                    "no scans matched: "
+                            + examined
+                            + " scan(s) examined, "
+                            + conditions.size()
+                            + " condition(s) applied");
         }
         return new ExecutionSummary(qualifying, examined, diagnostics);
     }

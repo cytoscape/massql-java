@@ -1,12 +1,11 @@
 package edu.ucsd.idekerlab.massql.exec;
 
-import edu.ucsd.idekerlab.massql.lang.ast.Comparator;
+import java.util.List;
+
 import edu.ucsd.idekerlab.massql.lang.ast.Qualifier;
 import edu.ucsd.idekerlab.massql.lang.ast.QualifierType;
 import edu.ucsd.idekerlab.massql.spectra.Column;
 import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
-
-import java.util.List;
 
 /**
  * The intensity predicate: three scales, three comparators, and an implicit floor.
@@ -51,19 +50,31 @@ public final class IntensityQualifiers {
     /** The clamp the source applies to a {@code >} threshold on either percent column. */
     static final double PERCENT_CAP = 0.99;
 
-    private IntensityQualifiers() { }
+    private IntensityQualifiers() {}
 
     /** Does this row satisfy every intensity qualifier, including the implicit floors? */
     public static boolean rowQualifies(SpectrumTable t, int row, List<Qualifier> qualifiers) {
-        // Evaluated per column, in the source's order, so the AND is over three independent predicates.
+        // Evaluated per column, in the source's order, so the AND is over three independent
+        // predicates.
         return columnQualifies(t, row, Column.I, QualifierType.INTENSITYVALUE, 1.0, qualifiers)
-                && columnQualifies(t, row, Column.I_NORM, QualifierType.INTENSITYPERCENT, 100.0, qualifiers)
-                && columnQualifies(t, row, Column.I_TIC_NORM, QualifierType.INTENSITYTICPERCENT, 100.0,
-                                   qualifiers);
+                && columnQualifies(
+                        t, row, Column.I_NORM, QualifierType.INTENSITYPERCENT, 100.0, qualifiers)
+                && columnQualifies(
+                        t,
+                        row,
+                        Column.I_TIC_NORM,
+                        QualifierType.INTENSITYTICPERCENT,
+                        100.0,
+                        qualifiers);
     }
 
-    private static boolean columnQualifies(SpectrumTable t, int row, Column col, QualifierType type,
-                                           double scale, List<Qualifier> qualifiers) {
+    private static boolean columnQualifies(
+            SpectrumTable t,
+            int row,
+            Column col,
+            QualifierType type,
+            double scale,
+            List<Qualifier> qualifiers) {
         double observed = t.value(row, col);
         Qualifier q = find(qualifiers, type);
 
@@ -72,11 +83,12 @@ public final class IntensityQualifiers {
 
         double threshold = ConstantFolder.fold(q.value()) / scale;
         return switch (q.comparator()) {
-            // The cap is inside the greaterthan branch in the source, and keyed on scale > 1.0 --
-            // i.e. both percent columns, never the absolute one.
+                // The cap is inside the greaterthan branch in the source, and keyed on scale > 1.0
+                // --
+                // i.e. both percent columns, never the absolute one.
             case GT -> observed > (scale > 1.0 ? Math.min(threshold, PERCENT_CAP) : threshold);
             case LT -> observed < threshold;
-            // "=" is >=, preserving historical semantics. No cap.
+                // "=" is >=, preserving historical semantics. No cap.
             case EQ -> observed >= threshold;
         };
     }

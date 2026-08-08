@@ -1,8 +1,7 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -11,6 +10,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
+
+import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
 
 /**
  * The real-world mzXML: schema 2.0, nested scans, 916 spectra.
@@ -32,18 +33,29 @@ class MzxmlSchema20IT {
             while (s.hasNext()) {
                 ScanView v = s.next();
                 scans++;
-                if (v.msLevel() == 1) ms1++; else ms2++;
+                if (v.msLevel() == 1) ms1++;
+                else ms2++;
 
-                // Document order must be strictly increasing here; the nested layout must not cause a
+                // Document order must be strictly increasing here; the nested layout must not cause
+                // a
                 // scan to be revisited or emitted out of order.
-                assertTrue(v.scanId() > previousId,
-                        "scan " + v.scanId() + " came after " + previousId + " -- the nested walk is "
+                assertTrue(
+                        v.scanId() > previousId,
+                        "scan "
+                                + v.scanId()
+                                + " came after "
+                                + previousId
+                                + " -- the nested walk is "
                                 + "emitting scans out of document order");
                 previousId = v.scanId();
 
                 SpectrumTable t = v.materialize();
-                assertEquals(v.peakCount(), t.rowCount(),
-                        "scan " + v.scanId() + ": peaksCount disagrees with the decoded array length");
+                assertEquals(
+                        v.peakCount(),
+                        t.rowCount(),
+                        "scan "
+                                + v.scanId()
+                                + ": peaksCount disagrees with the decoded array length");
                 peaks += t.rowCount();
             }
         }
@@ -57,7 +69,8 @@ class MzxmlSchema20IT {
 
     @Test
     void theFileReallyIsNestedSchemaTwoPointZero() {
-        // Guards the premise. If this fixture were ever replaced by a flat file, the nested code path
+        // Guards the premise. If this fixture were ever replaced by a flat file, the nested code
+        // path
         // would stop being exercised by any real input and only micro_nested.mzXML would cover it.
         Path mzxml = Fixtures.require("data/DP00570_F02.mzxml");
         String raw;
@@ -72,17 +85,24 @@ class MzxmlSchema20IT {
         int depth = 0, max = 0;
         for (int i = 0; i < raw.length() - 6; i++) {
             if (raw.startsWith("</scan>", i)) depth--;
-            else if (raw.startsWith("<scan ", i)) { depth++; max = Math.max(max, depth); }
+            else if (raw.startsWith("<scan ", i)) {
+                depth++;
+                max = Math.max(max, depth);
+            }
         }
-        assertEquals(2, max,
+        assertEquals(
+                2,
+                max,
                 "DP00570_F02.mzxml is expected to NEST MS2 inside its parent MS1; a flat file here "
                         + "would leave the nested walk untested by any real input");
     }
 
     @Test
     void theElevenNearEmptyScansAreReadNotSkipped() {
-        // Step 2 recorded peaksCount="3" scans as worth hand-checking. There are 11 of them (the spec
-        // implies fewer). A three-peak scan is where an off-by-one in the interleaved de-interleaving
+        // Step 2 recorded peaksCount="3" scans as worth hand-checking. There are 11 of them (the
+        // spec
+        // implies fewer). A three-peak scan is where an off-by-one in the interleaved
+        // de-interleaving
         // shows up most starkly, and where a reader that treated tiny scans as empty would differ.
         Path mzxml = Fixtures.require("data/DP00570_F02.mzxml");
         int threePeak = 0;
@@ -106,12 +126,17 @@ class MzxmlSchema20IT {
 
     @Test
     void nothingIsReportedAsSkipped() {
-        // This file has no ms level > 2, no empty msLevel and no peaks-less scan, so a clean read must
+        // This file has no ms level > 2, no empty msLevel and no peaks-less scan, so a clean read
+        // must
         // produce NO diagnostics. If any appear, the walk is discarding scans it should not.
         Path mzxml = Fixtures.require("data/DP00570_F02.mzxml");
         try (SpectraStream s = SpectraFile.open(mzxml)) {
-            while (s.hasNext()) { s.next(); /* drain */ }
-            assertEquals(java.util.List.of(), s.diagnostics(),
+            while (s.hasNext()) {
+                s.next(); /* drain */
+            }
+            assertEquals(
+                    java.util.List.of(),
+                    s.diagnostics(),
                     "unexpected diagnostics on a clean file: " + s.diagnostics());
         }
     }

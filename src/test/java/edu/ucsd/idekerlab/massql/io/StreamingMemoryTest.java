@@ -1,12 +1,13 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
+
+import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
 
 /**
  * Proves Correction C22's memory claim instead of restating it.
@@ -31,14 +32,19 @@ class StreamingMemoryTest {
     private static long settledHeap() {
         for (int i = 0; i < 3; i++) {
             System.gc();
-            try { Thread.sleep(30); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            try {
+                Thread.sleep(30);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
         return usedHeap();
     }
 
     @Test
     void streamingALargeFileRetainsNothingAcrossScans() {
-        // PlusRise.mgf: 34,513 blocks, 758,545 peak rows. Materialising the whole file into one store
+        // PlusRise.mgf: 34,513 blocks, 758,545 peak rows. Materialising the whole file into one
+        // store
         // would cost ~31 MB at 41 B/peak; streaming should retain one scan at a time.
         Path mgf = Fixtures.require("data/PlusRise.mgf");
 
@@ -63,18 +69,26 @@ class StreamingMemoryTest {
         // synthesises a 1-row all-zero MS1 placeholder (Correction C14) -- mz=0, i=0, scan=1, its
         // digests are the SHA of a zero. That row is not a peak, and our reader correctly omits it.
         // Step 8's parity comparison must exclude it too, or it will report a phantom MS1 scan.
-        assertEquals(758_544L, peaks, "real MS2 peak rows (dump total minus MassQL's synthetic MS1 row)");
+        assertEquals(
+                758_544L,
+                peaks,
+                "real MS2 peak rows (dump total minus MassQL's synthetic MS1 row)");
 
         long after = settledHeap();
         long retained = after - baseline;
 
-        System.out.printf("  streamed %,d scans / %,d peaks | baseline %,d KB, peak %,d KB, retained %,d KB%n",
+        System.out.printf(
+                "  streamed %,d scans / %,d peaks | baseline %,d KB, peak %,d KB, retained %,d KB%n",
                 scans, peaks, baseline / 1024, peakDuring / 1024, retained / 1024);
 
-        // The real assertion: once the stream is closed and the heap settles, essentially nothing is
+        // The real assertion: once the stream is closed and the heap settles, essentially nothing
+        // is
         // still held. A reader accumulating scans would show tens of MB here.
-        assertTrue(retained < 24L * 1024 * 1024,
-                "after streaming, " + (retained / 1024 / 1024) + " MB is still retained; "
+        assertTrue(
+                retained < 24L * 1024 * 1024,
+                "after streaming, "
+                        + (retained / 1024 / 1024)
+                        + " MB is still retained; "
                         + "the reader appears to be accumulating scans rather than streaming");
     }
 
@@ -94,20 +108,33 @@ class StreamingMemoryTest {
     void streamsWithinAConstrainedHeap() throws Exception {
         Path mgf = Fixtures.require("data/PlusRise.mgf");
 
-        String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();   // not `java`: it would shadow the package name
-        ProcessBuilder pb = new ProcessBuilder(
-                javaBin, "-Xmx48m", "-cp", System.getProperty("java.class.path"),
-                StreamHarness.class.getName(), mgf.toString());
+        String javaBin =
+                Path.of(System.getProperty("java.home"), "bin", "java")
+                        .toString(); // not `java`: it would shadow the package name
+        ProcessBuilder pb =
+                new ProcessBuilder(
+                        javaBin,
+                        "-Xmx48m",
+                        "-cp",
+                        System.getProperty("java.class.path"),
+                        StreamHarness.class.getName(),
+                        mgf.toString());
         pb.redirectErrorStream(true);
         Process proc = pb.start();
-        String output = new String(proc.getInputStream().readAllBytes(),
-                java.nio.charset.StandardCharsets.UTF_8).trim();
+        String output =
+                new String(
+                                proc.getInputStream().readAllBytes(),
+                                java.nio.charset.StandardCharsets.UTF_8)
+                        .trim();
         int exit = proc.waitFor();
 
         System.out.println("  48 MB heap subprocess: exit=" + exit + " | " + output);
-        assertEquals(0, exit,
+        assertEquals(
+                0,
+                exit,
                 "streaming PlusRise.mgf inside a 48 MB heap failed -- memory is no longer bounded by "
-                        + "scan size. Output:\n" + output);
+                        + "scan size. Output:\n"
+                        + output);
         assertTrue(output.contains("34513 scans"), "unexpected subprocess output: " + output);
         assertTrue(output.contains("758544 peaks"), "unexpected subprocess output: " + output);
     }
@@ -143,25 +170,37 @@ class StreamingMemoryTest {
         Path mzxml = Fixtures.require("data/DP00570_F02.mzxml");
 
         String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        ProcessBuilder pb = new ProcessBuilder(
-                javaBin, "-Xmx48m", "-cp", System.getProperty("java.class.path"),
-                StreamHarness.class.getName(), mzxml.toString());
+        ProcessBuilder pb =
+                new ProcessBuilder(
+                        javaBin,
+                        "-Xmx48m",
+                        "-cp",
+                        System.getProperty("java.class.path"),
+                        StreamHarness.class.getName(),
+                        mzxml.toString());
         pb.redirectErrorStream(true);
         Process proc = pb.start();
-        String output = new String(proc.getInputStream().readAllBytes(),
-                java.nio.charset.StandardCharsets.UTF_8).trim();
+        String output =
+                new String(
+                                proc.getInputStream().readAllBytes(),
+                                java.nio.charset.StandardCharsets.UTF_8)
+                        .trim();
         int exit = proc.waitFor();
 
         System.out.println("  48 MB heap subprocess (mzXML): exit=" + exit + " | " + output);
-        assertEquals(0, exit,
+        assertEquals(
+                0,
+                exit,
                 "streaming DP00570_F02.mzxml inside a 48 MB heap failed -- the mzXML reader is "
-                        + "accumulating scans rather than streaming. Output:\n" + output);
+                        + "accumulating scans rather than streaming. Output:\n"
+                        + output);
         assertTrue(output.contains("916 scans"), "unexpected subprocess output: " + output);
     }
 
     @Test
     void mzxmlRetainsNothingAcrossScans() {
-        // The retained-heap counterpart, for the mapped-file reader. Bounds are generous on purpose:
+        // The retained-heap counterpart, for the mapped-file reader. Bounds are generous on
+        // purpose:
         // what this tests is the SHAPE -- that nothing accumulates -- not an absolute byte figure.
         Path mzxml = Fixtures.require("data/DP00570_F02.mzxml");
 
@@ -178,10 +217,14 @@ class StreamingMemoryTest {
         long retained = settledHeap() - baseline;
 
         assertEquals(916, scans);
-        System.out.printf("  mzXML: streamed %d scans / %,d peaks | retained %,d KB%n",
+        System.out.printf(
+                "  mzXML: streamed %d scans / %,d peaks | retained %,d KB%n",
                 scans, peaks, retained / 1024);
-        assertTrue(retained < 24L * 1024 * 1024,
-                "after streaming, " + (retained / 1024 / 1024) + " MB is still retained; the mzXML "
+        assertTrue(
+                retained < 24L * 1024 * 1024,
+                "after streaming, "
+                        + (retained / 1024 / 1024)
+                        + " MB is still retained; the mzXML "
                         + "reader appears to be accumulating scans");
     }
 
@@ -195,7 +238,11 @@ class StreamingMemoryTest {
         long t0 = System.nanoTime();
         int metaOnly = 0;
         try (SpectraStream s = SpectraFile.open(mzml)) {
-            while (s.hasNext()) { ScanView v = s.next(); v.precmz(); metaOnly++; }
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                v.precmz();
+                metaOnly++;
+            }
         }
         long metaMs = (System.nanoTime() - t0) / 1_000_000;
 
@@ -203,13 +250,18 @@ class StreamingMemoryTest {
         int withPeaks = 0;
         long peaks = 0;
         try (SpectraStream s = SpectraFile.open(mzml)) {
-            while (s.hasNext()) { ScanView v = s.next(); peaks += v.materialize().rowCount(); withPeaks++; }
+            while (s.hasNext()) {
+                ScanView v = s.next();
+                peaks += v.materialize().rowCount();
+                withPeaks++;
+            }
         }
         long fullMs = (System.nanoTime() - t1) / 1_000_000;
 
         assertEquals(metaOnly, withPeaks);
         assertEquals(305_214L, peaks);
-        System.out.printf("  small.mzML: metadata-only %d ms vs full decode %d ms (%,d peaks)%n",
+        System.out.printf(
+                "  small.mzML: metadata-only %d ms vs full decode %d ms (%,d peaks)%n",
                 metaMs, fullMs, peaks);
         // No timing assertion -- it would flake. The number is printed so a regression that starts
         // decoding eagerly is visible in the build log.

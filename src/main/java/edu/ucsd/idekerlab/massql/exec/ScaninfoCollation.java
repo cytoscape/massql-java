@@ -1,5 +1,8 @@
 package edu.ucsd.idekerlab.massql.exec;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import edu.ucsd.idekerlab.massql.MassqlException;
 import edu.ucsd.idekerlab.massql.MassqlOptions;
 import edu.ucsd.idekerlab.massql.io.ScanView;
@@ -7,9 +10,6 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
 import edu.ucsd.idekerlab.massql.spectra.Column;
 import edu.ucsd.idekerlab.massql.spectra.Reductions;
 import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Turns qualifying scans into {@link ScanInfoResult} rows — the 7 native columns plus the 5 the SDK
@@ -53,8 +53,10 @@ public final class ScaninfoCollation implements QualifyingScanConsumer {
         // ---- metadata comes from ScanView, deliberately.
         //
         // Correction C20 stores precmz/ms1scan/charge on ScanIndex, and a single-scan table's index
-        // agrees with the view. But reading them off a TABLE invites reading them off the WRONG table:
-        // retainedMs1.index().precmzOf(0) is the MS1 scan's precmz (0), not this scan's. ScanView is the
+        // agrees with the view. But reading them off a TABLE invites reading them off the WRONG
+        // table:
+        // retainedMs1.index().precmzOf(0) is the MS1 scan's precmz (0), not this scan's. ScanView
+        // is the
         // reader's own metadata authority and cannot be confused with the other table.
         int scanId = view.scanId();
         int msLevel = view.msLevel();
@@ -62,14 +64,21 @@ public final class ScaninfoCollation implements QualifyingScanConsumer {
         int rawMs1scan = view.ms1scan();
         int rawCharge = view.charge();
 
-        // Ordering is a promise QualifyingScanConsumer makes ("scan-id-ascending falls out of document
-        // order for free") and it is a property of the FIXTURES, not a guarantee: MGF scan ids come from
-        // SCANS= when present, and a file with non-monotonic SCANS= would break it. All current fixtures
-        // ascend -- PlusRise's 34,513 SCANS= are monotonic -- so assert it rather than discover later
+        // Ordering is a promise QualifyingScanConsumer makes ("scan-id-ascending falls out of
+        // document
+        // order for free") and it is a property of the FIXTURES, not a guarantee: MGF scan ids come
+        // from
+        // SCANS= when present, and a file with non-monotonic SCANS= would break it. All current
+        // fixtures
+        // ascend -- PlusRise's 34,513 SCANS= are monotonic -- so assert it rather than discover
+        // later
         // that Tech_Step12's row-order comparison was silently comparing misaligned rows.
         if (scanId < lastScanId) {
             throw new MassqlException(
-                    "scans arrived out of order: " + scanId + " after " + lastScanId
+                    "scans arrived out of order: "
+                            + scanId
+                            + " after "
+                            + lastScanId
                             + ". Results must be scan-id ascending (Tech_Step10, Tech_Step12 §1). An MGF "
                             + "with non-monotonic SCANS= would cause this.");
         }
@@ -77,19 +86,25 @@ public final class ScaninfoCollation implements QualifyingScanConsumer {
 
         // ---- the two native computations.
         //
-        // tic is a SUM over this scan's peaks -- MassQL's `i` renamed. Not the base peak: `scanmaxint`
+        // tic is a SUM over this scan's peaks -- MassQL's `i` renamed. Not the base peak:
+        // `scanmaxint`
         // puts that in `i`, which is why the reference guards the rename to scaninfo queries.
         double tic = Reductions.sum(scan, 0, Column.I);
 
         // ---- base peaks, from THIS scan's own table, whatever its MS level.
         //
-        // Correction C40: the reference computed these from ms2_df and left-joined on scan, so MS1DATA
-        // rows missed the join and came back null. The rule is: MS1 ids join only to MS1 data. Here that
-        // is automatic -- `scan` IS the qualifying scan's table -- which is why the Java side never had
+        // Correction C40: the reference computed these from ms2_df and left-joined on scan, so
+        // MS1DATA
+        // rows missed the join and came back null. The rule is: MS1 ids join only to MS1 data. Here
+        // that
+        // is automatic -- `scan` IS the qualifying scan's table -- which is why the Java side never
+        // had
         // the bug and only the golden needed regenerating.
         int topRow = Reductions.argmax(scan, 0, Column.I);
-        // argmax returns -1 on an empty scan. The executor skips zero-peak scans (C35c) so this cannot
-        // fire today, but Reductions' contract allows it and a NaN reaching the JSON would be a null for
+        // argmax returns -1 on an empty scan. The executor skips zero-peak scans (C35c) so this
+        // cannot
+        // fire today, but Reductions' contract allows it and a NaN reaching the JSON would be a
+        // null for
         // entirely the wrong reason.
         Double basePeakI = topRow < 0 ? null : scan.intensity(topRow);
         Double basePeakMz = topRow < 0 ? null : scan.mz(topRow);
@@ -103,22 +118,25 @@ public final class ScaninfoCollation implements QualifyingScanConsumer {
         Integer ms1scan = rawMs1scan == 0 ? null : rawMs1scan;
         Integer charge = rawCharge == 0 ? null : rawCharge;
 
-        rows.add(new ScanInfoResult(
-                scanId,
-                clean(precmz),
-                ms1scan,
-                // rt is NEVER null-converted: 0.0 is a genuine retention time, and it is 664 rows of
-                // the PlusRise golden. It is also never NaN-cleaned to null for the same reason -- but
-                // an infinite rt would be a reader bug, so let clean() catch that.
-                clean(view.rt()),
-                charge,
-                clean(tic),
-                msLevel,
-                clean(basePeakI),
-                clean(basePeakMz),
-                clean(ms1.ms1I()),
-                clean(ms1.ms1Precmz()),
-                clean(ms1.ms1BasePeakI())));
+        rows.add(
+                new ScanInfoResult(
+                        scanId,
+                        clean(precmz),
+                        ms1scan,
+                        // rt is NEVER null-converted: 0.0 is a genuine retention time, and it is
+                        // 664 rows of
+                        // the PlusRise golden. It is also never NaN-cleaned to null for the same
+                        // reason -- but
+                        // an infinite rt would be a reader bug, so let clean() catch that.
+                        clean(view.rt()),
+                        charge,
+                        clean(tic),
+                        msLevel,
+                        clean(basePeakI),
+                        clean(basePeakMz),
+                        clean(ms1.ms1I()),
+                        clean(ms1.ms1Precmz()),
+                        clean(ms1.ms1BasePeakI())));
     }
 
     /**

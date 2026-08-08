@@ -1,10 +1,13 @@
 package edu.ucsd.idekerlab.massql.spectra;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import edu.ucsd.idekerlab.massql.MassqlException;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+
+import edu.ucsd.idekerlab.massql.MassqlException;
 
 /** Invariants are enforced with MassqlException, not assert, so they fail in release builds too. */
 class SpectrumTableBuilderTest {

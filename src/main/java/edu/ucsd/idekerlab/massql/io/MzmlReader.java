@@ -1,16 +1,5 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import edu.ucsd.idekerlab.massql.MassqlException;
-import edu.ucsd.idekerlab.massql.io.vendor.ByteBufferInputStream;
-import edu.ucsd.idekerlab.massql.io.vendor.FileMemoryMapper;
-import edu.ucsd.idekerlab.massql.io.vendor.MzMLBinaryDataInfo;
-import edu.ucsd.idekerlab.massql.io.vendor.MzMLBitLength;
-import edu.ucsd.idekerlab.massql.io.vendor.MzMLCompressionType;
-import edu.ucsd.idekerlab.massql.io.vendor.MzMLCV;
-import edu.ucsd.idekerlab.massql.io.vendor.MzMLPeaksDecoder;
-import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
-import edu.ucsd.idekerlab.massql.spectra.SpectrumTableBuilder;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +7,17 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+import edu.ucsd.idekerlab.massql.MassqlException;
+import edu.ucsd.idekerlab.massql.io.vendor.ByteBufferInputStream;
+import edu.ucsd.idekerlab.massql.io.vendor.FileMemoryMapper;
+import edu.ucsd.idekerlab.massql.io.vendor.MzMLBinaryDataInfo;
+import edu.ucsd.idekerlab.massql.io.vendor.MzMLBitLength;
+import edu.ucsd.idekerlab.massql.io.vendor.MzMLCV;
+import edu.ucsd.idekerlab.massql.io.vendor.MzMLCompressionType;
+import edu.ucsd.idekerlab.massql.io.vendor.MzMLPeaksDecoder;
+import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
+import edu.ucsd.idekerlab.massql.spectra.SpectrumTableBuilder;
 
 import javolution.text.CharArray;
 import javolution.xml.internal.stream.XMLStreamReaderImpl;
@@ -85,18 +85,24 @@ final class MzmlReader extends AbstractSpectraStream {
     public List<String> diagnostics() {
         List<String> out = new ArrayList<>(diagnostics);
         if (skippedHighMsLevel > 0) {
-            out.add("skipped " + skippedHighMsLevel + " spectra with ms level > 2 (out of scope for scaninfo)");
+            out.add(
+                    "skipped "
+                            + skippedHighMsLevel
+                            + " spectra with ms level > 2 (out of scope for scaninfo)");
         }
         return Collections.unmodifiableList(out);
     }
 
-    @Override protected ScanView view() { return scan; }
+    @Override
+    protected ScanView view() {
+        return scan;
+    }
 
     @Override
     protected boolean advance() {
         try {
             while (readSpectrum()) {
-                if (scan.msLevel > 2) {          // levels above 2 are out of scope
+                if (scan.msLevel > 2) { // levels above 2 are out of scope
                     skippedHighMsLevel++;
                     continue;
                 }
@@ -110,7 +116,8 @@ final class MzmlReader extends AbstractSpectraStream {
                 // the 12,571 empty ones are yielded per C24b); only the linkage skips it.
                 // peakCount is defaultArrayLength, so this costs no decode.
                 //
-                // ZeroPeakMs1ChainTest pins it, and it is not a hypothetical: with the guard removed
+                // ZeroPeakMs1ChainTest pins it, and it is not a hypothetical: with the guard
+                // removed
                 // that test reports "Got 4 -- expected 2".
                 if (scan.msLevel == 1) {
                     if (scan.peakCount > 0) previousMs1Scan = scan.scanId;
@@ -143,13 +150,14 @@ final class MzmlReader extends AbstractSpectraStream {
     }
 
     private void readSpectrumBody() throws XMLStreamException {
-        int depth = 1;                 // we are inside <spectrum>
+        int depth = 1; // we are inside <spectrum>
         boolean inSelectedIon = false;
         boolean inBinaryArray = false;
         Binary bin = null;
 
         // Correction C31: MassQL hard-indexes
-        // precursorList.precursor[0].selectedIonList.selectedIon[0] (msql_fileloading.py:603), so only
+        // precursorList.precursor[0].selectedIonList.selectedIon[0] (msql_fileloading.py:603), so
+        // only
         // the FIRST selectedIon of the FIRST precursor counts. mzML legitimately carries more --
         // multiplexed (MSX) acquisition co-fragments several precursors -- and this reader used to
         // OVERWRITE precmz/charge on every MS:1000744 it saw, i.e. last-wins. Every fixture was
@@ -194,7 +202,7 @@ final class MzmlReader extends AbstractSpectraStream {
                     bin = null;
                 }
                 depth--;
-                if (depth == 0) return;      // </spectrum>
+                if (depth == 0) return; // </spectrum>
             } else if (ev == XMLStreamConstants.END_DOCUMENT) {
                 throw new MassqlException("truncated mzML: <spectrum> is not closed in " + path);
             }
@@ -209,7 +217,8 @@ final class MzmlReader extends AbstractSpectraStream {
             scan.msLevel = parseInt(attr("value"), 0);
         } else if (eq(acc, MzMLCV.MS_RT_SCAN_START)) {
             double rt = parseDouble(attr("value"), 0.0);
-            // ⚠ CONDITIONAL on the declared unit. small.mzML says unitName="minute" -> pass through.
+            // ⚠ CONDITIONAL on the declared unit. small.mzML says unitName="minute" -> pass
+            // through.
             // A blind /60 is a silent 60x error that passes every MGF-only test
             // (msql_fileloading.py:564-571).
             String unitName = str(xml.getAttributeValue(null, "unitName"));
@@ -247,10 +256,16 @@ final class MzmlReader extends AbstractSpectraStream {
         // compression param clobber the bit length. That is a NullPointerException deep inside the
         // decoder, several frames from the cause.
         for (MzMLBitLength b : MzMLBitLength.values()) {
-            if (b.getValue().equals(a)) { bin.bitLength = b; return; }
+            if (b.getValue().equals(a)) {
+                bin.bitLength = b;
+                return;
+            }
         }
         for (MzMLCompressionType c : MzMLCompressionType.values()) {
-            if (c.getAccession().equals(a)) { bin.compression = c; return; }
+            if (c.getAccession().equals(a)) {
+                bin.compression = c;
+                return;
+            }
         }
     }
 
@@ -272,39 +287,63 @@ final class MzmlReader extends AbstractSpectraStream {
         int end = 0;
         while (end < tail.length() && Character.isDigit(tail.charAt(end))) end++;
         if (end == 0) {
-            throw new MassqlException("cannot derive a scan number from mzML spectrum id \"" + id
-                    + "\" (expected a trailing 'scan=<n>'); MassQL raises ValueError here");
+            throw new MassqlException(
+                    "cannot derive a scan number from mzML spectrum id \""
+                            + id
+                            + "\" (expected a trailing 'scan=<n>'); MassQL raises ValueError here");
         }
         return Integer.parseInt(tail.substring(0, end));
     }
 
     // ------------------------------------------------------------------ helpers
 
-    private String attr(String name) { return str(xml.getAttributeValue(null, name)); }
+    private String attr(String name) {
+        return str(xml.getAttributeValue(null, name));
+    }
 
-    private int intAttr(String name, int fallback) { return parseInt(attr(name), fallback); }
+    private int intAttr(String name, int fallback) {
+        return parseInt(attr(name), fallback);
+    }
 
-    private static String str(CharArray c) { return c == null ? null : c.toString(); }
+    private static String str(CharArray c) {
+        return c == null ? null : c.toString();
+    }
 
-    private static boolean eq(CharArray c, String s) { return c != null && c.equals(s); }
+    private static boolean eq(CharArray c, String s) {
+        return c != null && c.equals(s);
+    }
 
     private static int parseInt(String s, int fallback) {
         if (s == null) return fallback;
-        try { return Integer.parseInt(s.trim()); } catch (NumberFormatException e) { return fallback; }
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
     }
 
     private static double parseDouble(String s, double fallback) {
         if (s == null) return fallback;
-        try { return Double.parseDouble(s.trim()); } catch (NumberFormatException e) { return fallback; }
+        try {
+            return Double.parseDouble(s.trim());
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
     }
 
     private void closeQuietly() {
-        try { mapped.close(); } catch (IOException ignored) { }
+        try {
+            mapped.close();
+        } catch (IOException ignored) {
+        }
     }
 
     @Override
     protected void releaseResources() {
-        try { xml.close(); } catch (XMLStreamException ignored) { }
+        try {
+            xml.close();
+        } catch (XMLStreamException ignored) {
+        }
         closeQuietly();
     }
 
@@ -330,12 +369,16 @@ final class MzmlReader extends AbstractSpectraStream {
         Binary intensityArray;
 
         void reset() {
-            scanId = 0; msLevel = 0; rt = 0.0; polarity = 0;
-            precmz = 0.0;    // 0 sentinel -- Step 10 converts, not us
-            ms1scan = 0;     // 0 = no preceding MS1; the origin of the sentinel
+            scanId = 0;
+            msLevel = 0;
+            rt = 0.0;
+            polarity = 0;
+            precmz = 0.0; // 0 sentinel -- Step 10 converts, not us
+            ms1scan = 0; // 0 = no preceding MS1; the origin of the sentinel
             charge = 0;
             peakCount = 0;
-            mzArray = null; intensityArray = null;
+            mzArray = null;
+            intensityArray = null;
         }
 
         void accept(Binary b) {
@@ -344,14 +387,45 @@ final class MzmlReader extends AbstractSpectraStream {
             // Any other array type (e.g. retention time arrays on chromatograms) is ignored.
         }
 
-        @Override public int scanId()    { return scanId; }
-        @Override public int msLevel()   { return msLevel; }
-        @Override public double rt()     { return rt; }
-        @Override public int polarity()  { return polarity; }
-        @Override public double precmz() { return precmz; }
-        @Override public int ms1scan()   { return ms1scan; }
-        @Override public int charge()    { return charge; }
-        @Override public int peakCount() { return peakCount; }
+        @Override
+        public int scanId() {
+            return scanId;
+        }
+
+        @Override
+        public int msLevel() {
+            return msLevel;
+        }
+
+        @Override
+        public double rt() {
+            return rt;
+        }
+
+        @Override
+        public int polarity() {
+            return polarity;
+        }
+
+        @Override
+        public double precmz() {
+            return precmz;
+        }
+
+        @Override
+        public int ms1scan() {
+            return ms1scan;
+        }
+
+        @Override
+        public int charge() {
+            return charge;
+        }
+
+        @Override
+        public int peakCount() {
+            return peakCount;
+        }
 
         @Override
         public SpectrumTable materialize() {
@@ -359,8 +433,15 @@ final class MzmlReader extends AbstractSpectraStream {
             double[] in = decode(intensityArray, "intensity");
             int n = Math.min(mz.length, in.length);
             if (mz.length != in.length) {
-                diagnostics.add("scan " + scanId + ": m/z array has " + mz.length
-                        + " values but intensity array has " + in.length + "; using " + n);
+                diagnostics.add(
+                        "scan "
+                                + scanId
+                                + ": m/z array has "
+                                + mz.length
+                                + " values but intensity array has "
+                                + in.length
+                                + "; using "
+                                + n);
             }
             // defaultArrayLength is exact, so this allocates once and never grows or copies.
             SpectrumTableBuilder b = new SpectrumTableBuilder(msLevel == 1 ? 1 : 2, n);
@@ -373,23 +454,37 @@ final class MzmlReader extends AbstractSpectraStream {
             if (bin == null || bin.base64.isEmpty()) return new double[0];
             byte[] raw = bin.base64.getBytes(StandardCharsets.US_ASCII);
             if (bin.bitLength == null) {
-                throw new MassqlException("scan " + scanId + " in " + path + ": the " + what
-                        + " array declares no bit length (MS:1000521 or MS:1000523)");
+                throw new MassqlException(
+                        "scan "
+                                + scanId
+                                + " in "
+                                + path
+                                + ": the "
+                                + what
+                                + " array declares no bit length (MS:1000521 or MS:1000523)");
             }
             MzMLBinaryDataInfo info = new MzMLBinaryDataInfo(raw.length, peakCount);
             info.setArrayType(bin.arrayType);
             info.setBitLength(bin.bitLength);
             // An absent compression cvParam means uncompressed, matching mzXML's convention.
-            info.setCompressionType(bin.compression == null
-                    ? MzMLCompressionType.NO_COMPRESSION : bin.compression);
+            info.setCompressionType(
+                    bin.compression == null ? MzMLCompressionType.NO_COMPRESSION : bin.compression);
             try {
                 // The vendored decoder already implements the 32-bit rule:
                 // Float.intBitsToFloat(readInt()) into a double[] == (double)(float)raw.
-                return MzMLPeaksDecoder.decodeToDouble(new ByteArrayInputStream(raw), info,
-                        new double[peakCount]);
+                return MzMLPeaksDecoder.decodeToDouble(
+                        new ByteArrayInputStream(raw), info, new double[peakCount]);
             } catch (Exception e) {
-                throw new MassqlException("cannot decode the " + what + " array of scan " + scanId
-                        + " in " + path + ": " + e.getMessage(), e);
+                throw new MassqlException(
+                        "cannot decode the "
+                                + what
+                                + " array of scan "
+                                + scanId
+                                + " in "
+                                + path
+                                + ": "
+                                + e.getMessage(),
+                        e);
             }
         }
     }

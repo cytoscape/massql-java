@@ -16,4 +16,8 @@ package edu.ucsd.idekerlab.massql.lang.ast;
  * <p>{@link #EQ} carries a trap the engine must honour: for intensity comparisons
  * MassQL treats {@code =} as {@code >=}, "preserving historical semantics".
  */
-public enum Comparator { EQ, GT, LT }
+public enum Comparator {
+    EQ,
+    GT,
+    LT
+}

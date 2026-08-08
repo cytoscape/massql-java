@@ -1,5 +1,7 @@
 package edu.ucsd.idekerlab.massql.exec;
 
+import java.util.List;
+
 import edu.ucsd.idekerlab.massql.io.ScanView;
 import edu.ucsd.idekerlab.massql.lang.ast.Condition;
 import edu.ucsd.idekerlab.massql.lang.ast.ConditionType;
@@ -7,8 +9,6 @@ import edu.ucsd.idekerlab.massql.lang.ast.Expr;
 import edu.ucsd.idekerlab.massql.lang.ast.Polarity;
 import edu.ucsd.idekerlab.massql.spectra.IntRange;
 import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
-
-import java.util.List;
 
 /**
  * One evaluator per condition, each answering a single question about <b>one scan</b>.
@@ -36,7 +36,7 @@ import java.util.List;
  */
 public final class ConditionFilters {
 
-    private ConditionFilters() { }
+    private ConditionFilters() {}
 
     /** True if this condition can be decided from scan metadata alone, with no peaks. */
     public static boolean isScanLevel(Condition c) {
@@ -58,23 +58,27 @@ public final class ConditionFilters {
      */
     public static boolean scanLevelHolds(Condition c, ScanView v) {
         if (c instanceof Condition.PolarityIs p) {
-            // polarity == 1 positive / == 2 negative (msql_engine.py:440-444). 0 (unknown) matches neither.
+            // polarity == 1 positive / == 2 negative (msql_engine.py:440-444). 0 (unknown) matches
+            // neither.
             int want = p.polarity() == Polarity.POSITIVE ? 1 : 2;
             return v.polarity() == want;
         }
         Condition.Value cv = (Condition.Value) c;
         return switch (cv.type()) {
-            case RTMIN -> anyValue(cv.values(), x -> v.rt() > x);          // STRICT
-            case RTMAX -> anyValue(cv.values(), x -> v.rt() < x);          // STRICT
-            case SCANMIN -> anyValue(cv.values(), x -> v.scanId() >= (int) x);   // INCLUSIVE
-            case SCANMAX -> anyValue(cv.values(), x -> v.scanId() <= (int) x);   // INCLUSIVE
+            case RTMIN -> anyValue(cv.values(), x -> v.rt() > x); // STRICT
+            case RTMAX -> anyValue(cv.values(), x -> v.rt() < x); // STRICT
+            case SCANMIN -> anyValue(cv.values(), x -> v.scanId() >= (int) x); // INCLUSIVE
+            case SCANMAX -> anyValue(cv.values(), x -> v.scanId() <= (int) x); // INCLUSIVE
             case CHARGE -> anyValue(cv.values(), x -> v.charge() == (int) x);
-            case MS2PREC -> anyValue(cv.values(), target -> {
-                // The scan's own precursor m/z, in a STRICT window (msql_engine_filters.py:410).
-                double lo = Tolerance.loFor(cv.qualifiers(), target);
-                double hi = Tolerance.hiFor(cv.qualifiers(), target);
-                return v.precmz() > lo && v.precmz() < hi;
-            });
+            case MS2PREC -> anyValue(
+                    cv.values(),
+                    target -> {
+                        // The scan's own precursor m/z, in a STRICT window
+                        // (msql_engine_filters.py:410).
+                        double lo = Tolerance.loFor(cv.qualifiers(), target);
+                        double hi = Tolerance.hiFor(cv.qualifiers(), target);
+                        return v.precmz() > lo && v.precmz() < hi;
+                    });
             case MS2PROD, MS2NL, MS1MZ -> throw new IllegalStateException(
                     cv.type() + " is peak-level; call peakLevelHolds");
         };
@@ -87,8 +91,8 @@ public final class ConditionFilters {
      * @param v          its metadata — {@code MS2NL} needs {@code precmz}
      * @param retainedMs1 the linked MS1 scan for {@code MS1MZ}; may be null
      */
-    public static boolean peakLevelHolds(Condition c, SpectrumTable scan, ScanView v,
-                                         SpectrumTable retainedMs1) {
+    public static boolean peakLevelHolds(
+            Condition c, SpectrumTable scan, ScanView v, SpectrumTable retainedMs1) {
         Condition.Value cv = (Condition.Value) c;
         return switch (cv.type()) {
             case MS2PROD -> anyValue(cv.values(), target -> matchesInTable(scan, cv, target));
@@ -96,25 +100,33 @@ public final class ConditionFilters {
             case MS2NL -> {
                 // The neutral loss is computed from the scan's OWN precursor.
                 //
-                // A precmz of 0 is the "not recorded" sentinel, and the scan cannot satisfy an MS2NL
-                // condition. The source excludes it naturally -- it matches on (precmz - mz), which for
-                // precmz == 0 is negative while the window is positive -- but making it explicit here
+                // A precmz of 0 is the "not recorded" sentinel, and the scan cannot satisfy an
+                // MS2NL
+                // condition. The source excludes it naturally -- it matches on (precmz - mz), which
+                // for
+                // precmz == 0 is negative while the window is positive -- but making it explicit
+                // here
                 // states the rule instead of relying on the arithmetic (C37f).
                 if (v.precmz() == 0.0) yield false;
-                // Source form: (precmz - mz) strictly inside (value - tol, value + tol). Rearranged to a
+                // Source form: (precmz - mz) strictly inside (value - tol, value + tol). Rearranged
+                // to a
                 // window on mz, which is the same set and lets the binary search do the work:
                 //   value - tol < precmz - mz < value + tol
                 //   <=>  precmz - value - tol < mz < precmz - value + tol
-                yield anyValue(cv.values(), target -> {
-                    double half = Tolerance.halfWidthFor(cv.qualifiers(), target);
-                    double centre = v.precmz() - target;
-                    return matchesWindow(scan, cv, centre - half, centre + half);
-                });
+                yield anyValue(
+                        cv.values(),
+                        target -> {
+                            double half = Tolerance.halfWidthFor(cv.qualifiers(), target);
+                            double centre = v.precmz() - target;
+                            return matchesWindow(scan, cv, centre - half, centre + half);
+                        });
             }
 
             case MS1MZ -> {
-                // MassQL keeps MS2 scans whose ms1scan matched (`:557-562`). Under the document-order rule
-                // the retained MS1 IS that scan, so evaluating here is equivalent -- and because condition
+                // MassQL keeps MS2 scans whose ms1scan matched (`:557-562`). Under the
+                // document-order rule
+                // the retained MS1 IS that scan, so evaluating here is equivalent -- and because
+                // condition
                 // order is irrelevant (C37g), doing it per-scan loses nothing.
                 if (retainedMs1 == null || retainedMs1.isEmpty()) yield false;
                 yield anyValue(cv.values(), target -> matchesInTable(retainedMs1, cv, target));
@@ -127,12 +139,17 @@ public final class ConditionFilters {
 
     /** Any peak in a STRICT window around {@code target} that also passes the intensity qualifiers. */
     private static boolean matchesInTable(SpectrumTable t, Condition.Value cv, double target) {
-        return matchesWindow(t, cv, Tolerance.loFor(cv.qualifiers(), target),
-                             Tolerance.hiFor(cv.qualifiers(), target));
+        return matchesWindow(
+                t,
+                cv,
+                Tolerance.loFor(cv.qualifiers(), target),
+                Tolerance.hiFor(cv.qualifiers(), target));
     }
 
-    private static boolean matchesWindow(SpectrumTable t, Condition.Value cv, double lo, double hi) {
-        // mzWindowExclusive, NOT mzWindow: condition windows are strict (C37a). A single-scan table's only
+    private static boolean matchesWindow(
+            SpectrumTable t, Condition.Value cv, double lo, double hi) {
+        // mzWindowExclusive, NOT mzWindow: condition windows are strict (C37a). A single-scan
+        // table's only
         // ordinal is 0.
         IntRange r = t.mzWindowExclusive(0, lo, hi);
         for (int row = r.start(); row < r.end(); row++) {

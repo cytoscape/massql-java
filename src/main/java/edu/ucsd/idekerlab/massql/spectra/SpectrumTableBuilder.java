@@ -1,8 +1,8 @@
 package edu.ucsd.idekerlab.massql.spectra;
 
-import edu.ucsd.idekerlab.massql.MassqlException;
-
 import java.util.Arrays;
+
+import edu.ucsd.idekerlab.massql.MassqlException;
 
 /**
  * Append-then-freeze construction of a {@link SpectrumTable}.
@@ -85,18 +85,18 @@ public final class SpectrumTableBuilder {
      * @param ms1scan   linked MS1 scan id by document order, or {@code 0} for none
      * @param charge    precursor charge, or {@code 0} for "not recorded"
      */
-    public SpectrumTableBuilder startScan(int scanId, double rtMinutes, int polarity,
-                                          double precmz, int ms1scan, int charge) {
+    public SpectrumTableBuilder startScan(
+            int scanId, double rtMinutes, int polarity, double precmz, int ms1scan, int charge) {
         ensureNotBuilt();
         // Non-decreasing scan ids are what let the index be a range lookup instead of a hash
         // of lists. Readers stream in document order, so this costs nothing to require.
         if (scans > 0 && scanId < sIds[scans - 1]) {
-            throw new MassqlException("scan ids must be non-decreasing; got " + scanId
-                    + " after " + sIds[scans - 1]);
+            throw new MassqlException(
+                    "scan ids must be non-decreasing; got " + scanId + " after " + sIds[scans - 1]);
         }
         if (scans > 0 && scanId == sIds[scans - 1]) {
-            throw new MassqlException("duplicate scan id " + scanId
-                    + "; each scan must be started exactly once");
+            throw new MassqlException(
+                    "duplicate scan id " + scanId + "; each scan must be started exactly once");
         }
         if (scans == sIds.length) {
             int n = scans * 2;
@@ -139,12 +139,20 @@ public final class SpectrumTableBuilder {
     }
 
     /** Number of scans started so far. Lets a reader report progress without building. */
-    public int scanCount() { return scans; }
-    public int peakCount() { return rows; }
+    public int scanCount() {
+        return scans;
+    }
+
+    public int peakCount() {
+        return rows;
+    }
 
     /** True if any scan's peaks needed sorting during {@link #build}. Diagnostic only. */
     private boolean sortedAnyScan = false;
-    public boolean sortedAnyScan() { return sortedAnyScan; }
+
+    public boolean sortedAnyScan() {
+        return sortedAnyScan;
+    }
 
     public SpectrumTable build() {
         ensureNotBuilt();
@@ -195,12 +203,19 @@ public final class SpectrumTableBuilder {
             }
         }
 
-        ScanIndex index = new ScanIndex(scanIds, rowStart, rowEnd,
-                Arrays.copyOf(sRt, scans), Arrays.copyOf(sPol, scans),
-                Arrays.copyOf(sPrecmz, scans), Arrays.copyOf(sMs1scan, scans),
-                Arrays.copyOf(sCharge, scans));
+        ScanIndex index =
+                new ScanIndex(
+                        scanIds,
+                        rowStart,
+                        rowEnd,
+                        Arrays.copyOf(sRt, scans),
+                        Arrays.copyOf(sPol, scans),
+                        Arrays.copyOf(sPrecmz, scans),
+                        Arrays.copyOf(sMs1scan, scans),
+                        Arrays.copyOf(sCharge, scans));
 
-        return new SpectrumTable(mzOut, iOut, iNorm, iTicNorm, scanOut, rtOut, polOut, msLevel, index);
+        return new SpectrumTable(
+                mzOut, iOut, iNorm, iTicNorm, scanOut, rtOut, polOut, msLevel, index);
     }
 
     private static boolean isSorted(double[] a, int from, int to) {
@@ -226,6 +241,7 @@ public final class SpectrumTableBuilder {
     }
 
     private void ensureNotBuilt() {
-        if (built) throw new MassqlException("this builder has already been built; it is single-use");
+        if (built)
+            throw new MassqlException("this builder has already been built; it is single-use");
     }
 }

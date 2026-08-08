@@ -31,7 +31,7 @@ import java.nio.file.Paths;
  */
 final class Fixtures {
 
-    private Fixtures() { }
+    private Fixtures() {}
 
     /** Fixtures that are fetched rather than committed — drives the failure message only. */
     private static final String FETCHED_PREFIX = "data/DP00570_F02.";
@@ -71,14 +71,18 @@ final class Fixtures {
 
     private static String explainMissing(String relative) {
         if (relative.startsWith(FETCHED_PREFIX)) {
-            return "fixture missing: " + relative + "\n"
+            return "fixture missing: "
+                    + relative
+                    + "\n"
                     + "This is one of the two Ewing-lab files, gitignored because ewinglab.org\n"
                     + "publishes no redistribution terms (Correction C26).\n"
                     + "Fetch them with:  bash scripts/fetch-fixtures.sh\n"
                     + "This test must NOT be skipped -- the Ewing mzXML is the only fixture that can\n"
                     + "distinguish document-order ms1scan from precursorScanNum resolution.";
         }
-        return "fixture missing from src/test/resources: " + relative + "\n"
+        return "fixture missing from src/test/resources: "
+                + relative
+                + "\n"
                 + "It is committed to this repository (Correction C26). If it has been deleted or\n"
                 + "moved, restore it -- do not make the test conditional on its presence.";
     }

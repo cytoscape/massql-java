@@ -1,9 +1,9 @@
 package edu.ucsd.idekerlab.massql.io;
 
-import edu.ucsd.idekerlab.massql.MassqlException;
-
 import java.nio.file.Path;
 import java.util.NoSuchElementException;
+
+import edu.ucsd.idekerlab.massql.MassqlException;
 
 /**
  * The cursor mechanics every reader shares: the {@code hasNext()}/{@code next()} peek machine, the
@@ -81,8 +81,10 @@ abstract class AbstractSpectraStream implements SpectraStream {
     @Override
     public final ScanView next() {
         if (!hasNext()) {
-            throw new NoSuchElementException("no more spectra in " + path
-                    + "; a stream is single-pass -- reopen the file to query it again");
+            throw new NoSuchElementException(
+                    "no more spectra in "
+                            + path
+                            + "; a stream is single-pass -- reopen the file to query it again");
         }
         peeked = false;
         return view();
