@@ -23,6 +23,12 @@ version = cliVersion          // independent of sdkVersion
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
+
+    // Same three artifacts as the SDK. The CLI is an application rather than a library, so its
+    // javadoc is thin -- but a published coordinate that omits sources is one nobody can debug, and
+    // consistency costs nothing here.
+    withJavadocJar()
+    withSourcesJar()
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -34,10 +40,45 @@ dependencies {
     implementation project(':')
     testImplementation "org.junit.jupiter:junit-jupiter:${rootProject.ext.junitVersion}"
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // The SDK's test RESOURCES only -- the spectra fixtures and the .massql queries -- so the CLI is
+    // exercised against the same real files the goldens were generated from. Deliberately not
+    // sourceSets.test.output: that would put the SDK's test CLASSES here too, and the CLI has no
+    // business reaching into them.
+    testRuntimeOnly files(rootProject.sourceSets.test.output.resourcesDir)
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+    // The resources above are produced by that task, not by simply existing on disk.
+    dependsOn rootProject.tasks.named('processTestResources')
+}
+
+// Same bar as the SDK. The root gate excluded this project only while it held a single
+// package-info.java; once Main.java exists that exemption would just be an unenforced floor, which
+// is exactly what `make skipcheck` was before C43 replaced it.
+jacocoTestReport {
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = true
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                counter = 'INSTRUCTION'
+                value = 'COVEREDRATIO'
+                minimum = 0.90
+            }
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestCoverageVerification')
 }
 
 // The uber-jar IS this project's artifact, not a classified extra -- hence the empty classifier.
@@ -57,7 +98,12 @@ tasks.named('assemble') {
 publishing {
     publications {
         cli(MavenPublication) {
+            // The uber-jar is the primary artifact (archiveClassifier = ''), with -javadoc and
+            // -sources beside it. Listed explicitly because this publication is NOT
+            // `from components.java` -- that would publish the thin jar instead.
             artifact tasks.named('shadowJar')
+            artifact tasks.named('javadocJar')
+            artifact tasks.named('sourcesJar')
             artifactId = 'massql-java-cli'
             pom {
                 name = 'massql-java-cli'

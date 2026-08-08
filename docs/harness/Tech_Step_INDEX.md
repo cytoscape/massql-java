@@ -39,7 +39,7 @@ owning step.
 | [8](Tech_Step8.md) | Reader parity — bit-identical vs Python | 2, 6, 7 | 0.5 d | ⛔ **GATE** | ✅ **GATE GREEN 2026-08-03 — 392 tests** |
 | [9](Tech_Step9.md) | Condition filters (9a required + 9b) | 4, 5, 8 | 2 d | | ✅ **DONE 2026-08-05 — 453 tests** |
 | [10](Tech_Step10.md) | `scaninfo` collation, result model, JSON | 9, 5 | 1.5 d | | ✅ **DONE 2026-08-06 — 542 tests** |
-| [11](Tech_Step11.md) | Public API surface + CLI | 10 | 0.5 d | | not started |
+| [11](Tech_Step11.md) | Public API surface + CLI | 10 | 0.5 d | | ✅ **DONE 2026-08-08 — 587 tests** |
 | [12](Tech_Step12.md) | Integration layers 2–4 + error paths | 11, 2, 8 | 1.5 d | ⛔ **GATE** | not started |
 | [13](Tech_Step13.md) | Harden, document, hand off | 12 | 2 d | ⛔ **REVIEW** | not started |
 
@@ -550,6 +550,74 @@ needs. Both are also **read at runtime by tests**, so their paths are code rathe
 links pointing out of the repo — which is why the move was verified by measurement rather than by inspection.
 Check 5's pattern also had to gain a `/`: it matched `docs/[A-Za-z_]+\.md`, so a subdirectory path would have
 stopped matching and the check would have covered *less* than before while still reporting green.
+
+<a id="c45"></a>
+**C45 — a published library ships three artifacts, and the SDK's API reference is the javadoc jar, not
+prose.**
+
+**Fallout:** Tech_Step3.md, Tech_Step11.md, Tech_Step13.md
+
+`publish` was pushing the library jar and a POM. No `-javadoc`, no `-sources` — so an IDE could show a
+consumer nothing about `Massql.execute`, and nobody could step into the code they were debugging. Both
+coordinates now publish all three via `withJavadocJar()` / `withSourcesJar()`.
+
+**The javadoc task did not build at all.** Five hard errors, every one in `io/vendor/`: a bad HTML entity and
+unresolvable `@see` references in upstream MSDK. They cannot be fixed here without breaking the byte-identity
+`docs/VENDORED.md` asserts — and they should not be, because **vendored code is not our API**. It is excluded
+from javadoc, as is the generated ANTLR parser, for the same reason and a second one: between them they
+produced ~100 "no comment" warnings that would bury a real finding.
+
+> ⚠ **The sources jar keeps both.** It has to match the binary we ship, which contains those classes, and a
+> redistributor needs them for the EPL-1.0 election. Excluding from javadoc and excluding from sources are
+> different questions with different answers.
+
+Doclint settled at `-Xdoclint:all,-missing`: keep the groups that catch **broken** javadoc, drop the demand for
+an `@param`/`@return` on every member, because this codebase documents behaviour in prose rather than in tags.
+Verified still to have teeth — an unresolvable `{@link}` fails the build.
+
+**Consumer docs split by artifact.** `docs/API.md` covered both the SDK and the CLI in one file, which is the
+shape Correction C25 warns about: the CLI treats stdout as a data pipe, the SDK writes to no stream at all, and a
+single page invites reading one contract as the other's. Now `docs/SDK.md` (obtain and build), `docs/CLI.md`
+(the command-line contract) and a `README.md` introducing both.
+
+**`docs/SDK.md` documents no classes, deliberately.** Entry points, parameters and behaviour live in the
+javadoc jar; prose restating them is prose that drifts. It carries exactly two behavioural notes — streams are
+single-pass, the SDK writes to no stream — because those are what a consumer assumes wrongly *before* opening
+the javadoc.
+
+`README.md` was a [Step 13](Tech_Step13.md) deliverable and arrives at Step 11 instead, the same way the
+Makefile arrived at Step 9: the moment there are two artifacts to tell apart is the moment the document
+explaining them is worth writing.
+
+<a id="c44"></a>
+**C44 — the MGF reader ignored the file-level `CHARGE=` header, and the parity gate could not see it.**
+
+**Fallout:** Tech_Step6.md, Tech_Step8.md
+
+Found while smoke-testing the [Step 11](Tech_Step11.md) CLI against all 15 query goldens: 14 matched,
+`dp00570_mgf_results.json` did not — `charge` 2 in the golden, 1 from us, on both rows.
+
+**The rule, verified against pyteomics directly.** A `CHARGE=` in an MGF's file-level header is the **default
+charge for every block that does not carry its own**. pyteomics copies the header into each spectrum's params,
+so `CHARGE=2+ and 3+` arrives as `[2, 3]` on *every* spectrum and `msql_fileloading` takes element 0.
+`DP00570_F02.mgf` declares exactly that and then omits `CHARGE=` from **583 of its 625 blocks**. The oracle's
+distribution is `{2: 583, 1: 42}`; ours was `{1: 625}`. Only the header before the first `BEGIN IONS` counts.
+
+**⛔ The more important half: the gate could not have caught it.** The loader-parity dumps have carried
+`charge`, `ms1scan` and `precmz` on MS2 records all along — `ReaderParityIT` simply never compared them, and
+`ParityDump`'s record stopped at `polarity`. So Step 8 proved bit-identity of peaks, `rt` and polarity while
+three precursor-metadata columns went unchecked, and a reader bug survived a **green gate** for five steps
+before surfacing as two wrong rows in a query result. All three are now asserted; reverting the reader fix
+fails `ReaderParityIT` on `DP00570_F02.mgf`, which is where it should always have failed.
+
+Widening the assertions immediately found a second defect of a different kind: **`micro.mzXML.json.gz` was
+stale**, predating that fixture gaining `precursorCharge="2"`. It recorded `charge: 0` for scan 5 where the
+oracle now loads 2 — so here our reader was right and the *golden* was wrong. Refreshed from the oracle; the
+other 15 dumps were byte-identical and untouched.
+
+**The lesson is about gate design, not about MGF.** A gate that checks most of a record reads exactly like one
+that checks all of it. What made this discoverable at all was comparing whole result rows against an
+independent oracle — which is [Step 12](Tech_Step12.md)'s entire job, arriving early by accident.
 
 <a id="c43"></a>
 **C43 — the build moves from Maven to Gradle, which silently reintroduces a 15.44 MB dependency leak, breaks

@@ -203,6 +203,30 @@ class ReaderParityIT {
         assertEquals(want.peakCount(), t.rowCount(), at + ": peak count");
         assertEquals(want.polarity(), v.polarity(), at + ": polarity");
 
+        // ⛔ The PRECURSOR metadata, on MS2 scans (Correction C44).
+        //
+        // The dumps have always carried these three; nothing compared them. So the gate proved
+        // bit-identity of peaks, rt and polarity while leaving charge, precmz and ms1scan entirely
+        // unchecked -- and an MGF charge bug survived Step 8 green, reaching Step 11 as two wrong
+        // rows in a query golden, five steps from its cause.
+        //
+        // They belong here rather than at Step 12 because this is the difference between "the
+        // reader
+        // is wrong" and "some result rows differ".
+        if (key.mslevel() == 2) {
+            assertEquals(want.charge().intValue(), v.charge(), at + ": charge");
+            assertEquals(want.ms1scan().intValue(), v.ms1scan(), at + ": ms1scan");
+            assertEquals(
+                    Double.doubleToLongBits(want.precmz()),
+                    Double.doubleToLongBits(v.precmz()),
+                    at
+                            + ": precmz must be bit-identical (want "
+                            + want.precmz()
+                            + ", got "
+                            + v.precmz()
+                            + ")");
+        }
+
         // rt BIT-identical. This single assertion covers all three RT-unit rules -- mzML's
         // conditional
         // conversion, mzXML's unconditional one, MGF's RTINSECONDS/60 -- and requires the

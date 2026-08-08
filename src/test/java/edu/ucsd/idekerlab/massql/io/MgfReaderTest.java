@@ -9,6 +9,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -60,12 +62,14 @@ class MgfReaderTest {
     }
 
     @Test
-    void absentChargeIsOneNotZero(@TempDir Path dir) throws IOException {
-        // ⚠ Correction C6. SPIKE.md §3 says MGF charge is "null if absent"; the live pyteomics
-        // loader
-        // uses params.get('charge', [1]) with `except: charge = 1`. Since only 0 is null-converted
-        // (Step 10 §4), MGF charge is NEVER null -- a genuine 1+ and an absent CHARGE are
-        // indistinguishable. The golden agrees: {1: 653, 2: 10, 3: 1}, zero nulls.
+    void chargeFallsBackToOneOnlyWhenTheFileDeclaresNoneEither(@TempDir Path dir)
+            throws IOException {
+        // ⚠ Corrections C6 and C44. SPIKE.md §3 says MGF charge is "null if absent"; the live
+        // pyteomics loader uses params.get('charge', [1]) with `except: charge = 1`. Since only 0
+        // is
+        // null-converted (Step 10 §4), MGF charge is NEVER null -- a genuine 1+ and an absent
+        // CHARGE are indistinguishable. 1 is the fallback for a file with no CHARGE anywhere; a
+        // file-level header supplies a different default, which is the case below this one.
         Path p =
                 write(
                         dir,
@@ -78,6 +82,100 @@ class MgfReaderTest {
                 END IONS
                 """);
         assertEquals(1, readAll(p).get(0).charge());
+    }
+
+    @Test
+    void theFileLevelChargeHeaderIsTheDefaultForBlocksWithoutTheirOwn(@TempDir Path dir)
+            throws IOException {
+        // ⛔ Correction C44 -- and it is a real file's behaviour, not a hypothetical:
+        // DP00570_F02.mgf declares `CHARGE=2+ and 3+` once, then omits CHARGE= from 583 of its 625
+        // blocks. pyteomics copies the file header into EVERY spectrum's params, so MassQL sees
+        // [2, 3] on all of them and takes element 0. Reading only per-block CHARGE= lines gave 1
+        // for
+        // 93% of that file.
+        //
+        // The multi-charge form is why the FIRST value is taken rather than the line rejected: the
+        // 3
+        // is never consulted by the reference.
+        Path p =
+                write(
+                        dir,
+                        "a.mgf",
+                        """
+                COM=converted from something
+                CHARGE=2+ and 3+
+
+                BEGIN IONS
+                TITLE=inherits the file default
+                PEPMASS=500.5
+                100.0 10.0
+                END IONS
+                BEGIN IONS
+                TITLE=overrides it
+                PEPMASS=600.5
+                CHARGE=3+
+                100.0 10.0
+                END IONS
+                BEGIN IONS
+                TITLE=inherits it again
+                PEPMASS=700.5
+                100.0 10.0
+                END IONS
+                """);
+        List<Row> r = readAll(p);
+        assertEquals(2, r.get(0).charge(), "no CHARGE= of its own -> the file-level default");
+        assertEquals(3, r.get(1).charge(), "its own CHARGE= wins for this block only");
+        assertEquals(2, r.get(2).charge(), "and the override does not leak into the next block");
+    }
+
+    @Test
+    void onlyTheHeaderBeforeTheFirstBlockCounts(@TempDir Path dir) throws IOException {
+        // A CHARGE= sitting between two blocks is not a file header -- pyteomics stops reading the
+        // header at the first BEGIN IONS. Treating it as one would silently re-default every
+        // following block.
+        Path p =
+                write(
+                        dir,
+                        "a.mgf",
+                        """
+                CHARGE=2+
+
+                BEGIN IONS
+                PEPMASS=500.5
+                100.0 10.0
+                END IONS
+
+                CHARGE=7+
+
+                BEGIN IONS
+                PEPMASS=600.5
+                100.0 10.0
+                END IONS
+                """);
+        List<Row> r = readAll(p);
+        assertEquals(2, r.get(0).charge());
+        assertEquals(2, r.get(1).charge(), "the stray CHARGE=7+ after block 1 must not be adopted");
+    }
+
+    @Test
+    void theRealFixtureCarriesTheFileLevelDefault() {
+        // The regression this fix exists for, asserted against the committed file rather than a
+        // constructed one. Block 370 has no CHARGE= of its own; the golden says charge 2.
+        List<Row> rows = readAll(Fixtures.require("data/DP00570_F02.mgf"));
+        assertEquals(
+                2, rows.get(369).charge(), "block 370 inherits the file-level CHARGE=2+ and 3+");
+        assertEquals(2, rows.get(597).charge(), "and so does block 598");
+
+        // The whole-file distribution, taken from the oracle itself:
+        //     pyteomics + msql_fileloading -> {2: 583, 1: 42}
+        // The 42 are the blocks carrying their own `CHARGE=1+`; the 583 inherit the header. Before
+        // C44 this read {1: 625} and nothing noticed, because the loader-parity dumps did not
+        // record
+        // charge at all.
+        Map<Integer, Long> byCharge =
+                rows.stream().collect(Collectors.groupingBy(Row::charge, Collectors.counting()));
+        assertEquals(
+                Map.of(2, 583L, 1, 42L), byCharge, "charge distribution must match the oracle");
     }
 
     @Test

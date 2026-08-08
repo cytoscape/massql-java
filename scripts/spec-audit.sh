@@ -508,7 +508,7 @@ echo
 # checkbox is a claim and nothing was comparing claims to the filesystem.
 #
 # Scoped to completed steps for the same reason as check 4: DIFFERENTIAL_REPORT.md (Step 12) and
-# API.md (Step 11) are SUPPOSED to be absent right now.
+# the Step 12/13 review artifacts are SUPPOSED to be absent right now.
 #
 # ⚠ The pattern is `docs/[A-Za-z_/]+\.md` -- note the SLASH. It was `[A-Za-z_]+` until Correction
 # C41 moved six docs into docs/harness/ and four artifacts into docs/harness/oracle/, at which

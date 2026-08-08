@@ -64,7 +64,7 @@ Governing sections: [`SPIKE.md`](SPIKE.md) §4.
 | `src/main/java/…/massql/Massql.java` | The **four** entry points (C42 — this said "three", omitting `executeWithDiagnostics`) |
 | `cli/src/main/java/…/massql/cli/Main.java` | The CLI. ⚠ **A separate Gradle project** (C43): it is versioned and released independently of the SDK, and because it depends on the SDK as an external project it can only compile against the **public API** — making the boundary `ApiEncapsulationTest` checks a compile error too |
 | `src/test/java/…` — `MassqlApiTest`, `ApiEncapsulationTest`; and `cli/src/test/java/…` — `MainTest`, `MainStreamDisciplineTest`, `MainOutputFileTest`, `MainExitCodeTest`, `MainNoStackTraceOnStdoutTest`. **All seven** are named in *Tests required* | ⚠ This row listed **three** while *Tests required* names **seven** (Correction **C42**). `spec-audit` check 4 enforces the match the moment Done-when is ticked, so a name here that is never written fails the build — the C38 lesson |
-| `docs/API.md` | The public surface, with the stability promise and a usage example |
+| `docs/SDK.md`, `docs/CLI.md`, `README.md` | Consumer-facing docs (Correction **C45**), **split by artifact** so the SDK's and the CLI's stream contracts cannot be read as one (C25). `SDK.md` is obtain-and-build only — class-level documentation is the published `-javadoc.jar`, not prose. `README.md` introduces both and links out |
 
 ## Specification
 
@@ -101,7 +101,7 @@ this spec demanded and nothing previously delivered.
 > - **Reuse**: one stream serves **one** query. Several queries over one *file* means reopening it —
 >   `SpectraFile.open(path)` per query, each in its own try-with-resources.
 >
-> Say this in `docs/API.md` explicitly. The old whole-file design made re-querying free; this does not, and
+> Say this in `docs/SDK.md` explicitly. The old whole-file design made re-querying free; this does not, and
 > a Phase-2 author who assumes otherwise gets an exception rather than a wrong answer.
 
 ```java
@@ -135,7 +135,7 @@ Rules on this surface:
   the reader and parser swappable, and it is a [`SPIKE.md`](SPIKE.md) §4 requirement, not a style preference.
 - Results are ordered by **scan id ascending**, so output is deterministic and `diff`-able. Confirm the goldens are
   in that order (`small_mzml_results.json` starts at scan 3 and `plusrise_results.json` at 576, both ascending);
-  if MassQL's own ordering differs anywhere, match MassQL and record it in `docs/API.md`.
+  if MassQL's own ordering differs anywhere, match MassQL and record it in `docs/SDK.md`.
 
 > ⚠ **Correction C40 deleted this paragraph's subject.** It read: *"Where the query is `scaninfo(MS1DATA)`,
 > `execute` returns rows with `ms1DataShape = true` so `ResultJson` emits the 4-key form."*
@@ -317,30 +317,48 @@ on it. So:
 
 ## Done when
 
-- [ ] `make test` green (and `make verify` before calling the step done).
-- [ ] The **four** entry points match §1's sketch — which is [`SPIKE.md`](SPIKE.md) §4's *shape* with C22's
+- [x] `make verify` green — **587 tests, 0 skipped** (525 SDK unit + 30 SDK integration + 32 CLI unit).
+- [x] The **four** entry points match §1's sketch — which is [`SPIKE.md`](SPIKE.md) §4's *shape* with C22's
       type. ⚠ This box read *"the three entry points match the SPIKE.md §4 sketch **exactly**"* and was
       **unsatisfiable** (Correction **C42**): §4 shows a `SpectraFile` parameter that no longer exists, and it
       omits `executeWithDiagnostics`. Matching it exactly would mean writing code that does not compile.
-- [ ] `ApiEncapsulationTest` passes — no third-party type on the public surface. `Format` is package-private as
-      of C42, so it must not appear either.
-- [ ] **A drained stream handed to `execute` throws** rather than returning an empty list, and `docs/API.md`
-      states the reopen-per-query rule.
-- [ ] `Main.run(String[], PrintStream, PrintStream)` returns the exit code and **never** calls `System.exit`;
-      only `main` does.
-- [ ] CLI arg order, flag and default match `massql_query.py`; a manual run against `data/small.mzML` +
-      `test_mzml.massql` produces JSON on stdout that parses.
-- [ ] All four exit codes verified, including 0-with-`[]`.
-- [ ] stdout is provably free of diagnostics and stack traces on every path.
-- [ ] **`--output FILE` is byte-identical to stdout mode**, atomic (temp-then-`ATOMIC_MOVE`), and leaves
-      neither a partial output file nor a `.tmp` behind on the failure path.
-- [ ] `docs/API.md` documents the surface, the ownership rules, the exit codes, both output modes, and
-      **which layer each stream rule governs** (Correction C25 — the SDK writes to no stream).
+- [x] `ApiEncapsulationTest` passes — no third-party type on the public surface. `Format` is package-private as
+      of C42, so it must not appear either. Written as an **allowlist** (every type must be a JDK type or ours,
+      *and* itself public), which catches an unforeseen dependency that a blocklist could not. Both halves
+      demonstrated to fail on an injected leak.
+- [x] **A drained stream handed to `execute` throws** rather than returning an empty list
+      (`MassqlApiTest.aSpentStreamFailsLoudlyRatherThanReturningNothing`), and `docs/SDK.md` states the
+      reopen-per-query rule.
+- [x] `Main.run(String[], PrintStream, PrintStream)` returns the exit code and **never** calls `System.exit`;
+      only `main` does — which is the only reason `MainExitCodeTest` can assert exit codes at all.
+- [x] CLI arg order, flag and default match `massql_query.py`. The run against `data/small.mzML` +
+      `test_mzml.massql` is **automated**, not manual: it produces 6 rows whose scan ids and 12 keys match
+      `small_mzml_results.json`, with the only value differences being the 6 `tic` figures at relative ~1e-8 —
+      the float32 accumulation error C34 documents on the *reference* side.
+- [x] All four exit codes verified, including 0-with-`[]` (`MainExitCodeTest`, one test per code plus one
+      asserting they stay distinct).
+- [x] stdout is provably free of diagnostics and stack traces on every path — `MainStreamDisciplineTest`
+      walks 7 failure routes and `MainNoStackTraceOnStdoutTest` walks 12, asserting no stack frame and no
+      exception type name on **either** stream.
+- [x] **`--output FILE` is byte-identical to stdout mode** (asserted on raw bytes, trailing newline
+      included), atomic (temp-then-`ATOMIC_MOVE`), and leaves neither a partial output file nor a `.tmp`
+      behind on the failure path.
+- [x] `docs/SDK.md` and `docs/CLI.md` document each artifact separately — obtaining and building the
+      SDK, the CLI's arguments, exit codes and both output modes — and **which layer each stream rule
+      governs** (Correction C25 — the SDK writes to no stream, so stdout-as-data is the CLI's contract
+      alone). `README.md` introduces both. The SDK's class-level reference is the published
+      `-javadoc.jar`, so no prose can drift from it — and the build publishes that jar, plus
+      `-sources`, for both coordinates (C45).
 
 ## References
 
 - [`SPIKE.md`](SPIKE.md) §4 (the API sketch, the two API rules, the CLI signature)
-- `massql_query.py` — `:119-133` (argparse shape), `:141` (the deliberate stdout→stderr redirect), `:194-195`
-  (`json.dump(..., indent=2, allow_nan=False)` then a newline)
+- `massql_query.py` — cited by **anchor**, not line number (Correction C42): its
+  `parser.add_argument("mgf_file"…)` / `parser.add_argument("query_file")` /
+  `"--precursor-tol-ppm", type=float, default=20.0` block for the argv shape; its
+  `with contextlib.redirect_stdout(sys.stderr):` for the deliberate stdout→stderr redirect; and
+  `json.dump(records, sys.stdout, default=str, indent=2, allow_nan=False)` followed by
+  `sys.stdout.write("\n")` for the payload. ⚠ The line numbers this entry used to carry had already
+  drifted — `:194-195` pointed at the C40 base-peak comment, not at `json.dump`.
 - [Step 10](Tech_Step10.md) §5 — the JSON contract this prints
 - Consumer: [Step 12](Tech_Step12.md) layer 4 asserts the CLI contract; Phase 2 codes against this surface

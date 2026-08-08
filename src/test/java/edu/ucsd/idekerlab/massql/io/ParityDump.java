@@ -45,7 +45,14 @@ import java.util.zip.GZIPInputStream;
  */
 final class ParityDump {
 
-    /** One scan's worth of MassQL's loaded state. Hex fields are kept raw and parsed on demand. */
+    /**
+     * One scan's worth of MassQL's loaded state. Hex fields are kept raw and parsed on demand.
+     *
+     * <p>The last three are <b>MS2 only</b> and are null on an MS1 record — the generator emits them
+     * under {@code if level == "2"}, because {@code ms1_df} has no such columns. That is a real
+     * property of the reference's two-dataframe shape, not a gap: an MS1 survey scan has no
+     * precursor to describe.
+     */
     record Scan(
             int scan,
             int mslevel,
@@ -56,7 +63,15 @@ final class ParityDump {
             List<String> iHexFirst8,
             List<String> mzHexFirst8,
             String rtHex,
-            int polarity) {
+            int polarity,
+            String precmzHex,
+            Integer ms1scan,
+            Integer charge) {
+
+        /** MassQL's precursor m/z for this scan. MS2 only. */
+        double precmz() {
+            return parseHex(precmzHex);
+        }
 
         /** The composite key. See the class note: scan id alone is unsafe. */
         Key key() {
@@ -137,7 +152,10 @@ final class ParityDump {
                             hexList(m.group(7)),
                             hexList(m.group(8)),
                             m.group(9),
-                            Integer.parseInt(m.group(10)));
+                            Integer.parseInt(m.group(10)),
+                            m.group(11),
+                            m.group(12) == null ? null : Integer.valueOf(m.group(12)),
+                            m.group(13) == null ? null : Integer.valueOf(m.group(13)));
             Scan clash = byKey.put(s.key(), s);
             // A duplicate key would mean the dump itself is malformed, or that our key is too weak
             // --
@@ -210,7 +228,11 @@ final class ParityDump {
                             + "\"i_hex_first8\":\\s*\\[([^\\]]*)\\],\\s*"
                             + "\"mz_hex_first8\":\\s*\\[([^\\]]*)\\],\\s*"
                             + "\"rt_hex\":\\s*\"([^\"]*)\",\\s*"
-                            + "\"polarity\":\\s*(-?\\d+)");
+                            + "\"polarity\":\\s*(-?\\d+)"
+                            // MS2 only -- absent on an MS1 record, hence the optional group.
+                            + "(?:,\\s*\"precmz\":\\s*\"([^\"]*)\",\\s*"
+                            + "\"ms1scan\":\\s*\"?(-?\\d+)\"?,\\s*"
+                            + "\"charge\":\\s*\"?(-?\\d+)\"?)?");
 
     private static List<String> hexList(String body) {
         List<String> out = new ArrayList<>(8);

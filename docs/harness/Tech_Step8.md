@@ -218,6 +218,7 @@ agree — they had drifted to three different numbers before that check existed.
 | Per-scan first 8 `mz` and `i` | **Bit-identical** via `i_hex_first8` / `mz_hex_first8`. Cheap detector of an interleaving or byte-order error, and the diagnostic that separates "wrong values" from "wrong order" when a digest fails |
 | Per-scan `rt` | **Bit-identical** against `rt_hex`. This is the assertion that catches all three RT-unit rules at once, and it requires the double-precision `scanRt` from [Step 5](Tech_Step5.md) §1 |
 | Per-scan polarity | Exact (1 / 2 / 0) |
+| Per-scan **`charge`**, **`ms1scan`**, **`precmz`** | ⛔ Exact on every **MS2** scan; `precmz` **bit-identical** against its hex. MS1 dump records carry none of the three — the generator emits them under `if level == "2"` because `ms1_df` has no such columns, which is a property of the reference's two-dataframe shape, not a gap. These are the precursor-metadata columns [Step 10](Tech_Step10.md) collates and [Step 12](Tech_Step12.md) compares, so a divergence here is a **reader** defect and must be caught as one |
 | Per-scan intensity sum | `i_sum_hex` at relative **1e-15**, secondary only (§1) |
 
 > ⛔ **Correction C32(c) — the dumps omit every zero-peak scan; our readers deliberately yield them.**
@@ -398,7 +399,8 @@ untested while the table implied otherwise.
 
 - [x] `mvn verify` green — **369 unit + 23 IT, 0 skipped**.
 - [x] For **all three formats**: scan counts, scan ids (as a set keyed by `(mslevel, scan)`), per-scan peak
-      counts, polarity and `rt` all match the dumps exactly.
+      counts, polarity, `rt`, and — on MS2 scans — `charge`, `ms1scan` and `precmz` all match the dumps
+      exactly.
 - [x] `mz` and `i` are **bit-identical** via `i_sha256` / `mz_sha256` on all **16** fixtures with a dump — no
       tolerance. The set now includes the four decode variants that previously had none.
 - [x] The reader-only scan count is **asserted** per fixture, not tolerated: PlusRise **12,571**, micro
@@ -414,7 +416,10 @@ untested while the table implied otherwise.
 - [x] `ReaderParityHarnessTest` **demonstrated** to detect a single-ULP perturbation — proven by shifting one
       intensity with `Math.nextUp` and confirming `ReaderParityIT` fails on exactly the three mzML fixtures
       with an actionable message.
-- [x] **⛔ GATE GREEN.** One real reader bug found and fixed: MGF `polarity` was 0, MassQL emits 1 (C33).
+- [x] **⛔ GATE GREEN.** Two real reader bugs found and fixed: MGF `polarity` was 0 where MassQL emits 1
+      (C33), and MGF `charge` ignored the file-level `CHARGE=` header, giving 1 for 583 of `DP00570_F02.mgf`'s
+      625 blocks where MassQL gives 2 (C44). One stale dump was refreshed at the same time —
+      `micro.mzXML.json.gz` predated that fixture gaining `precursorCharge="2"`.
 
 ## References
 

@@ -52,7 +52,7 @@ Governing sections: [`SPIKE.md`](SPIKE.md) §4 (layout), §5 (readers), §6d (bu
 | `src/main/antlr/edu/ucsd/idekerlab/massql/lang/Massql.g4` | Placeholder grammar; real content in Step 4 |
 | `src/main/java/.../massql/MassqlException.java`, `MassqlParseException.java`, `MassqlOptions.java` | See Specification §5 |
 | `.github/workflows/ci.yml` | Full suite on every push to master and every PR — see §8 |
-| `.github/workflows/release.yml` | Version-stamped jar from a semver tag, attached to the release and deployed to the Cytoscape nexus — see §8 |
+| `.github/workflows/release.yml` | Version-stamped artifacts from a prefixed semver tag, attached to the release and deployed to the Cytoscape nexus — see §8 |
 | `scripts/dependency-audit.sh` | Regenerates `dependency-audit.txt`; **exits non-zero** on a constraint violation or budget breach, so it works as a CI gate |
 
 ## Specification
@@ -247,6 +247,23 @@ bare `v1.2.3` cannot silently release the wrong one; **`make set-version-sdk`** 
 (which re-check semver themselves); **`make fixtures`** then **`make verify`**; `gh release upload` that
 artifact's jar; **`make publish-sdk`** / **`make publish-cli`** to the nexus. Every step goes through the
 Makefile.
+
+**Each coordinate publishes three artifacts** — the library, `-javadoc` and `-sources` — via
+`withJavadocJar()` / `withSourcesJar()`. That is the idiomatic shape for a published Java library: an
+IDE attaches the javadoc jar automatically, and a coordinate with no sources is one nobody can debug.
+It is also what lets `docs/SDK.md` document **no classes at all** — the javadoc jar is the API
+reference, so there is no prose to drift from it (C45).
+
+> ⛔ **Javadoc excludes `io/vendor/` and the generated parser; the sources jar does not.** The
+> asymmetry is deliberate. Javadoc documents *our* API, and vendored MSDK carries 5 upstream javadoc
+> errors — a bad HTML entity and unresolvable `@see` references — that **fail the javadoc task** and
+> cannot be fixed without breaking the byte-identity `docs/VENDORED.md` asserts. The sources jar must
+> match the binary we ship, which does contain those classes, and a redistributor needs them for the
+> EPL-1.0 election.
+>
+> Doclint runs as `-Xdoclint:all,-missing`: the groups that catch **broken** javadoc stay on, while
+> the demand for an `@param`/`@return` on every member is dropped, because this codebase documents
+> behaviour in prose. A genuinely unresolvable `@link` still fails the build.
 
 The publishing repository is declared in `build.gradle` / `cli/build.gradle`, pointing at
 `nrnb-nexus.ucsd.edu/repository/cytoscape_releases` exactly as cy-ndex-2 does, so `massql-app` needs no extra

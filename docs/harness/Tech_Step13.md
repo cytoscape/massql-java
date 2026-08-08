@@ -46,7 +46,7 @@ questions), §6d.
 
 | Path | Content |
 |---|---|
-| `README.md` | The primary review artifact |
+| `README.md` | The primary review artifact. ✅ **Already written at Step 11** (C45), alongside `docs/SDK.md` and `docs/CLI.md` — the consumer-facing docs were split by artifact when the CLI arrived, since that is when the SDK's and the CLI's stream contracts first had to be stated apart (C25). What remains here is the **review** framing: the SPIKE.md §11 answers, the differential table, and the honest-limitations section |
 | `Makefile` | ✅ **Already filled in at Step 9** (the Step 3 stub grew a full target set, and both workflows now call it). This step adds only the **differential table** to `verify` |
 | `dependency-audit.txt` | Final SDK runtime closure + measured total (updated from Step 6) |
 | `scripts/check-osgi-readiness.sh` | The §9 assertions, scripted |

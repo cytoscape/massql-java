@@ -88,6 +88,36 @@ spotless {
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
+
+    // Published alongside the main jar, with -javadoc and -sources classifiers. The javadoc jar is
+    // where the SDK's class-level documentation lives -- docs/SDK.md deliberately documents no
+    // classes, because prose duplicating javadoc drifts from it.
+    withJavadocJar()
+    withSourcesJar()
+}
+
+// ⛔ Vendored MSDK sources are excluded from JAVADOC but NOT from the sources jar, and the asymmetry
+// is deliberate:
+//
+//   - javadoc documents OUR API. io/vendor/ is an implementation detail of the mzML/mzXML decoders,
+//     not something a consumer calls. It also carries 5 upstream javadoc errors (bad HTML entity,
+//     unresolvable @see references) that FAIL the javadoc task -- and they cannot be fixed here
+//     without breaking the byte-identity docs/VENDORED.md asserts.
+//   - the sources jar must match the binary we ship, which does contain those classes, and a
+//     redistributor needs them to satisfy the EPL-1.0 election.
+tasks.named('javadoc') {
+    // Keep the doclint groups that catch BROKEN javadoc -- bad HTML, unresolvable @link/@see,
+    // malformed syntax -- and drop `missing`, which demands an @param/@return on every member.
+    // This codebase documents behaviour in prose rather than in tags (the reader sentinel contracts,
+    // the C36 note, the two m/z window semantics), so `missing` reports ~100 non-problems and would
+    // bury a real one. Removing `-missing` is a tag-completeness project, not a correctness fix.
+    options.addStringOption('Xdoclint:all,-missing', '-quiet')
+
+    exclude 'edu/ucsd/idekerlab/massql/io/vendor/**'
+    // Same reasoning for the generated lexer/parser: machine-written, not our API, and the source of
+    // ~100 "no comment" warnings that bury anything real.
+    exclude '**/MassqlLexer.java', '**/MassqlParser.java', '**/MassqlVisitor.java',
+            '**/MassqlBaseVisitor.java'
 }
 
 tasks.withType(JavaCompile).configureEach {

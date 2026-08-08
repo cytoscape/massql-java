@@ -36,6 +36,15 @@ final class MgfReader extends AbstractSpectraStream {
     private int blockIndex = 0; // 1-based once incremented; the scan-id fallback
     private final Scan scan = new Scan();
 
+    /**
+     * Charge for blocks carrying no {@code CHARGE=} of their own.
+     *
+     * <p>1 unless the file-level header supplies one. {@code DP00570_F02.mgf} declares
+     * {@code CHARGE=2+ and 3+} and then omits {@code CHARGE=} from 583 of its 625 blocks, all of
+     * which are therefore charge <b>2</b> — the first value of the header's list.
+     */
+    private int fileDefaultCharge = 1;
+
     MgfReader(Path path) {
         super(path);
         try {
@@ -67,16 +76,25 @@ final class MgfReader extends AbstractSpectraStream {
     private boolean readBlock() throws IOException {
         String line;
 
-        // Skip to BEGIN IONS, tolerating blank lines, comments and file-level headers
-        // (PlusRise.mgf and DP00570 both carry a COM= / CHARGE= preamble).
+        // Skip to BEGIN IONS, tolerating blank lines, comments and file-level headers.
+        //
+        // The file-level header is not merely skipped: a CHARGE= there is the DEFAULT CHARGE for
+        // every block that does not carry its own. pyteomics copies the header into each spectrum's
+        // params, so `CHARGE=2+ and 3+` reaches MassQL as [2, 3] on every spectrum and it takes the
+        // first -- 2. Only the header before the FIRST block counts, which is why this is guarded
+        // on
+        // blockIndex.
         while ((line = reader.readLine()) != null) {
             String t = line.trim();
             if (t.equalsIgnoreCase("BEGIN IONS")) break;
+            if (blockIndex == 0 && t.regionMatches(true, 0, "CHARGE=", 0, 7)) {
+                fileDefaultCharge = firstCharge(t.substring(7), fileDefaultCharge);
+            }
         }
         if (line == null) return false;
 
         blockIndex++;
-        scan.reset();
+        scan.reset(fileDefaultCharge);
 
         double[] mz = new double[64];
         double[] in = new double[64];
@@ -175,6 +193,31 @@ final class MgfReader extends AbstractSpectraStream {
         return -1;
     }
 
+    /**
+     * The first charge in a {@code CHARGE=} value, or {@code fallback} if there is none.
+     *
+     * <p>Handles every form the fixtures use: {@code 2}, {@code 2+}, {@code 2-}, and the multi-charge
+     * {@code 2+ and 3+}. The multi-charge case is why this takes the <b>first</b> value rather than
+     * rejecting the line: pyteomics parses it to a list and MassQL reads element 0, so
+     * {@code CHARGE=2+ and 3+} means charge 2 and the 3 is never consulted.
+     *
+     * <p>An unparseable value yields {@code fallback} rather than throwing, matching the reference
+     * loader's bare {@code except: charge = 1}.
+     */
+    private static int firstCharge(String value, int fallback) {
+        int i = 0;
+        int n = value.length();
+        while (i < n && !Character.isDigit(value.charAt(i))) i++;
+        int start = i;
+        while (i < n && Character.isDigit(value.charAt(i))) i++;
+        if (start == i) return fallback;
+        try {
+            return Integer.parseInt(value.substring(start, i));
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
     private void applyHeader(String key, String value) {
         switch (key) {
             case "PEPMASS" -> {
@@ -183,19 +226,9 @@ final class MgfReader extends AbstractSpectraStream {
                 String first = value.split("\\s+")[0];
                 scan.precmz = parseOr(first, 0.0);
             }
-            case "CHARGE" -> {
-                // "2+" / "2-" / "2". Absent is handled in Scan.reset(): default 1, NOT 0.
-                String v = value.trim();
-                if (!v.isEmpty()) {
-                    char last = v.charAt(v.length() - 1);
-                    if (last == '+' || last == '-') v = v.substring(0, v.length() - 1);
-                    try {
-                        scan.charge = Integer.parseInt(v.trim());
-                    } catch (NumberFormatException ignored) {
-                        scan.charge = 1; // matches the pyteomics loader's `except: charge = 1`
-                    }
-                }
-            }
+            case "CHARGE" ->
+            // A block's own CHARGE overrides the file-level default for this block only.
+            scan.charge = firstCharge(value, scan.charge);
             case "RTINSECONDS" -> scan.rt = parseOr(value, 0.0) / 60.0;
             case "SCANS" -> {
                 try {
@@ -238,13 +271,15 @@ final class MgfReader extends AbstractSpectraStream {
         double[] in = new double[0];
         int n;
 
-        void reset() {
+        void reset(int defaultCharge) {
             explicitScanId = 0;
             scanId = 0;
             precmz = 0.0; // 0 sentinel: not recorded
-            charge = 1; // ⚠ Correction C6: absent CHARGE is 1, NOT 0 -- so MGF charge is
-            // never null downstream, and a genuine 1+ is indistinguishable
-            // from an absent one. plusrise golden: {1:653, 2:10, 3:1}, no nulls.
+            // ⚠ MGF charge is NEVER null and never 0 (C6/C44). A block with no CHARGE= of its own
+            // takes the file-level header's charge, and 1 only when the file declares none either.
+            // A genuine 1+ is therefore indistinguishable from an absent one -- deliberately, since
+            // that is what the reference produces.
+            charge = defaultCharge;
             rt = 0.0; // ⚠ absent RTINSECONDS is 0.0, a REAL value, never null
             n = 0;
         }
