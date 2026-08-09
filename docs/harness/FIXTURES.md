@@ -43,17 +43,19 @@ every expected value follows from arithmetic you can check by hand (`fixtures/mi
 | `micro_multiprec.mzXML` | **Two** `<precursorMz>` elements; the second is a decoy. MassQL indexes `[0]`, so first wins (C31) |
 | `micro_multiprec.mzML` | Same idea, plus a second `<selectedIon>` **and** a second `<precursor>` — so honouring one nesting level but not the other still fails |
 | `micro_ms1var.mzML` | **Two MS1 scans with different peaks.** The baseline's two MS1 scans are identical, so no existing fixture could tell an `MS1MZ` condition evaluated against the *right* linked MS1 scan from one evaluated against the wrong one — nor discriminate condition **order** (C37). Every scan here has peaks, so nothing is reader-only |
+| `micro_onbound.mzML` | **An MS1 peak exactly on the precursor-lookup window bound** — `499.99`, which *is* `500.0 - 500.0 * 20 / 1e6` in IEEE-754, the same bits in CPython and Java. Pins the **inclusive** half of C37 (Step 10's lookup) where `micro_mzml_edge` pins the strict half (Step 9's conditions). The reference admits the peak, so `ms1_i` is `7000.0`; an exclusive lookup yields `null`. `ms1_base_peak_i` is a *different* peak (`9000.0`), so the two cannot be conflated. Every scan has peaks, so nothing is reader-only |
 
 ## Parity coverage — which fixtures have a dump, and which cannot
 
 All **16** fixtures with a dump are compared **bit-identically** against MassQL by the Step 8 gate
-([`PARITY_REPORT.md`](PARITY_REPORT.md)). **Four** fixtures deliberately have none:
+([`PARITY_REPORT.md`](PARITY_REPORT.md)). **Five** fixtures deliberately have none:
 
 | Fixture | Why no dump |
 |---|---|
 | `micro_nopolarity.mzXML` | MassQL raises `KeyError: 'polarity'` (C27c) — verified by execution. Parity is not available; `MzxmlPolarityTest` pins *our* contract |
 | `micro_noprecursor.mzXML` | MassQL raises `KeyError: 'precursorMz'` (C27c). `MzxmlEdgeCaseTest` pins ours |
 | `micro_multiprec.mzML` | Adds nothing over the mzXML twin for *peak* parity; C31 is pinned by `MultiPrecursorTest` |
+| `micro_onbound.mzML` | Same encoding as `micro.mzML` from the same generator, so it adds no decode path. Its point is the **query** layer, and it is pinned there by `DifferentialIT` — uniquely sharply: its MS1 peak sits exactly on the lookup bound, so a decode off by a single ULP flips the `>=` and turns `ms1_i` null, which the differential reports (C37) |
 | `fixtures/edge/empty_msLevel_tag.mzXML` | 8 of its 10 scans are dropped on `msLevel` (C27a). Still our only 64-bit + zlib decode of a file we did not generate |
 
 The four decode variants (`micro_p64`, `micro_zlib`, `micro_p64_zlib`, `micro_nested`) were in that list until

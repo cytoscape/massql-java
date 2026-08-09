@@ -48,14 +48,31 @@ Governing sections: [`SPIKE.md`](SPIKE.md) §6b layers 2–4, §3 (the populatio
 
 ## Deliverables
 
+Integration tests live in the **`integrationTest` source set**, not `src/test` — they are a separate Gradle
+suite (C43), and there is no `it` package. The two non-IT classes live in the **unit** source set on purpose:
+`integrationTest` depends on `sourceSets.test.output`, so an IT can use them, while a unit test could not reach
+them the other way round.
+
 | Path | Content |
 |---|---|
-| `src/test/java/…/it/DifferentialIT.java` | Layer 2 |
-| `src/test/java/…/it/CrossFormatEquivalenceIT.java` | Layer 3 |
-| `src/test/java/…/it/CliContractIT.java` | Layer 4 |
-| `src/test/java/…/it/ErrorPathIT.java` | Error paths |
-| `src/test/java/…/it/ResultComparator.java` | The per-column comparison policy, in one reusable place |
-| `docs/DIFFERENTIAL_REPORT.md` | The per-format, per-column table — the review artifact |
+| `src/test/java/…/io/GoldenResults.java` | Reads `goldens/query-results/*.json` into `ScanInfoResult` rows |
+| `src/test/java/…/io/GoldenResultsTest.java` | ⛔ Proves the reader rejects a truncated or short file — see below |
+| `src/test/java/…/exec/ResultComparator.java` | The per-column comparison policy, in one reusable place |
+| `src/test/java/…/exec/ResultComparatorTest.java` | ⛔ Proves the comparator detects a single-bit difference |
+| `src/integrationTest/java/…/exec/DifferentialIT.java` | Layer 2 |
+| `src/integrationTest/java/…/io/CrossFormatEquivalenceIT.java` | Layer 3 |
+| `src/integrationTest/java/…/io/ErrorPathIT.java` | Error paths |
+| `src/integrationTest/java/…/io/ResourceLeakIT.java` | 200+ open/close cycles |
+| `src/integrationTest/java/…/exec/PerformanceIT.java` | Wall-clock, peak heap, host spec |
+| **`cli/src/integrationTest/java/…/cli/CliContractIT.java`** | Layer 4 — a **different Gradle project**, because it forks the CLI uber-jar. See §3 |
+| `docs/harness/DIFFERENTIAL_REPORT.md` | The per-format, per-column table — the review artifact |
+
+> ⛔ **Both self-tests are load-bearing, not ceremony.** A comparator that always passes, or a reader that
+> silently returns fewer rows, converts this gate into a green light that proves nothing. That is not
+> hypothetical here: `ParityDump`'s hand-rolled regex stopped at `polarity` and silently dropped `charge`,
+> `precmz` and `ms1scan`, which let an MGF charge bug survive [Step 8](Tech_Step8.md)'s **green** gate for five
+> steps (C44). The reader for *this* step therefore uses a real JSON parser — `gson`, `testImplementation` only,
+> so it never reaches the shipping closure — and proves its own strictness.
 
 ## Specification
 
@@ -87,10 +104,17 @@ Also compare **row count** and **row order** (ascending scan id) before comparin
 >
 > | Wrong choice | Symptom here |
 > |---|---|
-> | Step 9 using the **inclusive** window | **Row count** off — a scan qualifies that the golden excludes |
-> | Step 10 using the **exclusive** window | `ms1_i`/`ms1_precmz` **null where the golden has a value** — caught by the *"exact null-vs-value"* row, not by any tolerance |
+> | Step 9 using the **inclusive** window | **Row count** off — a scan qualifies that the golden excludes: `micro_mzml_edge` returns 1 row where its golden has 0 |
+> | Step 10 using the **exclusive** window | `ms1_i`/`ms1_precmz` **null where the golden has a value** — `micro_onbound` returns `null` where its golden has `7000.0` and `499.99`, reported by the *"exact null-vs-value"* row |
 >
-> Both are silent at the unit level unless a peak lands exactly on a bound, which is why
+> Both halves are covered at this layer, by one fixture each, and they fail in **different columns** — which is
+> what makes a failure attributable. `micro_mzml_edge` puts a **condition** window bound exactly on scan 3's
+> `201.0` peak and its golden is empty by design, so an inclusive condition window surfaces as a row count.
+> `micro_onbound` puts an **MS1** peak exactly on the **lookup** bound at the default 20 ppm and its golden
+> populates `ms1_i`, so an exclusive lookup surfaces as a null. Each was verified by injecting that swap and
+> confirming the matching pair — and only that pair — fails.
+>
+> Both are silent unless a peak lands exactly on a bound, which is why
 > [Step 5](Tech_Step5.md)'s `MzWindowTest` and [Step 10](Tech_Step10.md)'s `PrecursorLookupTest` each assert the
 > on-bound case directly. **If a differential failure has this shape, check the window method before suspecting
 > the decoder or the tolerance arithmetic.**
@@ -104,7 +128,7 @@ Also compare **row count** and **row order** (ascending scan id) before comparin
 > `ms2_df.groupby("scan").sum()["i"]` over it (`msql_engine.py:638,660`, renamed at
 > `massql_query.py`'s `rename(columns={"i": "tic"})`) — a **float32 accumulation**. Our float64 sum is *exact*; the golden's is not.
 >
-> **Measured on `output/small_mzml_results.json` — all six rows differ, worst 3.691e-08:**
+> **Measured on `goldens/query-results/small_mzml_results.json` — all six rows differ, worst 3.691e-08:**
 >
 > | scan | golden `tic` | ours (float64) | rel diff |
 > |---|---|---|---|
@@ -124,19 +148,20 @@ Fixtures and expected counts:
 
 | Fixture | Query | Golden | Expected |
 |---|---|---|---|
-| `data/small.mzML` | `test_mzml.massql` *(default 20 ppm)* | `output/small_mzml_results.json` | **6 rows**, of which **4 have null `ms1_i`/`ms1_precmz` with `ms1_base_peak_i` populated** |
-| `data/small.mzML` | `test_mzml.massql` `--precursor-tol-ppm 60` | `output/small_mzml_tol60_results.json` | **6 rows**, all `ms1_*` populated |
-| `data/PlusRise.mgf` | `test.massql` | `output/plusrise_results.json` | **664 rows** |
-| `data/small.mzXML` | `test_mzml.massql` | `output/small_mzxml_results.json` | **6 rows** |
-| `data/small.mzXML` | `test_mzml.massql` `--precursor-tol-ppm 60` | `output/small_mzxml_tol60_results.json` | **6 rows** |
-| `data/DP00570_F02.mzxml` | **`test_dp00570.massql`** | `output/dp00570_mzxml_results.json` | **3 rows**, all `ms1_*` populated |
-| `data/DP00570_F02.mgf` | **`test_dp00570.massql`** | `output/dp00570_mgf_results.json` | **2 rows**, all `ms1_*` null |
-| `data/DP00570_F02.mzxml` | `test.massql` | `output/dp00570_mzxml_empty_results.json` | **0 rows** — deliberate empty-result case (`test.massql` is the metabolomics query and matches nothing here) |
-| `data/small.mzML` | `test_ms1.massql` | `output/small_mzml_ms1_results.json` | **14 rows**, MS1DATA shape — see below |
-| `fixtures/micro/micro.{mgf,mzML,mzXML}` | `test_micro.massql` | `output/micro_*_results.json` | **2 rows** each |
-| `fixtures/micro/micro_rtseconds.mzML` | `test_micro.massql` | `output/micro_mzml_rtseconds_results.json` | **2 rows** — the mzML `unitName="second"` side of the RT conditional |
-| `fixtures/micro/micro.mzML` | **`test_micro_edge.massql`** *(added Step 9)* | `output/micro_mzml_edge_results.json` | **0 rows.** ⚠ **An empty golden is a real assertion here, not a missing one** — do not treat `[]` as "nothing to check" or skip the pair. `MS2PROD=201.5:TOLERANCEMZ=0.5` puts the window bound exactly on scan 3's `201.0` peak, and MassQL excludes it; this file *is* the executed evidence for the strict half of Correction C37 (§1). A build that used inclusive bounds for conditions returns 1 row and fails here — the only golden that catches it |
-| `fixtures/micro/micro_ms1var.mzML` | **`test_micro_ms1var.massql`** *(added Step 9)* | `output/micro_ms1var_results.json` | **1 row**, scan `2`. Two conditions ANDed across different MS levels (`MS1MZ=400.0 AND MS2PROD=200.0`) against the only fixture whose two MS1 scans differ, so it is the only golden that can catch an `MS1MZ` condition resolved against the wrong linked MS1 scan. Every value is hand-computable: `tic` 2000.0, `base_peak_i` 1500.0, `base_peak_mz` 200.0, `ms1_base_peak_i` 2000.0, and `ms1_i`/`ms1_precmz` **null** — a [Step 10](Tech_Step10.md) §3.2 tolerance miss on a file small enough to check by hand |
+| `data/small.mzML` | `test_mzml.massql` *(default 20 ppm)* | `goldens/query-results/small_mzml_results.json` | **6 rows**, of which **4 have null `ms1_i`/`ms1_precmz` with `ms1_base_peak_i` populated** |
+| `data/small.mzML` | `test_mzml.massql` `--precursor-tol-ppm 60` | `goldens/query-results/small_mzml_tol60_results.json` | **6 rows**, all `ms1_*` populated |
+| `data/PlusRise.mgf` | `test.massql` | `goldens/query-results/plusrise_results.json` | **664 rows** |
+| `data/small.mzXML` | `test_mzml.massql` | `goldens/query-results/small_mzxml_results.json` | **6 rows** |
+| `data/small.mzXML` | `test_mzml.massql` `--precursor-tol-ppm 60` | `goldens/query-results/small_mzxml_tol60_results.json` | **6 rows** |
+| `data/DP00570_F02.mzxml` | **`test_dp00570.massql`** | `goldens/query-results/dp00570_mzxml_results.json` | **3 rows**, all `ms1_*` populated |
+| `data/DP00570_F02.mgf` | **`test_dp00570.massql`** | `goldens/query-results/dp00570_mgf_results.json` | **2 rows**, all `ms1_*` null |
+| `data/DP00570_F02.mzxml` | `test.massql` | `goldens/query-results/dp00570_mzxml_empty_results.json` | **0 rows** — deliberate empty-result case (`test.massql` is the metabolomics query and matches nothing here) |
+| `data/small.mzML` | `test_ms1.massql` | `goldens/query-results/small_mzml_ms1_results.json` | **14 rows**, MS1DATA shape — see below |
+| `fixtures/micro/micro.{mgf,mzML,mzXML}` | `test_micro.massql` | `goldens/query-results/micro_*_results.json` | **2 rows** each |
+| `fixtures/micro/micro_rtseconds.mzML` | `test_micro.massql` | `goldens/query-results/micro_mzml_rtseconds_results.json` | **2 rows** — the mzML `unitName="second"` side of the RT conditional |
+| `fixtures/micro/micro.mzML` | **`test_micro_edge.massql`** *(added Step 9)* | `goldens/query-results/micro_mzml_edge_results.json` | **0 rows.** ⚠ **An empty golden is a real assertion here, not a missing one** — do not treat `[]` as "nothing to check" or skip the pair. `MS2PROD=201.5:TOLERANCEMZ=0.5` puts the window bound exactly on scan 3's `201.0` peak, and MassQL excludes it; this file *is* the executed evidence for the strict half of Correction C37 (§1). A build that used inclusive bounds for conditions returns 1 row and fails here |
+| `fixtures/micro/micro_ms1var.mzML` | **`test_micro_ms1var.massql`** *(added Step 9)* | `goldens/query-results/micro_ms1var_results.json` | **1 row**, scan `2`. Two conditions ANDed across different MS levels (`MS1MZ=400.0 AND MS2PROD=200.0`) against the only fixture whose two MS1 scans differ, so it is the only golden that can catch an `MS1MZ` condition resolved against the wrong linked MS1 scan. Every value is hand-computable: `tic` 2000.0, `base_peak_i` 1500.0, `base_peak_mz` 200.0, `ms1_base_peak_i` 2000.0, and `ms1_i`/`ms1_precmz` **null** — a [Step 10](Tech_Step10.md) §3.2 tolerance miss on a file small enough to check by hand |
+| `fixtures/micro/micro_onbound.mzML` | **`test_micro_onbound.massql`** *(added Step 12)* | `goldens/query-results/micro_onbound_results.json` | **1 row**, scan `2`. The **inclusive** half of C37 (§1), at the precursor lookup rather than the conditions. The MS1 peak is at `499.99` — exactly `500.0 - 500.0 * 20 / 1e6` in IEEE-754, the same bits on both sides — so at the default tolerance the reference admits it: `ms1_i` `7000.0`, `ms1_precmz` `499.99`. An exclusive lookup returns `null` for both. `ms1_base_peak_i` is `9000.0`, a *different* peak in the same MS1 scan, so conflating the lookup with the scan-level base peak also fails |
 
 > ✅ **RESOLVED by Correction C40 — the MS1DATA shape is the SAME 12 keys as MS2DATA.** This paragraph read
 > *"The MS1DATA shape is 9 keys, not 4 (Correction C15) … Resolve the open decision in Step 10 §5 before writing
@@ -144,12 +169,12 @@ Fixtures and expected counts:
 > [cytoscape/cytoscape#26](https://github.com/cytoscape/cytoscape/issues/26) defines **one union schema**
 > discriminated by `mslevel`, with no key ever absent.
 >
-> **This file also contradicted itself** — `:139` said 9 keys while the `DifferentialIT` row said 4. Both now
+> **This file also contradicted itself** — the fixture table said 9 keys while the `DifferentialIT` row said 4. Both now
 > read one 12-key shape. The contract is [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md); do not restate it here.
 >
 > For the MS1DATA pair specifically: `precmz`/`ms1scan`/`charge` and the three `ms1_*` columns are **present and
 > `null`**, while **`base_peak_i`/`base_peak_mz` carry real values**. `small_mzml_ms1_results.json` was
-> regenerated accordingly — it was the only non-conforming golden of the 15.
+> regenerated accordingly — it was the only non-conforming golden of the 16.
 >
 > ⚠ **`tic` needs C34's relative 1e-6 on MS1DATA rows too.** Measured on MS1 scan 1: golden `69381840.0` vs our
 > exact `69381842.11895752`, relative **3.05e-08** — the same `float32` accumulation, so the tolerance is not
@@ -212,23 +237,44 @@ rule ([Step 7](Tech_Step7.md)), where all 687 links are now verified.
 
 Drive `cli.Main` as a subprocess.
 
-> ⚠ **How the JVM is launched was never specified** (Correction **C43**). This section said "as a subprocess"
-> and stopped, leaving `CliContractIT` to invent a command — and the one [Step 11](Tech_Step11.md) documented
-> could not have worked, since it put only the thin SDK jar on the classpath. Use the CLI uber-jar, which
-> bundles `antlr4-runtime` and `javolution`:
+This is a **subprocess** test in the `:cli` project — `cli/src/integrationTest/java` — because the thing under
+test is the assembled uber-jar and its real file descriptors. `Main.run(String[], PrintStream, PrintStream)` is
+package-private and already fully exercised in-process by [Step 11](Tech_Step11.md); calling it again here would
+test nothing new and would not prove the streams stay apart.
+
+**The build supplies both facts the test needs**, rather than the test guessing them:
+
+```groovy
+// cli/build.gradle -- integrationTest suite
+dependencies { implementation project(':') }
+targets.configureEach {
+    testTask.configure {
+        dependsOn tasks.named('shadowJar')          // the jar exists and is current
+        systemProperty 'cliJar', tasks.named('shadowJar').get().archiveFile.get().asFile
+    }
+}
+```
+
+```java
+// java.home rather than a bare "java": the forked JVM must be the one running the test.
+Path java = Paths.get(System.getProperty("java.home"), "bin", "java");
+Path cliJar = Path.of(System.getProperty("cliJar"));
+Process p = new ProcessBuilder(java.toString(), "-jar", cliJar.toString(),
+                spectra.toString(), query.toString(), "--output", out.toString())
+        .start();
+```
+
+> ⚠ **Two traps, both of which a first draft of this section fell into** (Corrections C43, C46):
 >
-> ```java
-> // `java.home` rather than a bare "java": the forked JVM must be the one running the test.
-> Path java = Paths.get(System.getProperty("java.home"), "bin", "java");
-> Path cliJar = TestPaths.repositoryRoot().resolve("cli/build/libs")   // built by :cli:shadowJar
->         .resolve("massql-java-cli-" + System.getProperty("cliVersion") + ".jar");
-> new ProcessBuilder(java.toString(), "-jar", cliJar.toString(),
->                    spectra.toString(), query.toString(), "--output", out.toString())
-> ```
+> - **Do not build the jar name from `System.getProperty("cliVersion")`.** `cliVersion` is a *Gradle* property
+>   from `gradle.properties`, not a JVM system property — it resolves to `null` and the path becomes
+>   `massql-java-cli-null.jar`. Have the build hand over the resolved path, as above; then a version bump
+>   cannot break the test.
+> - **Do not call `TestPaths.repositoryRoot()` from here.** It lives in the **SDK's** test source set, and
+>   `:cli` deliberately takes only the SDK's test *resources*, not its classes.
 >
-> The IT lives in `cli/src/integrationTest/java` and must depend on `:cli:shadowJar`, so the jar it forks is
-> guaranteed to exist and to be current. A test that silently skips because the jar is absent would reproduce
-> exactly the C26 failure.
+> `dependsOn shadowJar` is what makes the jar guaranteed present. A test that skipped because the jar was
+> missing would reproduce exactly the C26 failure.
 
 **Two independent properties, deliberately tested separately** (Correction C25c) — the original version asserted both at once by reading data off the pipe, which made
 a stream-hygiene regression present as a data mismatch and vice versa.
@@ -240,7 +286,7 @@ to inspect.
 | Assertion | Detail |
 |---|---|
 | Exit code 0 on success | |
-| `--precursor-tol-ppm` honoured | Two directions, both against real goldens rather than ad-hoc checks: the **default 20 ppm** run must match `small_mzml_results.json` (4 rows with null `ms1_i`/`ms1_precmz` and **populated `ms1_base_peak_i`**), and `--precursor-tol-ppm 60` must match `small_mzml_tol60_results.json` (all 6 populated). Same file, same query, differing only in that flag — the CLI-level proof of [Step 10](Tech_Step10.md) §3.2. Additionally check a deliberately absurd tolerance (0.001 ppm) nulls **all** matches while every `ms1_base_peak_i` survives |
+| `--precursor-tol-ppm` honoured | Two directions, both against real goldens rather than ad-hoc checks: the **default 20 ppm** run must match `small_mzml_results.json` (**6 rows**, of which **4** have null `ms1_i`/`ms1_precmz` with **populated `ms1_base_peak_i`**), and `--precursor-tol-ppm 60` must match `small_mzml_tol60_results.json` (all 6 populated). Same file, same query, differing only in that flag — the CLI-level proof of [Step 10](Tech_Step10.md) §3.2. Additionally check a deliberately absurd tolerance (0.001 ppm) nulls **all** matches while every `ms1_base_peak_i` survives |
 | Default is 20.0 | Omitting the flag reproduces the golden |
 
 The tight-tolerance case is the one to write first — it is the only place the `ms1_base_peak_i`-survives-a-miss
@@ -287,7 +333,7 @@ in `DIFFERENTIAL_REPORT.md`; they answer [`SPIKE.md`](SPIKE.md) §11 Q8.
 
 ### 6. The differential report
 
-`docs/DIFFERENTIAL_REPORT.md` is what the reviewer reads, and [Step 13](Tech_Step13.md)'s `make verify` table
+`docs/harness/DIFFERENTIAL_REPORT.md` is what the reviewer reads, and [Step 13](Tech_Step13.md)'s `make verify` table
 builds on it. Per format: rows expected vs matched, per-column pass/fail, any adopted tolerance with its
 justification, layer 3 results including the Pair B intersection size, and the performance numbers.
 
@@ -320,8 +366,8 @@ Answer these [`SPIKE.md`](SPIKE.md) §11 questions here, one sentence each: **Q2
 
 | Test | Type | Pins |
 |---|---|---|
-| `DifferentialIT` | IT | §1 for every fixture/golden pair, per-column policy, row count and order first. Includes the MS1DATA pair, which carries the **same 12 keys** as every other row (C40 — this row used to say "the MS1DATA 4-key shape", contradicting `:139`'s "9 keys" eight lines earlier). |
-| `ResultComparatorTest` | unit | The comparator itself: a single-bit intensity difference **fails**; a 1e-10 relative m/z difference **passes** and 1e-8 fails; null-vs-0.0 **fails**; a row-count mismatch reports counts. **Test the test** — a comparator that always passes yields a meaningless gate. |
+| `DifferentialIT` | IT | §1 for every fixture/golden pair, per-column policy, row count and order first. Includes the MS1DATA pair, which carries the **same 12 keys** as every other row (C40 — this row used to say "the MS1DATA 4-key shape" while the fixture table said "9 keys"). |
+| `ResultComparatorTest` | unit | The comparator itself: a single-bit intensity difference **fails**; on **`precmz`** a 1e-10 relative difference **passes** and 1e-8 **fails** — scoped to that column deliberately, because `ms1_precmz` on a 32-bit mzXML permits 1e-7 and the same comparator must accept 1e-8 in that mode; null-vs-0.0 **fails**; a row-count mismatch reports counts. **Test the test** — a comparator that always passes yields a meaningless gate. |
 | `CrossFormatEquivalenceIT` | IT | Pair A identical rows (or documented degradation, stated in the failure message); Pair B shared columns equal **and** `ms1_*` differing exactly per the table, with the intersection size reported. |
 | `CliContractIT` | IT | §3(a) via subprocess reading `--output FILE` — including the tight-tolerance case proving `ms1_base_peak_i` survives — **and** §3(b)'s stream-separation assertions, which include the piped-vs-`--output` byte-equality check that justifies (a)'s file-based comparison. |
 | `ErrorPathIT` | IT | Every §4 row, per format. |
@@ -330,17 +376,24 @@ Answer these [`SPIKE.md`](SPIKE.md) §11 questions here, one sentence each: **Q2
 
 ## Done when
 
-- [ ] `make verify` green.
-- [ ] The differential table reads **6/6 on `small.mzML`, 664/664 on `PlusRise.mgf`, and the full mzXML golden —
-      per column**.
-- [ ] The MS1DATA differential passes with the **same 12 keys** as every other row (C40): precursor keys
+- [x] `make test` and `make it` green, with **zero skips** (C26) — 699 tests: 551 SDK unit, 104 SDK
+      integration, 32 CLI unit, 12 CLI integration. `make verify` is [Step 13](Tech_Step13.md)'s wrapper and
+      is not this step's criterion — §Scope puts it there.
+- [x] The differential table reads **6/6 on `small.mzML`, 664/664 on `PlusRise.mgf`, 6/6 on `small.mzXML`,
+      3/3 on `DP00570_F02.mzxml` and 0/0 on its empty pair — per column**, and all 16 pairs pass.
+      **717 rows compared; 11 of the 12 columns bit-identical**, `tic` worst case 4.700e-8.
+- [x] The MS1DATA differential passes with the **same 12 keys** as every other row (C40): precursor keys
       **present and `null`**, `base_peak_i`/`base_peak_mz` **non-null**. This box used to require them "absent".
-- [ ] Layer 3 Pair A: identical rows, or a degradation documented and traced to [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md).
-- [ ] Layer 3 Pair B: shared columns equal, `ms1_*` differing exactly as predicted, intersection size reported.
-- [ ] CLI: all of §3, including the tight-tolerance case.
-- [ ] Every §4 error path behaves as specified; 200+ file cycles leak nothing.
-- [ ] `ResultComparatorTest` proves the comparator detects a single-bit difference.
-- [ ] `docs/DIFFERENTIAL_REPORT.md` has the per-format per-column table, any adopted tolerance with
+- [x] Layer 3 Pair A: **identical rows, not degraded** — [`CONVERSION_NOTES.md`](oracle/CONVERSION_NOTES.md)
+      records 34 `precursorScanNum` in `small.mzXML`, and `ms1scan` is asserted populated on both sides.
+      `ms1_precmz` differs by at most 2.929e-8 (C11); every other column is bit-identical.
+- [x] Layer 3 Pair B: shared columns equal, `ms1_*` and `charge` differing exactly as predicted,
+      **intersection size 0** — the scan ids are disjoint (C13), so no join is attempted.
+- [x] CLI: all of §3, including the tight-tolerance case at 0.001 ppm.
+- [x] Every §4 error path behaves as specified; 250 cycles per format (plus 750 interleaved and 250 on
+      `PlusRise.mgf`) leak nothing.
+- [x] `ResultComparatorTest` proves the comparator detects a single-bit difference.
+- [x] `docs/harness/DIFFERENTIAL_REPORT.md` has the per-format per-column table, any adopted tolerance with
       justification, performance numbers, and one-sentence answers to §11 Q2, Q6 and Q8.
 
 ## References

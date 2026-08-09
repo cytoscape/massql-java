@@ -89,10 +89,10 @@ public final class PrecursorLookup {
      * filters use {@code >} / {@code <} and therefore the exclusive variant. <b>The two genuinely differ
      * and must not be unified.</b>
      *
-     * <p>Switching this to the exclusive variant fails <i>silently</i>: the only symptom is a peak sitting
-     * exactly on a bound, which turns {@code ms1_i}/{@code ms1_precmz} from a value into null — columns
-     * Tech_Step12 compares at 1e-9, so it surfaces as an unexplained parity failure far from its cause.
-     * {@code PrecursorLookupTest} asserts the on-bound case directly for that reason.
+     * <p>The choice is asserted against the reference at two layers: {@code PrecursorLookupTest}
+     * exercises an on-bound peak directly on the store, and {@code DifferentialIT}'s
+     * {@code micro_onbound.mzML} pair exercises it end to end against a Python-generated golden whose
+     * {@code ms1_i} is 7000.0. The exclusive variant returns null for that peak and fails both.
      */
     private static IntRange candidates(SpectrumTable ms1, double precmz, double tolPpm) {
         double tol = precmz * tolPpm / 1e6;

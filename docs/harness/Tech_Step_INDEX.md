@@ -40,7 +40,7 @@ owning step.
 | [9](Tech_Step9.md) | Condition filters (9a required + 9b) | 4, 5, 8 | 2 d | | ✅ **DONE 2026-08-05 — 453 tests** |
 | [10](Tech_Step10.md) | `scaninfo` collation, result model, JSON | 9, 5 | 1.5 d | | ✅ **DONE 2026-08-06 — 542 tests** |
 | [11](Tech_Step11.md) | Public API surface + CLI | 10 | 0.5 d | | ✅ **DONE 2026-08-08 — 587 tests** |
-| [12](Tech_Step12.md) | Integration layers 2–4 + error paths | 11, 2, 8 | 1.5 d | ⛔ **GATE** | not started |
+| [12](Tech_Step12.md) | Integration layers 2–4 + error paths | 11, 2, 8 | 1.5 d | ⛔ **GATE** | ✅ **DONE 2026-08-08 — 699 tests, [GREEN](DIFFERENTIAL_REPORT.md)** |
 | [13](Tech_Step13.md) | Harden, document, hand off | 12 | 2 d | ⛔ **REVIEW** | not started |
 
 **Total ≈ 16 days** (SPIKE.md §7 estimated ~12; the delta is the finer integration split, plus what was
@@ -550,6 +550,54 @@ needs. Both are also **read at runtime by tests**, so their paths are code rathe
 links pointing out of the repo — which is why the move was verified by measurement rather than by inspection.
 Check 5's pattern also had to gain a `/`: it matched `docs/[A-Za-z_]+\.md`, so a subdirectory path would have
 stopped matching and the check would have covered *less* than before while still reporting green.
+
+<a id="c46"></a>
+**C46 — [Step 12](Tech_Step12.md)'s deliverables name a source set that has not existed since C43, and two of
+its own instructions cannot run.**
+
+**Fallout:** Tech_Step12.md, Tech_Step13.md, SPIKE.md
+
+Reviewed as its implementer before writing any code. The **comparison science is sound** — every tolerance was
+re-measured against the goldens and matched what the spec already stated, including C11's `4.9e-9 / 2.9e-8` for
+`ms1_precmz`. What was wrong is structural.
+
+1. **All five Java deliverables said `src/test/java/…/it/`.** C43 moved integration tests into their own Gradle
+   source set, `src/integrationTest/java`, and there is no `it` package. Repathed.
+2. **`CliContractIT` was specified in two projects at once** — the deliverables table put it in the SDK's unit
+   source set, while §3 put it in `cli/src/integrationTest/java`. §3 is right: it forks the uber-jar.
+3. **`ResultComparator` sat in `it/` while its test was typed *unit*.** A unit test cannot see the
+   `integrationTest` source set. Both non-IT classes moved to the unit set; `integrationTest` already depends on
+   `sourceSets.test.output`, so the ITs still reach them — the dependency runs one way only.
+4. **Three required tests had no deliverable row** (`ResultComparatorTest`, `ResourceLeakIT`, `PerformanceIT`),
+   which `spec-audit` check 4 would demand the moment the step is ticked.
+5. ⛔ **Two instructions added by C43 could not have run**, both introduced while fixing a different defect:
+   `System.getProperty("cliVersion")` returns **null** — it is a *Gradle* property, so the jar path resolved to
+   `massql-java-cli-null.jar` — and `TestPaths.repositoryRoot()` lives in the SDK's test source set, which
+   `:cli` cannot see. The build now hands the resolved jar path to the test as a system property, which also
+   makes a version bump unable to break it.
+6. **`make verify` was both out of scope (§Scope) and Done-when box 1.** The box is now this step's own suites;
+   the wrapper stays [Step 13](Tech_Step13.md)'s.
+
+**A JSON parser replaces hand-rolled regex for the goldens**, and the reasoning is worth recording because it
+reverses a convention. Three existing places parse JSON with regex, `ParityDump` citing
+`DEPENDENCY_POLICY.md` constraint 1 — *"Jackson discovers modules via ServiceLoader"*. But that constraint's
+**stated failure mechanism** is *"the thread-context classloader cannot see inside an OSGi bundle"*, and a test
+running under Gradle in a plain JVM has no bundle. The rule was applied outside its own mechanism, which the
+policy's preamble specifically warns against. `checkBannedDependencies` inspects `runtimeClasspath`, so a
+`testImplementation` dependency provably cannot reach the shipping closure.
+
+> ⛔ **The decisive argument is [C44](#c44).** That same hand-rolled `ParityDump` regex stopped at `polarity`
+> and silently dropped three columns, letting an MGF charge bug survive a **green** [Step 8](Tech_Step8.md) gate
+> for five steps. For the artifact that *is* the spike's exit criterion, a parser whose failure mode is silent
+> truncation is the wrong tool. `gson` (`testImplementation`, no `ServiceLoader` at all) reads the goldens, and
+> `GoldenResultsTest` proves it rejects a truncated or short file.
+
+**Path drift fixed with it.** `docs/DIFFERENTIAL_REPORT.md` → `docs/harness/DIFFERENTIAL_REPORT.md`, where
+`Makefile`:83 already looks and where its sibling `PARITY_REPORT.md` lives — written at the old path,
+`make report` would have printed "(not yet written)" forever. Goldens cited as `output/*.json`, the *oracle's*
+directory, now point at `goldens/query-results/` where C26 committed them. And `SPIKE.md` §6b, which Step 12
+names as **governing**, still carried the pre-C11/C34 tolerances and "identical rows" for Pair A; it now defers
+to Step 12 §1 rather than contradicting it.
 
 <a id="c45"></a>
 **C45 — a published library ships three artifacts, and the SDK's API reference is the javadoc jar, not

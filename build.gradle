@@ -25,6 +25,9 @@ version = sdkVersion          // gradle.properties; independent of cliVersion
 ext.antlrVersion = '4.13.2'
 ext.junitVersion = '5.11.4'
 
+// Test-only, in both projects. Declared once so the SDK and CLI suites cannot drift apart.
+ext.gsonVersion = '2.11.0'
+
 allprojects {
     apply plugin: 'com.diffplug.spotless'
     apply plugin: 'net.ltgt.errorprone'
@@ -174,6 +177,22 @@ dependencies {
 
     // The ANTLR *tool*, used only by generateGrammarSource. See the severing below.
     antlr "org.antlr:antlr4:${antlrVersion}"
+
+    // ⚠ TEST SCOPE ONLY -- reads the query-result goldens for Tech_Step12's differential.
+    //
+    // `checkBannedDependencies` inspects runtimeClasspath, so this provably cannot reach the 0.749 MB
+    // shipping closure, and `make audit` would fail if it did.
+    //
+    // This reverses the convention in ParityDump, which parses JSON with a regex citing
+    // DEPENDENCY_POLICY constraint 1 ("Jackson discovers modules via ServiceLoader"). That
+    // constraint's stated failure mechanism is "the thread-context classloader cannot see inside an
+    // OSGi bundle" -- a test in a plain JVM has no bundle, so the rule was applied outside its own
+    // mechanism (C46). The decisive argument is C44: that same regex silently stopped at `polarity`
+    // and dropped three columns, letting a reader bug survive a GREEN gate for five steps. For the
+    // artifact that IS the exit criterion, silent truncation is the wrong failure mode.
+    //
+    // gson rather than Jackson: one artifact, and it uses no ServiceLoader at all.
+    testImplementation "com.google.code.gson:gson:${gsonVersion}"
 }
 
 // ---------------------------------------------------------------------------------------------

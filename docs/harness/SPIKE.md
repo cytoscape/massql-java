@@ -316,9 +316,12 @@ Four layers, **each run against all three formats**:
    mismatch here means the decoder is wrong, and this is the cheapest place to learn that.
 2. **End-to-end differential.** Run the public API over each fixture with its query and diff against the
    Python golden. Per-column policy: exact on `scan`/`ms1scan`/`charge`/`mslevel`, relative 1e-9 on m/z,
-   bit-identical on intensities, exact null-vs-value.
+   bit-identical on intensities, exact null-vs-value. ⚠ Two refinements are **measured facts** and live in
+   [Step 12](Tech_Step12.md) §1, which is authoritative: `tic` is a `float32` accumulation on the reference
+   side and needs relative **1e-6** (C34), and `ms1_precmz` needs **1e-7** on a 32-bit mzXML (C11).
 3. **Same-data cross-format equivalence.** Two pairs, each testing something the other can't.
-   `small.mzML` / `small.mzXML` — same data, same query, identical rows including populated `ms1_*`;
+   `small.mzML` / `small.mzXML` — same data, same query, identical rows including populated `ms1_*` (⚠ except
+   `ms1_precmz`, where the mzXML's `precision="32"` truncates a *measured* m/z — C11);
    catches reader-specific bugs a per-format golden hides. `DP00570_F02.mzxml` / `DP00570_F02.mgf` — same
    experiment, and the rows must differ in exactly the way §3's format table predicts: the mzXML populates
    `ms1scan`/`ms1_*` **by document order** while the MGF nulls them, so this pair pins the format

@@ -12,7 +12,7 @@ one table, and judge whether the spike succeeded.
 
 | Step | Why |
 |---|---|
-| [Step 12](Tech_Step12.md) | Its gate must be green, and `docs/DIFFERENTIAL_REPORT.md` is the input to the `make verify` table. |
+| [Step 12](Tech_Step12.md) | Its gate must be green, and `docs/harness/DIFFERENTIAL_REPORT.md` is the input to the `make verify` table. It sits beside `PARITY_REPORT.md` in `docs/harness/`, which is where `Makefile`:83's `report` target looks; written to `docs/` as this row once said, that target would print "(not yet written)" forever (C46). |
 
 ## Context
 
@@ -309,7 +309,7 @@ exposure than [`SPIKE.md`](SPIKE.md) assumed.
 
 - [`SPIKE.md`](SPIKE.md) §7 Step 3 (this step), §8 (honest framing and the out-of-scope list), §9 (the constraints and the
   canary), §11 (the eight questions), §6d (build wiring and `make verify`), §10 (Phase-2 sketch — context only)
-- Inputs: [`PARITY_REPORT.md`](PARITY_REPORT.md) ([Step 8](Tech_Step8.md)), `docs/DIFFERENTIAL_REPORT.md`
+- Inputs: [`PARITY_REPORT.md`](PARITY_REPORT.md) ([Step 8](Tech_Step8.md)), `docs/harness/DIFFERENTIAL_REPORT.md`
   ([Step 12](Tech_Step12.md)), **[`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md)** ([Step 10](Tech_Step10.md) — renamed from the
   never-written `RESULT_CONTRACT.md` by **C40**, which folded it into the one existing definition),
   [`SEMANTICS.md`](SEMANTICS.md) ([Step 9](Tech_Step9.md)), [`VENDORED.md`](../VENDORED.md) ([Step 6](Tech_Step6.md), owned by

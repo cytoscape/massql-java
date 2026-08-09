@@ -129,9 +129,8 @@ class PrecursorLookupTest {
 
     @Test
     void aPeakExactlyONTheBoundISAcandidate() {
-        // ⛔ Correction C37, and the ONLY thing standing between a future refactor and a silent
-        // switch to
-        // mzWindowExclusive. Tech_Step10 §3.4 records this as verified by EXECUTION: at
+        // ⛔ Correction C37 at the unit layer; DifferentialIT's micro_onbound.mzML pair asserts the
+        // same property end to end. Tech_Step10 §3.4 records this as verified by EXECUTION: at
         // --precursor-tol-ppm 7.8125 the reference returns ms1_i = 1000.0.
         //
         // Why 7.8125: 500.0 * 7.8125 / 1e6 = 0.00390625, and 500.0 - 0.00390625 = 499.99609375

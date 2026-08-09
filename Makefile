@@ -39,8 +39,11 @@ test:
 	$(GRADLE) test
 
 ## it: integration tests only (*IT.java in src/integrationTest). Fast gate re-check.
+#
+# Both projects. `integrationTest` alone resolves to the ROOT project's task, so the CLI contract
+# suite -- which forks the uber-jar -- would never run (C46).
 it:
-	$(GRADLE) integrationTest
+	$(GRADLE) integrationTest :cli:integrationTest
 
 ## verify: unit + integration + coverage gate + lint + banned deps, then audit and spec-audit. What the reviewer runs.
 verify:

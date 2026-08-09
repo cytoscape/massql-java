@@ -50,6 +50,7 @@ Governing sections: [`SPIKE.md`](SPIKE.md) §6c, §7 Step 0.
 | **Two multi-precursor variants** (added in Step 8) | `micro_multiprec.mzXML` — two `<precursorMz>` elements, the second a decoy — and `micro_multiprec.mzML`, which adds a second `<selectedIon>` **and** a second `<precursor>`, so honouring one nesting level but not the other still fails. Added by Correction **C31**: MassQL indexes `[0]`, and no existing fixture had more than one precursor, so a last-wins reader passed everywhere |
 | **`fixtures/micro/micro_zeroint.mgf`** (added in Step 9) | **Zero-intensity peaks.** Correction **C36**: MGF *drops* them while mzML/mzXML keep them, and no fixture contained one, so the divergence was invisible. One block is entirely zeros and therefore reduces to a zero-peak scan — MassQL emits no rows for it at all, making this the fixture's second job: it is the MGF case where a scan vanishes from the dataframe but not from our reader (exactly one reader-only scan) |
 | **`fixtures/micro/micro_ms1var.mzML`** (added in Step 9) | **Two MS1 scans with *different* peaks.** Correction **C37**: every other fixture's MS1 scans are identical, so nothing could distinguish an `MS1MZ` condition evaluated against the correct linked MS1 scan from one evaluated against the wrong scan, nor discriminate condition **evaluation order**. Condition-order independence was proven from the reference source *and* here; a rule with no fixture able to falsify it is the recurring failure shape this whole harness exists to catch. Every scan has peaks, so nothing is reader-only |
+| **`fixtures/micro/micro_onbound.mzML`** (added in Step 12) | **An MS1 peak exactly on the precursor-lookup window bound.** The complement of `micro_mzml_edge`: that fixture pins the **strict** half of Correction **C37** (Step 9's condition windows, exclusive), this one pins the **inclusive** half ([Step 10](Tech_Step10.md)'s lookup). Its MS1 peak is at `499.99`, which *is* `500.0 - 500.0 * 20 / 1e6` in IEEE-754 — bit-identical in CPython and Java — so at the default tolerance the reference's `>=` matches it and `ms1_i` is `7000.0`, while an exclusive lookup yields `null`. Its `ms1_base_peak_i` is a **different** peak (`9000.0`), so conflating the two also fails. Every scan has peaks, so nothing is reader-only |
 | `fixtures/micro/EXPECTED.md` | Hand-computed expected values per micro-fixture, with the arithmetic shown |
 | `fixtures/edge/empty_msLevel_tag.mzXML` | From MSDK's `msdk-io-mzxml` test resources |
 | `output/*_results.json` | One golden per (fixture, query) pair — see the matrix below |
@@ -198,8 +199,10 @@ golden in `oracle/generate-all.sh` and in `oracle/reproduce-goldens.sh`.
 | `fixtures/micro/micro.mzML` | **`test_micro_edge.massql`** *(added Step 9)* | *(defaults)* | `output/micro_mzml_edge_results.json` | **0 records — and an empty golden is a real assertion, not a missing one.** `MS2PROD=201.5:TOLERANCEMZ=0.5` puts the window bound exactly on scan 3's `201.0` peak; MassQL returns nothing, which is the executed proof of the **strict** half of Correction **C37**. A reader that used inclusive bounds for conditions would return a row here |
 | `fixtures/micro/micro_ms1var.mzML` | **`test_micro_ms1var.massql`** *(added Step 9)* | *(defaults)* | `output/micro_ms1var_results.json` | **1 record**, scan `2`. Two conditions ANDed across *different* levels (`MS1MZ=400.0` and `MS2PROD=200.0`), which only this fixture can discriminate. Note `ms1_i`/`ms1_precmz` are **null** while `ms1_base_peak_i` is `2000.0` — the [Step 10](Tech_Step10.md) §3.2 rule again, on a hand-computable file |
 
-Both Step 9 queries live in `goldens/queries/` alongside the others, per §5's rule that a golden records the
-query and flags it was produced with.
+| `fixtures/micro/micro_onbound.mzML` | **`test_micro_onbound.massql`** *(added Step 12)* | *(defaults)* | `output/micro_onbound_results.json` | **1 record**, scan `2`. `ms1_i` = `7000.0` and `ms1_precmz` = `499.99` — the peak sitting exactly on the 20 ppm lower bound, which the reference's **inclusive** lookup window admits. `ms1_base_peak_i` = `9000.0` is a different peak in the same MS1 scan |
+
+The Step 9 and Step 12 queries live in `goldens/queries/` alongside the others, per §5's rule that a golden
+records the query and flags it was produced with.
 
 Create `test_ms1.massql` containing a `scaninfo(MS1DATA)` query — e.g.
 `QUERY scaninfo(MS1DATA) WHERE MS1MZ=810.79:TOLERANCEMZ=1.0` — so the MS1DATA path has a golden.
@@ -280,8 +283,9 @@ Scripts, verified by running them:
 - [x] All goldens exist; the two pre-existing ones still reproduce bit-identically; the MS1DATA
       golden confirmed to have precursor keys **present and `null`** — ⚠ this box read *"absent, not null"* and is
       inverted by **C40**. **The count also read "All 13 goldens" and the count
-      is now 15** — Step 9 added `micro_mzml_edge_results.json` and `micro_ms1var_results.json`. Counts that
-      later steps grow are exactly what `make spec-audit` checks, rather than a number maintained by hand.
+      is now 16** — Step 9 added `micro_mzml_edge_results.json` and `micro_ms1var_results.json`, and Step 12
+      added `micro_onbound_results.json`. Counts that later steps grow are exactly what `make spec-audit`
+      checks, rather than a number maintained by hand.
 - [x] `oracle/loader-parity/` has one gzipped file per fixture (4.7 MB total; digests, not full hex arrays), floats as hex, with per-scan peak counts and intensity
       sums. **16 dumps** as of C37; see [Step 8](Tech_Step8.md) §2 for the authoritative list.
 - [x] The `small.mzML` vs `small.mzXML` golden comparison is recorded, whatever the result.

@@ -54,6 +54,75 @@ tasks.named('test') {
     dependsOn rootProject.tasks.named('processTestResources')
 }
 
+// ---------------------------------------------------------------------------------------------
+// Integration tests -- the CLI contract, which only a real subprocess can establish
+// ---------------------------------------------------------------------------------------------
+//
+// Separate from the unit suite for the same reason the SDK's is: these fork a JVM per case and read
+// multi-megabyte fixtures, so they stay out of the edit loop.
+//
+// ⚠ The thing under test is the ASSEMBLED UBER-JAR, not Main.run. Step 11 already exercises
+// Main.run(String[], PrintStream, PrintStream) in-process and owns the payload-shape assertions;
+// what an in-process test cannot establish is that real file descriptors keep stdout and stderr
+// apart, which is the whole reason this suite exists (Tech_Step12 §3(b), C25c).
+testing {
+    suites {
+        integrationTest(JvmTestSuite) {
+            useJUnitJupiter(rootProject.ext.junitVersion)
+            dependencies {
+                implementation project()
+            }
+            targets.configureEach {
+                testTask.configure {
+                    shouldRunAfter(test)
+
+                    // The build hands the test the jar it must fork, resolved rather than guessed.
+                    //
+                    // ⛔ Do NOT reconstruct this path from a version string. `cliVersion` is a Gradle
+                    // property, not a JVM system property, so System.getProperty("cliVersion") is
+                    // null and the path becomes massql-java-cli-null.jar (C46). Passing the resolved
+                    // file also means a version bump cannot break the test.
+                    dependsOn tasks.named('shadowJar')
+                    systemProperty 'cliJar',
+                            tasks.named('shadowJar').get().archiveFile.get().asFile.absolutePath
+
+                    // Same spectra fixtures and .massql queries the goldens were generated from.
+                    dependsOn rootProject.tasks.named('processTestResources')
+                }
+            }
+        }
+    }
+}
+
+// Mirrors the SDK's wiring (root build.gradle): without these the IT suite gets its own empty
+// configurations -- no JUnit, no CliFixtures, and none of the SDK's test resources, so every
+// fixture lookup would fail at runtime rather than at configuration time.
+configurations {
+    integrationTestImplementation.extendsFrom testImplementation
+    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+dependencies {
+    // CliFixtures lives in cli's unit suite and is package-private to ...massql.cli; the IT is in
+    // that same package, so it reuses the lookup rather than carrying a second copy.
+    integrationTestImplementation sourceSets.test.output
+
+    // The contract test must inspect the CLI's JSON payload -- row count and which columns are null.
+    // Hand-rolling that parse is the C44 failure mode (a regex that stops early and silently drops
+    // columns) applied to the artifact that proves the CLI contract. Test-only: checkBannedDependencies
+    // inspects runtimeClasspath, which this cannot reach, and the uber-jar is built from `implementation`.
+    integrationTestImplementation "com.google.code.gson:gson:${rootProject.ext.gsonVersion}"
+}
+
+configurations {
+    integrationTestImplementation.extendsFrom testImplementation
+    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+tasks.named('check') {
+    dependsOn testing.suites.integrationTest
+}
+
 // Same bar as the SDK. The root gate excluded this project only while it held a single
 // package-info.java; once Main.java exists that exemption would just be an unenforced floor, which
 // is exactly what `make skipcheck` was before C43 replaced it.
