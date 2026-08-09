@@ -184,11 +184,12 @@ Do not make callers parse diagnostics out of a log they cannot see.
 > `Massql.execute` in-process, never this CLI. See *Terminology* in
 > [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md).
 
-Mirror `massql_query.py`'s interface, plus one addition:
+Mirror `massql_query.py`'s interface, then extend it where a batch filter needs more than the reference
+offers:
 
 ```
 java -jar massql-java-cli-<version>.jar \
-     <spectra-file> <query-file> [--precursor-tol-ppm 20] [--output FILE]
+     <spectra-file> [<query-file>|-] [-q QUERY] [--precursor-tol-ppm 20] [--output FILE]
 ```
 
 > ⚠ **This replaces a command that could never have run** (Correction **C43**). The original form,
@@ -200,11 +201,12 @@ java -jar massql-java-cli-<version>.jar \
 |---|---|
 | **stdout** (default output mode) | The JSON array, and **nothing else**. Ever. |
 | **stderr** | All progress, warnings and diagnostics — on **every** output mode. Matches the Python wrapper's deliberate redirect. |
-| Positional args | `<spectra-file>` then `<query-file>`, same order as Python |
+| Positional args | `<spectra-file>` then the query, same order as Python |
+| **Query source** | **Exactly one** of: `<query-file>`, `-` (stdin), or `-q`/`--query STRING`. See the rules below |
 | `--precursor-tol-ppm` | double, default **20.0** |
 | `--output FILE` | JSON → `FILE`; **nothing** on stdout. See the atomicity rule below |
 | `--output -` | Explicit stdout; identical to omitting the flag |
-| Query file handling | Read whole file, `.strip()` equivalent; empty → error, exit 2 |
+| Query handling | Whole source read, `.strip()` equivalent applied to **all three**; empty → error, exit 2, naming which source was empty |
 | Exit 0 | Success, **including a query that matched nothing** (`[]`) |
 | Exit 1 | Execution failure — a file that exists and is readable but whose **content** will not parse |
 | Exit 2 | Usage error — bad args, missing file, empty query, unsupported query, unwritable `--output` path |
@@ -219,6 +221,36 @@ java -jar massql-java-cli-<version>.jar \
 > non-empty → any failure is exit **2**. Once past that gate, any `MassqlException` from reading the content is
 > exit **1**. No public API change, and the rule reads the way the table does: *could the user have known from
 > the command line alone?*
+
+**Three query sources, exactly one per invocation.** The reference takes a file only; a batch filter that
+composes into a shell pipeline needs more than that, and quoting a long query inline is worse than piping
+it.
+
+| Form | Meaning |
+|---|---|
+| `<query-file>` | read that file |
+| `-` in the query position | read **stdin** — symmetric with `--output -` already meaning stdout |
+| `-q`, `--query STRING` | the query inline |
+
+- **Zero sources → exit 2**, with a message naming all three forms. `<spectra-file>` stays required.
+- **Two or more → exit 2.** ⛔ **No precedence rule, deliberately.** A caller who supplied two is unsure
+  which one runs, and silently picking one hides exactly the confusion worth reporting. The rejection
+  names the sources it found.
+- **A repeated `-q` is last-wins**, not an error — overriding one flag is ordinary, and
+  `--precursor-tol-ppm` already behaves that way. Mixing two *different* sources is the error.
+- **Empty or whitespace-only from any source → exit 2**, naming which one.
+- **A failed stdin read is exit 2**, not 1. Exit 1 is defined as *spectra content* that will not parse,
+  which this is not — and it matches the pre-existing treatment of an unreadable query file.
+- ⚠ **`-` is rejected in the spectra position**, with a message saying why: readers memory-map their
+  input and sniff the format from the head, so a non-seekable stream cannot work. A bare "unknown
+  option" would send the user looking in the wrong place.
+- ⚠ **`-` with no pipe blocks until EOF**, exactly as `cat -` does. That is correct for an *explicit*
+  dash, and is why stdin is never selected implicitly: an omitted argument must fail, not hang. An
+  invocation with a file or inline query never reads stdin at all.
+
+`.strip()` applies to every source, so **all three produce byte-identical output** for the same query.
+That equality is the property to assert — it is what keeps three front doors from becoming three query
+paths.
 
 **Why stdout stays the default.** The Java CLI is a batch filter, so the Unix convention applies: stdout
 carries the program's data, stderr carries diagnostics — which is what makes `| jq` work, and what the
@@ -309,7 +341,9 @@ on it. So:
 |---|---|---|
 | `MassqlApiTest` | unit | `run` closes what it opened, including on exception (use a probe path or a wrapper asserting `close` ran); `execute` does **not** close the caller's file; null `opts` → defaults; empty result is an empty immutable list, never null; results ordered by ascending scan id. |
 | `ApiEncapsulationTest` | unit | No MSDK / ANTLR / `io.vendor` type in any public signature — reflect over the public API and assert every parameter and return type is a JDK type or one of ours. Cheap, and it is the check that keeps the parser and reader swappable. |
-| `MainTest` | unit | Arg parsing: order, `--precursor-tol-ppm` parsing and default, missing args → exit 2, empty query file → exit 2. |
+| `MainTest` | unit | Arg parsing: order, `--precursor-tol-ppm` parsing and default, a missing `<spectra-file>` → exit 2, an extra positional → exit 2, an unknown option → exit 2. |
+| `MainQuerySourceTest` | unit | The three query sources. Each form runs; **⛔ all three produce byte-identical stdout** for the same query — the assertion that keeps three front doors from becoming three query paths. Zero sources → 2 naming all three forms; every pairwise combination and all three together → 2, even when the sources agree; empty/blank file, stdin and `--query` → 2 each naming its source; `-` as spectra → 2 with the reason; repeated `-q` is last-wins; stdin is **not** read when another source was given (the property that stops a hang); `--output -` and a query `-` do not interfere. Stdin is driven through `Main.run`'s `InputStream` parameter, never `System.setIn`. |
+| `UsageDocSyncTest` | unit | `docs/CLI.md` documents every option `--help` prints, compared against the **actual output** rather than the `USAGE` field — the docs reproduce that block by hand, and nothing else keeps them in step. |
 | `MainStreamDisciplineTest` | unit | **Owns the payload-shape half of stream hygiene** (C25c). Capture both streams via the `PrintStream` parameters — not `System.setOut` — and assert stdout is **only** the JSON array plus a trailing newline, while a run that emits diagnostics puts them on stderr and leaves stdout parseable. ⚠ This row claimed [Step 12](Tech_Step12.md) *"delegates here rather than re-asserting it"*, which overstates it (Correction **C42**): Step 12 §3(b) keeps the assertions **only a forked process can make** — that real file descriptors keep the streams apart, which an in-process capture cannot establish however carefully it is written. The two are complements, not a delegation. |
 | `MainOutputFileTest` | unit | `--output FILE` writes the JSON to `FILE` and leaves stdout **empty**; the bytes are **identical** to what the same run puts on stdout without the flag (this is what proves the single-writer rule); `--output -` behaves as stdout; no `FILE.tmp` survives a successful run; an unwritable path exits 2 with **no output file and no temp file** left behind. |
 | `MainExitCodeTest` | unit | 0 on success; **0 with `[]` on a no-match query**; 1 on a malformed spectra file; 2 on an unsupported query, with the offending construct named on stderr. |
@@ -329,12 +363,23 @@ on it. So:
 - [x] **A drained stream handed to `execute` throws** rather than returning an empty list
       (`MassqlApiTest.aSpentStreamFailsLoudlyRatherThanReturningNothing`), and `docs/SDK.md` states the
       reopen-per-query rule.
-- [x] `Main.run(String[], PrintStream, PrintStream)` returns the exit code and **never** calls `System.exit`;
-      only `main` does — which is the only reason `MainExitCodeTest` can assert exit codes at all.
-- [x] CLI arg order, flag and default match `massql_query.py`. The run against `data/small.mzML` +
-      `test_mzml.massql` is **automated**, not manual: it produces 6 rows whose scan ids and 12 keys match
-      `small_mzml_results.json`, with the only value differences being the 6 `tic` figures at relative ~1e-8 —
-      the float32 accumulation error C34 documents on the *reference* side.
+- [x] `Main.run(String[], InputStream, PrintStream, PrintStream)` returns the exit code and **never** calls
+      `System.exit`; only `main` does — which is the only reason `MainExitCodeTest` can assert exit codes at
+      all. All three streams are parameters, so no test needs `System.setIn`/`setOut`.
+- [x] CLI arg order, flag and default match `massql_query.py`, and the query sources deliberately **exceed**
+      it: the reference takes a file only, while this CLI also accepts `-` for stdin and `-q`/`--query`
+      inline. The run against `data/small.mzML` + `test_mzml.massql` is **automated**, not manual: it
+      produces 6 rows whose scan ids and 12 keys match `small_mzml_results.json`, with the only value
+      differences being the 6 `tic` figures at relative ~1e-8 — the float32 accumulation error C34 documents
+      on the *reference* side.
+- [x] **The three query sources produce byte-identical output** for the same query, and every rejection
+      (none given, more than one, blank from any source, `-` as spectra) exits 2 with stdout untouched —
+      `MainQuerySourceTest`. A real pipe through the assembled jar is `CliContractIT`'s, since only a fork
+      proves `main` wires `System.in` through.
+- [x] `docs/CLI.md` carries **runnable examples** using fixtures committed to this repository, spanning all
+      three formats, both `MS1DATA` and `MS2DATA`, and all three query sources. Every `(fixture, query)`
+      pair is one `DifferentialIT` already asserts, so the documented row counts are test-backed.
+      `UsageDocSyncTest` keeps the documented options in step with `--help`.
 - [x] All four exit codes verified, including 0-with-`[]` (`MainExitCodeTest`, one test per code plus one
       asserting they stay distinct).
 - [x] stdout is provably free of diagnostics and stack traces on every path — `MainStreamDisciplineTest`

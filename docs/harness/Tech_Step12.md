@@ -288,9 +288,13 @@ to inspect.
 | Exit code 0 on success | |
 | `--precursor-tol-ppm` honoured | Two directions, both against real goldens rather than ad-hoc checks: the **default 20 ppm** run must match `small_mzml_results.json` (**6 rows**, of which **4** have null `ms1_i`/`ms1_precmz` with **populated `ms1_base_peak_i`**), and `--precursor-tol-ppm 60` must match `small_mzml_tol60_results.json` (all 6 populated). Same file, same query, differing only in that flag — the CLI-level proof of [Step 10](Tech_Step10.md) §3.2. Additionally check a deliberately absurd tolerance (0.001 ppm) nulls **all** matches while every `ms1_base_peak_i` survives |
 | Default is 20.0 | Omitting the flag reproduces the golden |
+| **A query piped into stdin** | ⛔ The one query-source case that belongs here rather than in [Step 11](Tech_Step11.md). `MainQuerySourceTest` drives `Main.run`'s `InputStream` parameter and covers every rule about the three sources; what it **cannot** prove is that `main` hands `System.in` to `run` — a one-line wiring slip that would leave every in-process test green while `cat q.massql \| massql-java-cli …` hung or read nothing. Write the query to the forked process's stdin, close it, and assert the payload is **byte-identical** to the same query supplied as a file. An inline `-q` case runs here too, but only to confirm the argument survives the jar boundary; it has no stream plumbing to get wrong |
 
 The tight-tolerance case is the one to write first — it is the only place the `ms1_base_peak_i`-survives-a-miss
 rule is observable from outside the SDK.
+
+⚠ Always close the forked process's stdin, whether or not this test writes to it. Left open, any invocation
+that reads stdin waits for EOF forever — correct CLI behaviour, and a hung suite.
 
 **(b) Stream hygiene — the one thing only a subprocess can prove.** [Step 11](Tech_Step11.md)'s
 `MainStreamDisciplineTest` owns the payload-shape assertions in-process; keep here only what an

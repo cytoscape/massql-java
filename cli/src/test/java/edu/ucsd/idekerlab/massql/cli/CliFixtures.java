@@ -2,8 +2,10 @@ package edu.ucsd.idekerlab.massql.cli;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
@@ -91,14 +93,25 @@ final class CliFixtures {
         }
     }
 
-    /** Runs the CLI in-process and captures both streams. */
+    /**
+     * Runs the CLI in-process with <b>empty</b> stdin and captures both streams.
+     *
+     * <p>Empty rather than {@code System.in}: a test that accidentally selected the stdin source would
+     * otherwise block on the terminal forever instead of failing.
+     */
     static Invocation invoke(String... args) {
+        return invokeWithStdin("", args);
+    }
+
+    /** Runs the CLI in-process with {@code stdin} as its standard input. */
+    static Invocation invokeWithStdin(String stdin, String... args) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
+        InputStream in = new ByteArrayInputStream(stdin.getBytes(StandardCharsets.UTF_8));
         int code;
         try (PrintStream o = new PrintStream(out, true, StandardCharsets.UTF_8);
                 PrintStream e = new PrintStream(err, true, StandardCharsets.UTF_8)) {
-            code = Main.run(args, o, e);
+            code = Main.run(args, in, o, e);
         }
         return new Invocation(
                 code, out.toString(StandardCharsets.UTF_8), err.toString(StandardCharsets.UTF_8));

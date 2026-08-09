@@ -28,13 +28,11 @@ published `-javadoc.jar`**, not prose in this repository.
 
 ### 🖥 [`massql-java-cli`](docs/CLI.md) — the command-line tool
 
-A standalone uber-jar. Spectra file in, JSON on stdout, exit code that means something.
+A standalone uber-jar. Spectra file in, JSON on stdout, exit code that means something. The query can
+come from a file, from stdin, or inline as `--query`.
 
-```sh
-java -jar massql-java-cli-<version>.jar spectra.mzML query.massql | jq '.[0].scan'
-```
-
-→ **[docs/CLI.md](docs/CLI.md)** for arguments, streams, output modes and exit codes.
+→ **[docs/CLI.md](docs/CLI.md)** for arguments, streams, output modes and exit codes, plus
+**runnable examples** against fixtures committed to this repository — paste them as written.
 
 > The separation is not cosmetic. The CLI treats stdout as a data pipe; the SDK writes to no stream
 > at all. Conflating the two is how a library ends up printing into someone else's application, so

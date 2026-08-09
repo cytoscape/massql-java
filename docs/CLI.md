@@ -1,14 +1,17 @@
 # massql-java-cli — the command-line tool
 
-A standalone batch filter: give it a spectra file and a query file, get JSON on stdout. Distributed
+A standalone batch filter: give it a spectra file and a query, get JSON on stdout. Distributed
 as an uber-jar, so it needs nothing on the classpath.
 
 ```sh
 java -jar massql-java-cli-<version>.jar spectra.mzML query.massql | jq '.[0].scan'
 ```
 
+The query can come from a **file**, from **stdin**, or **inline** — see [Examples](#examples).
+
 Its argument order and defaults mirror the reference implementation `massql_query.py`, so the two can
-be run over the same inputs and compared directly.
+be run over the same inputs and compared directly; the extra query sources and `--output` are
+deliberate additions on top of that interface.
 
 ---
 
@@ -32,18 +35,121 @@ make cli            # -> cli/build/libs/massql-java-cli-<version>.jar
 ## Usage
 
 ```
-massql-java-cli <spectra-file> <query-file> [options]
+massql-java-cli <spectra-file> [<query-file>|-] [options]
 
   <spectra-file>   .mgf, .mzML or .mzXML (format is sniffed from content, not extension)
   <query-file>     file containing one MassQL query
+  -                read the query from stdin
 
 Options:
+  -q, --query <STRING>           the query itself, inline
   --precursor-tol-ppm <double>   tolerance for matching the precursor peak in MS1 (default 20.0)
   --output <FILE|->              write JSON to FILE; '-' means stdout (the default)
   -h, --help                     this message
 ```
 
-The query comes from a **file**, not an argument — matching the reference implementation.
+## Where the query comes from
+
+Exactly **one** of three sources, always chosen explicitly:
+
+| Form | Use it when |
+|---|---|
+| `<query-file>` | the query lives in a `.massql` file |
+| `-` | you are piping the query in |
+| `-q`, `--query` | it is a one-liner |
+
+Giving **none**, or **more than one**, is a usage error (exit 2). There is deliberately no precedence
+rule: two sources means it is unclear which one runs, and quietly choosing for you would hide that. A
+repeated `-q` is an ordinary last-wins override.
+
+Whitespace is stripped from every source, so all three produce **identical output** for the same query
+— a heredoc's trailing newline changes nothing.
+
+> ⚠ `-` selects stdin for the **query** only. The spectra file must be a real path: readers memory-map
+> it and sniff the format by reading the head, so a non-seekable stream cannot work.
+
+## Examples
+
+Every command below runs against a fixture **committed to this repository**, so you can paste them as
+written after cloning — no data of your own, and no download. Paths are relative to the repo root.
+
+> The `data/DP00570_F02.*` fixtures are *not* used here: those are fetched by `make fixtures` rather
+> than committed. Everything referenced below ships in the repo.
+
+Build the jar first with `make cli`, then set:
+
+```sh
+JAR=cli/build/libs/massql-java-cli-0.1.0-SNAPSHOT.jar
+RES=src/test/resources
+```
+
+**A query file** — the classic form. 6 rows from a 48-spectrum mzML:
+
+```sh
+java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql | jq length
+# 6
+```
+
+**Inline with `-q`** — best for a short query. 2 rows from the tiny mzML fixture:
+
+```sh
+java -jar $JAR $RES/fixtures/micro/micro.mzML \
+  -q 'QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.5:TOLERANCEMZ=0.5' | jq length
+# 2
+```
+
+**Inline, MS1 scans** — `MS1DATA` selects survey scans instead of fragmentation ones, so the same file
+yields a different set. 14 rows:
+
+```sh
+java -jar $JAR $RES/data/small.mzML \
+  -q 'QUERY scaninfo(MS1DATA) WHERE MS1MZ=810.79:TOLERANCEMZ=1.0' | jq length
+# 14
+```
+
+**Piped from stdin with `-`** — the form to reach for when the query is long. This one ANDs three
+product-ion conditions across a 34,513-spectrum MGF and returns 664 rows:
+
+```sh
+cat $RES/goldens/queries/test.massql | java -jar $JAR $RES/data/PlusRise.mgf - | jq length
+# 664
+```
+
+**Stdin from a heredoc** — no temp file, no shell quoting to fight. 6 rows from the mzXML:
+
+```sh
+java -jar $JAR $RES/data/small.mzXML - <<'EOF' | jq length
+QUERY scaninfo(MS2DATA) WHERE MS2PREC=810.79:TOLERANCEMZ=1.0
+EOF
+# 6
+```
+
+**Inline, writing to a file** — `--output` keeps stdout empty, so nothing needs redirecting. 2 rows
+from the MGF fixture:
+
+```sh
+java -jar $JAR $RES/fixtures/micro/micro.mgf \
+  -q 'QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.5:TOLERANCEMZ=0.5' \
+  --output /tmp/hits.json
+jq length /tmp/hits.json
+# 2
+```
+
+**Widening the precursor tolerance** — the same file and query, twice, differing only in the flag.
+At the default 20 ppm four of the six rows have a null `ms1_i`; at 60 ppm all six are populated:
+
+```sh
+java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql \
+  | jq '[.[] | select(.ms1_i == null)] | length'
+# 4   -- four of the six precursors fall outside a 20 ppm window
+
+java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql --precursor-tol-ppm 60 \
+  | jq '[.[] | select(.ms1_i == null)] | length'
+# 0   -- at 60 ppm every one of the six matches
+```
+
+Each `(fixture, query)` pair above is one the differential test suite already asserts against the
+Python reference, so the row counts are pinned by tests rather than typed by hand.
 
 ## Streams
 

@@ -89,6 +89,16 @@ class CliContractIT {
      * {@code java} would resolve to on {@code PATH}.
      */
     private static Run fork(Object... args) {
+        return forkWithStdin(null, args);
+    }
+
+    /**
+     * Forks with {@code stdin} written to the child's standard input, then closed.
+     *
+     * <p>Written before the pipes are drained, which is safe only because a query is small enough to
+     * fit the pipe buffer; the payload coming back is the large direction and is read below.
+     */
+    private static Run forkWithStdin(String stdin, Object... args) {
         List<String> cmd = new ArrayList<>();
         cmd.add(Paths.get(System.getProperty("java.home"), "bin", "java").toString());
         cmd.add("-jar");
@@ -97,6 +107,13 @@ class CliContractIT {
 
         try {
             Process p = new ProcessBuilder(cmd).start();
+
+            // Always close the child's stdin. Left open, an invocation that reads stdin would wait
+            // for EOF forever -- which is correct CLI behaviour and a hung test.
+            try (java.io.OutputStream childIn = p.getOutputStream()) {
+                if (stdin != null) childIn.write(stdin.getBytes(StandardCharsets.UTF_8));
+            }
+
             // Read both pipes fully BEFORE waitFor: a process that fills a pipe buffer blocks
             // forever otherwise, and this CLI can emit a multi-megabyte array.
             byte[] out = p.getInputStream().readAllBytes();
@@ -252,6 +269,48 @@ class CliContractIT {
                 readBytes(explicit),
                 "omitting --precursor-tol-ppm must be identical to passing 20 -- the usage text"
                         + " promises '(default 20.0)'");
+    }
+
+    /**
+     * ⛔ A query arriving over a <b>real pipe</b>, which is the one thing only a fork can establish.
+     *
+     * <p>{@code MainQuerySourceTest} drives the {@code InputStream} parameter directly and covers every
+     * rule about the three sources. What it cannot prove is that {@code main} actually hands
+     * {@code System.in} to {@code run} — a one-line wiring mistake that would leave every in-process
+     * test green while `cat q.massql | massql-java-cli …` hung or read nothing.
+     *
+     * <p>The result is compared byte-for-byte against the same query supplied as a file, so this asserts
+     * the pipe is genuinely equivalent rather than merely non-empty.
+     */
+    @Test
+    void aQueryPipedIntoStdinIsEquivalentToTheFileForm(@TempDir Path dir) {
+        String query = readString(CliFixtures.standardQuery());
+        assertFalse(query.isBlank(), "the query fixture must have content, or this proves nothing");
+
+        Path viaFile = dir.resolve("file.json");
+        fork(CliFixtures.smallMzml(), CliFixtures.standardQuery(), "--output", viaFile);
+
+        Run piped = forkWithStdin(query, CliFixtures.smallMzml(), "-");
+
+        assertEquals(0, piped.exit(), () -> "piped query failed: " + piped.err());
+        assertEquals(6, parseArray(piped.out(), "the piped-query payload").size());
+        assertArrayEquals(
+                readBytes(viaFile),
+                piped.stdout(),
+                "a query on stdin must produce exactly what the same query in a file produces");
+    }
+
+    /** An inline {@code --query} survives the jar boundary too — quoting is the only risk here. */
+    @Test
+    void anInlineQueryWorksThroughTheAssembledJar() {
+        Run r =
+                fork(
+                        CliFixtures.smallMzml(),
+                        "-q",
+                        "QUERY scaninfo(MS2DATA) WHERE MS2PREC=810.79:TOLERANCEMZ=1.0");
+
+        assertEquals(0, r.exit(), () -> r.err());
+        assertEquals(6, parseArray(r.out(), "the --query payload").size());
     }
 
     /** A query that matches nothing is an empty array and exit <b>0</b> — not a crash, not exit 1. */
