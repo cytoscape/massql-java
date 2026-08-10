@@ -82,9 +82,16 @@ public final class UnsupportedConstructs {
         REASONS.put("nested subquery", "nested sub-queries are not supported in this version");
     }
 
-    /** Every unsupported construct, in stable order, mapped to its reason. */
+    /**
+     * Every unsupported construct, in stable insertion order, mapped to its reason.
+     *
+     * <p>⚠ Deliberately <b>not</b> {@code Map.copyOf}, which returns an unordered map whose iteration
+     * order is randomised per JVM run. The feature matrix is generated from this and committed, so an
+     * unordered source would reshuffle the file's rows on every regeneration and make its drift guard
+     * fail at random.
+     */
     public static Map<String, String> all() {
-        return Map.copyOf(REASONS);
+        return java.util.Collections.unmodifiableMap(new LinkedHashMap<>(REASONS));
     }
 
     /** Ordered construct names. Used by Tech_Step13 to generate the feature matrix. */

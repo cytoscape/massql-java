@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Regenerate dependency-audit.txt. Kept as a script so `make audit` and CI agree.
 #
-# SDK ONLY. This measures the closure massql-app embeds under OSGi, which is what
+# SDK ONLY. This measures the closure a host application embeds, which is what
 # DEPENDENCY_POLICY.md's size budget is about. The cli/ subproject's uber-jar is a standalone
 # download and deliberately not an audited number -- including it would inflate the very figure the
-# budget is written against with bytes that never reach a Cytoscape bundle.
+# budget is written against with bytes an embedding host never sees.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 BUDGET=1572864   # ~1.5 MB, DEPENDENCY_POLICY.md constraint 6
@@ -30,7 +30,7 @@ echo
 echo "Answers SPIKE.md §11 Q3 and \"did dependency complexity stay bounded?\" at the review gate."
 echo
 echo "================================================================"
-echo "SHIPPING CLOSURE  (the SDK's runtime closure = what massql-app embeds)"
+echo "SHIPPING CLOSURE  (the SDK's runtime closure = what a consumer embeds)"
 echo "================================================================"
 printf "  %-46s %9s %9s %9s %7s\n" ARTIFACT SIZE SERVICES VERSIONS NATIVE
 while IFS=$'\t' read -r coord sz jar; do

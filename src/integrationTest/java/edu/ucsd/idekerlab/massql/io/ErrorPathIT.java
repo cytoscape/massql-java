@@ -32,8 +32,8 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  * <ul>
  *   <li>The failure is a {@link MassqlException} — <b>not</b> a leaked {@code XMLStreamException},
  *       {@code NumberFormatException} or {@code NullPointerException}. A caller can only handle what
- *       the API declares, and Phase 2 embeds this SDK inside Cytoscape where an unexpected runtime
- *       exception surfaces as a broken app rather than a bad file.
+ *       the API declares. In an embedding application an unexpected runtime exception surfaces as a
+ *       broken feature rather than as a bad input file.
  *   <li><b>No partial results.</b> A reader that returns the rows it managed to parse before hitting
  *       damage is worse than one that throws: the caller gets a plausible short answer with no
  *       indication anything was lost. That is the same failure shape as C44, where a parser stopped

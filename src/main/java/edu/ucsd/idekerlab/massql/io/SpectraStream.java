@@ -11,7 +11,8 @@ import java.util.NoSuchElementException;
  * instead of the whole file.
  *
  * <p><b>Why a cursor rather than whole-file tables.</b> Materialising every peak costs 41 bytes each,
- * so a 500 MB input projects to 1.0–1.9 GB of heap — an OOM inside Cytoscape. Streaming bounds
+ * so a 500 MB input projects to 1.0–1.9 GB of heap — an OOM in any host that did not budget for it.
+ * Streaming bounds
  * retained memory by the largest single scan (measured: 33,335 peaks, 2.6 MB across all fixtures).
  * Every v1 condition is a per-scan computation, so nothing is lost.
  *
@@ -79,7 +80,7 @@ public interface SpectraStream extends AutoCloseable {
      * Non-fatal notes accumulated so far, e.g. "skipped 3 spectra with ms level > 2".
      *
      * <p>The SDK logs nothing ({@code DEPENDENCY_POLICY.md} constraint 2), so diagnostics are returned
-     * and the caller decides: the CLI prints them to stderr, the Cytoscape app can surface them in a
+     * and the caller decides: the CLI prints them to stderr, a GUI could surface them in a
      * dialog. Accumulates as the stream advances, so read it <b>after</b> iterating.
      */
     List<String> diagnostics();

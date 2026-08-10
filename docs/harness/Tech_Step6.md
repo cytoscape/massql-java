@@ -64,7 +64,7 @@ Governing sections: [`SPIKE.md`](SPIKE.md) §3 (population by format), §5 (read
 
 > ⚠ **REPLACED by Correction C22 — this is a streaming cursor, not two whole-file tables.** The
 > original API below returned `SpectrumTable ms1()` / `ms2()` for the entire file. That projects a
-> **500 MB input to 1.0–1.9 GB of heap**, which OOMs inside Cytoscape. See C22 for the measurements
+> **500 MB input to 1.0–1.9 GB of heap**, which OOMs the host. See C22 for the measurements
 > and why streaming is possible at all.
 
 ```java
@@ -127,7 +127,7 @@ while (stream.next()) {
 
 **`AutoCloseable` is mandatory, and now genuinely load-bearing.** `open()` maps the file and parses
 forward on demand, so the cursor holds a mapped region and a descriptor for its whole lifetime.
-Phase 2's `shutDown()` depends on release and [Step 12](Tech_Step12.md) tests 200 open/close cycles.
+A host's own shutdown depends on release, and [Step 12](Tech_Step12.md) tests 200 open/close cycles.
 `close()` must be idempotent. The mapped region is **off-heap**, so a 500 MB file costs address
 space, not heap.
 

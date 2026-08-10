@@ -17,7 +17,7 @@ deliberate additions on top of that interface.
 
 ## Getting it
 
-Attach it from a GitHub release, or resolve it from the Cytoscape nexus as
+Attach it from a GitHub release, or resolve it from the NRNB Nexus as
 `edu.ucsd.idekerlab:massql-java-cli` — the uber-jar is the primary artifact, with `-javadoc` and
 `-sources` beside it.
 

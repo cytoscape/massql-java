@@ -26,9 +26,9 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  *
  * <p>Three other places ({@code ParityDump}, {@code MzmlReaderTest}, {@code MzxmlReaderTest}) hand-roll
  * their parsing, {@code ParityDump} citing {@code DEPENDENCY_POLICY.md} constraint 1 — <i>"Jackson
- * discovers modules via ServiceLoader"</i>. But that constraint's stated <b>failure mechanism</b> is
- * <i>"the thread-context classloader cannot see inside an OSGi bundle"</i>, and a test running under
- * Gradle in a plain JVM has no bundle. The rule was being applied outside its own mechanism
+ * discovers modules via ServiceLoader"</i>. But that constraint's stated <b>failure mechanism</b> is a
+ * thread-context classloader that cannot see the caller's classes, and a test running under Gradle on a
+ * flat classpath has no such split. The rule was being applied outside its own mechanism
  * (Correction C46). {@code gson} is {@code testImplementation} only, and
  * {@code checkBannedDependencies} inspects {@code runtimeClasspath}, so it provably cannot reach the
  * shipping closure.

@@ -16,7 +16,7 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
 /**
  * Public entry point for the MassQL SDK — parse a query, run it over a spectra file, get rows back.
  *
- * <p>This is the contract {@code massql-app} codes against, so it changes deliberately. Four entry
+ * <p>This is the contract consumers code against, so it changes deliberately. Four entry
  * points, and no ANTLR, MSDK or vendored type appears in any signature — that is what keeps the
  * parser and readers swappable, and {@code ApiEncapsulationTest} asserts it.
  *
@@ -118,7 +118,7 @@ public final class Massql {
      * three-argument form.
      *
      * <p>The seam exists for one assertion that cannot otherwise be made: <i>{@code run} closes what
-     * it opened, including when the query throws</i>. That is a resource-leak guarantee Phase 2's
+     * it opened, including when the query throws</i>. That is a resource-leak guarantee a long-lived
      * {@code shutDown()} depends on, and with the opener hard-wired there is no way to observe
      * whether {@code close} ran. Counting file descriptors was the alternative and is not portable —
      * and a test that skips on some platforms is exactly what Correction C26 forbids.

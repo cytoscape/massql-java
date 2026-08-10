@@ -327,7 +327,7 @@ Fold once, before evaluation, not per row.
 The SDK logs nothing (`DEPENDENCY_POLICY.md` **constraint 2**). Where a query is valid but degenerate — a tolerance so
 tight nothing can match, an `MS2NL` against a `0` precursor, an RT window outside the file's range — return the
 information as a **diagnostic on the result**, so [Step 11](Tech_Step11.md)'s CLI can print it to stderr and the
-Phase-2 app can surface it. An empty result set is a legitimate answer ([Step 12](Tech_Step12.md) requires empty
+a GUI can surface it. An empty result set is a legitimate answer ([Step 12](Tech_Step12.md) requires empty
 JSON array, exit 0), but a *silent* empty result set is a poor one.
 
 ## Known traps

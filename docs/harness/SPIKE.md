@@ -3,32 +3,25 @@
 **Audience:** the developer building the prototype.
 **Spike scope:** finish **`massql-java`** only, verified by **unit and integration tests inside the SDK**,
 green at the CLI layer against **all three input formats** (`.mgf`, `.mzML`, `.mzXML`). That proves the
-pure-Java MassQL SDK works. **Then stop for manual review** before any Cytoscape app work begins.
+pure-Java MassQL SDK works. **Then stop for manual review** before any downstream work begins.
 **Language scope:** `scaninfo` only.
 
 ---
 
-## 1. The two repos
+## 1. One repo, two artifacts
 
-| Repo | Packaging | Contents | Phase |
-|---|---|---|---|
-| **`massql-java`** | plain `jar` | Pure-Java MassQL SDK. Parser, spectra readers, query engine, result model, full unit + integration test suite, **plus a standalone `Main` class that acts as a CLI wrapper**. Zero Cytoscape. Zero OSGi. | **This spike** |
-| **`cytoscape/massql-app`** | OSGi `bundle` | Imports `massql-java` as a dependency. Cytoscape desktop app: activator, menu, dialog, node-table write-back, `MASSQL_PARSE` Formula function. | Phase 2, after review |
+| Artifact | Packaging | Contents |
+|---|---|---|
+| **`massql-java`** | plain `jar` | Pure-Java MassQL SDK. Parser, spectra readers, query engine, result model, full unit + integration test suite. |
+| **`massql-java-cli`** | uber-`jar` | A standalone command-line wrapper over the SDK, versioned and released independently. |
 
-**Why this split is the right call:** `massql-java` physically cannot compile against Cytoscape because
-Cytoscape isn't on its classpath. That compile-time firewall is the only thing that reliably keeps
-`org.cytoscape` imports out of engine code. It also means the entire spike is verified with `make verify`
-and a shell command — no Cytoscape, no OSGi, no 84 MB log files, no bundle resolution debugging.
-A pure-Java MassQL SDK is also independently useful (there is currently **no** Java MassQL implementation
-anywhere — verified), so it deserves to be its own artifact rather than buried in an app.
+**Why this is the right shape:** the SDK depends on nothing but the JVM and two runtime libraries, so the
+entire spike is verified with `make verify` and a shell command. A pure-Java MassQL SDK is independently
+useful — there is currently **no** Java MassQL implementation anywhere, verified — so it deserves to be its
+own artifact rather than buried inside whatever consumes it.
 
-**Two decisions to make before `git init`:**
-1. **Where does `massql-java` live?** `cytoscape/massql-java` keeps it adjacent to the app, but the SDK has
-   value beyond Cytoscape (MZmine, GNPS tooling) and might belong somewhere more neutral.
-2. **How does `massql-app` consume it?** Publish to the Cytoscape nexus
-   (`nrnb-nexus.ucsd.edu/repository/cytoscape_releases`) — what the existing Cytoscape repos already
-   resolve against — or Maven Central for wider reach. Publishing to a local repo is fine for the spike, but
-   Phase 2 needs a real answer.
+**One decision to make before `git init`:** how it is published. The NRNB-hosted Nexus is what related
+projects already resolve against; Maven Central would reach wider. A local repo is fine for the spike.
 
 ---
 
@@ -166,7 +159,7 @@ Still true: nearly free once the store exists, since it is the same collation pa
 
 ## 4. `massql-java` layout and public API
 
-The public API is the contract with `massql-app`, so design it deliberately — everything else can churn.
+The public API is the contract with every consumer, so design it deliberately — everything else can churn.
 
 ```
 massql-java/                          packaging=jar, <release>17</release>
@@ -185,7 +178,7 @@ massql-java/                          packaging=jar, <release>17</release>
   src/test/resources/…       fixtures + goldens (see §6)
 ```
 
-Sketch of the surface `massql-app` will code against:
+Sketch of the surface consumers will code against:
 
 ```java
 MassqlQuery q = Massql.parse(queryText);                    // throws MassqlParseException
@@ -209,7 +202,7 @@ List<ScanInfoResult> rows = Massql.run(queryText, path, opts);   // one-shot con
 
 Two API rules that matter downstream:
 - **`ScanInfoResult` uses boxed `Double`/`Integer`** so null is a real, testable value. All the sentinel and
-  NaN rules from §3 live **in the SDK**, not in the app — so they're unit-tested outside OSGi and the app's
+  NaN rules from §3 live **in the SDK**, not in any consumer — so they're unit-tested directly and a caller's
   write-back stays a dumb loop.
 - **`ResultJson` produces exactly the 12-key object** in §3. The app writes that string into the node table
   verbatim and `MASSQL_PARSE` reads it back — so key names and float formatting are a published contract,
@@ -240,7 +233,7 @@ java -cp massql-java.jar …cli.Main <spectra-file> <query-file> [--precursor-to
 
 - **Both the mzML and mzXML parsers are hand-written streaming parsers, not JAXB.** They use
   `javolution.xml.internal.stream.XMLStreamReaderImpl` (instantiated **directly** — no
-  `XMLInputFactory`/`ServiceLoader` discovery, which matters for Phase 2), `java.util.Base64`, and
+  `XMLInputFactory`/`ServiceLoader` discovery, which constraint 1 forbids), `java.util.Base64`, and
   `java.util.zip.InflaterInputStream`.
 - **`msdk-io-mzml` depends on `msdk-io-mzxml`** — you get mzXML in the transitive closure whether you want
   it or not, convenient since all three formats are in the contract. mzXML's pom declares
@@ -263,12 +256,12 @@ java -cp massql-java.jar …cli.Main <spectra-file> <query-file> [--precursor-to
   pure Java. If MSDK-as-a-dependency disappoints, vendoring is the known fallback (+3–5 days).
 - **Split-package check:** the *published* 0.0.27 pom reportedly declares both
   `org.javolution:javolution-core-java` **and** `com.github.chhh:javolution-core-java-msftbx` — two forks of
-  the same packages, which Felix will reject in Phase 2. On master the plain fork is **commented out**.
+  the same packages, which is a split package (constraint 5). On master the plain fork is **commented out**.
   Verify the released pom; if both are present, **exclude `org.javolution:javolution-core-java`** and keep
   the `chhh` fork (the one the code imports).
 - Also exclude CDK + Guava (2.7 MB, arrives via `msdk-datamodel`) and slf4j.
-- **License: dual LGPL-2.1 / EPL-1.0.** Get a written yes/no on shipping LGPL. Cytoscape core is LGPL so
-  probably fine, but it's blocking and it's a 1-hour question. **Ask in week 1, not in Phase 2** — a "no"
+- **License: dual LGPL-2.1 / EPL-1.0.** Get a written yes/no on shipping LGPL. It is blocking and it is a
+  1-hour question. **Ask in week 1** — a "no"
   changes the reader choice, which is the foundation of this repo.
 
 **MGF: write it yourself, ~150–200 LOC.** `BEGIN IONS` / `TITLE=` / `PEPMASS=` / `CHARGE=` /
@@ -411,7 +404,7 @@ golden belongs to the full file. Or commit the full 14 MB and skip this; it's re
 
 ### 6d. Build wiring
 
-- JUnit 5 (`junit-jupiter`), **test scope only** — never leaks into the artifact `massql-app` embeds.
+- JUnit 5 (`junit-jupiter`), **test scope only** — never leaks into the published artifact.
 - Split fast from slow: unit tests in `src/test` (`make test`), integration tests in `src/integrationTest`
   on `*IT.java` (`make it`). The reviewer runs `make verify`, which runs both.
 - **No network in any test.** The 47 golden parses are checked-in files, never live calls to
@@ -508,12 +501,11 @@ What makes the repo reviewable rather than just working.
   to validate the thing.
 - **Dependency audit checked in** — the SDK runtime closure after exclusions, with total byte size. This is
   the artifact that answers "did dependency complexity stay bounded?"
-- **OSGi-readiness assertions** (§9) as a scripted check, so Phase 2 isn't a surprise.
 - **Coverage report** (JaCoCo) — not as a target to game, but so the reviewer can see which of the §3 rules
   are actually exercised.
 
 **⛔ REVIEW GATE — stop here.** Manual review of `massql-java` against the goldens, the test suite and the
-README before any `massql-app` work starts.
+README before any downstream work starts.
 
 ---
 
@@ -546,50 +538,36 @@ tool whose own docs advertise functions (`scanmaxmz`, `scanrun`) that don't exis
 
 ---
 
-## 9. Constraints `massql-java` must satisfy so Phase 2 isn't blocked
+## 9. Dependency constraints the library must satisfy
 
 The library's dependency choices get locked in during this spike and are the hardest thing to change later.
-`massql-java` never sees OSGi, but `massql-app` will embed it — so build these in from the start and verify
-them with a scripted check in Step 3:
+Build these in from the start; `DEPENDENCY_POLICY.md` is their authoritative statement, and each rule there
+states its own failure mechanism.
 
-- **No `ServiceLoader` / `META-INF/services`** anywhere in the dependency closure — the thread-context
-  classloader can't see inside an OSGi bundle. (cytoscape-mcp hit this twice, with Lucene and the MCP SDK.)
-  MSDK is clean; anything added later must be checked.
+- **No `ServiceLoader` / `META-INF/services`** anywhere in the dependency closure — provider lookup goes
+  through the thread-context classloader, which in an embedding application frequently cannot see this
+  library's classes, so it finds nothing rather than failing.
 - **No JAXB, no native code, no `sun.misc.Unsafe`.**
-- **No `META-INF/versions/**`** (multi-release jars) in embedded deps — they break Felix resolution on
-  Cytoscape 3.10.x.
-- **No slf4j/logback dependency.** Use `java.util.logging`, or better, no logging in the SDK at all — return
-  diagnostics and let the caller log. Sidesteps a real conflict (`cy-ndex-2` embeds slf4j+logback while
-  cytoscape-mcp deliberately excludes `org/slf4j/**`).
+- **No `META-INF/versions/**`** (multi-release jars) — they break any consumer that reads class entries
+  directly rather than through a multi-release-aware loader, including common repackaging tooling.
+- **No slf4j/logback dependency.** Better still, no logging in the SDK at all — return diagnostics and let
+  the caller log. A library that brings its own logging framework fights whatever the host already uses.
 - **Under ~1.5 MB of embedded dependencies** after the §5 exclusions.
-- **Java 17** — matches Cytoscape 3.10.4's parent pom. (The build is Gradle since
-  [C43](Tech_Step_INDEX.md#c43); §6d's Maven wording was updated with it.)
-- Put the `.g4` in **`src/main/antlr/`, never `src/main/resources/`** — Cytoscape app poms set
-  `<filtering>true</filtering>` on resources and a grammar containing `${...}` gets silently corrupted. Also
-  confirm the formatter (Spotless) excludes the generated-source directory.
-- **Close your file handles.** MSDK memory-maps files, so `SpectraFile` must be `AutoCloseable` and the app's
-  `shutDown()` will depend on it. Add an integration test that opens and closes many files without leaking.
-
-**Recommended: a 2-hour OSGi canary at the end of Step 3.** Not an app — a throwaway bundle that just embeds
-`massql-java` and logs a scan count from `small.mzML` inside Cytoscape. It's the one risk that, if it fails,
-forces a change *inside* `massql-java` (vendor the MSDK parser rather than depend on it). Cheap insurance
-against discovering it after the review gate. Cut it if you'd rather keep the spike strictly pure-Java —
-just know that's where the exposure sits.
+- **Java 17.** (The build is Gradle since [C43](Tech_Step_INDEX.md#c43); §6d's Maven wording was updated
+  with it.)
+- Put the `.g4` in **`src/main/antlr/`, never `src/main/resources/`** — some build setups enable filtering on
+  resources, and a grammar containing `${...}` gets silently corrupted. Also confirm the formatter (Spotless)
+  excludes the generated-source directory.
+- **Close your file handles.** The readers memory-map files, so `SpectraFile` must be `AutoCloseable`. Add an
+  integration test that opens and closes many files without leaking.
 
 ---
 
-## 10. Phase 2 preview (`cytoscape/massql-app`) — not part of this spike
+## 10. *(removed)*
 
-Sketch only, so the review has context for what it's approving into: activator copied from
-`cytoscape-mcp/.../CyActivator.java` (`AppsFinishedStartingListener` + `ServiceTracker` dynamic-install
-fallback + `initDone` guard + `shutDown()`); `MassqlTaskFactory` registered twice, once for the
-Apps→Run MassQL menu and once with `COMMAND`/`COMMAND_NAMESPACE` so it's CyREST-drivable for in-Cytoscape
-verification; a dialog with file chooser, query name, scan-column selector and query text area;
-`ResultToNodeTable` writing the 12-key JSON into `massql _<query name>` joined on scan (watch for graphml
-typing `scan` as String while results carry Integer — the most likely real bug there); and
-`MassqlParseFunction extends AbstractFunction` registered as `org.cytoscape.equations.Function`
-(`org.cytoscape:equations-api:3.10.4` is in the local Maven repo — verified). `massql-java` arrives as a nested jar on
-`Bundle-ClassPath` via `Embed-Dependency`, the normal pattern (`cy-ndex-2-3.7.3.jar` nests 26 of them).
+This section sketched a downstream consumer application. It is out of scope for this SDK, which processes
+MassQL and nothing else, and the sketch was removed rather than maintained here. The section number is kept so
+that §11's question numbering — cited throughout the step specs — stays stable.
 
 ---
 
@@ -603,7 +581,7 @@ typing `scan` as String while results carry Integer — the most likely real bug
 4. Is MSDK's LGPL-2.1/EPL-1.0 shippable here? *(blocking — ask in week 1)*
 5. Parser: ANTLR embedded, hand-written, or remote `/parse`?
 6. Measured LOC — does the 1,200–1,800 estimate hold?
-7. Where does `massql-java` live, and how is it published for `massql-app` to consume?
+7. Where does `massql-java` live, and how is it published?
 8. Wall-clock and peak heap on all three fixtures vs. the pandas path.
 
 ---
@@ -612,7 +590,6 @@ typing `scan` as String while results carry Integer — the most likely real bug
 
 - Behavioral contract: `massql_query.py` (esp. `add_precursor_intensity`, lines 62-116),
   [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md), `output/*_results.json` — all in this directory
-- App spec: [cytoscape/cytoscape#26](https://github.com/cytoscape/cytoscape/issues/26)
 - Grammar + goldens: [`msql.ebnf`](oracle/msql.ebnf) (165 lines), `tests/reference_parses/` (47 files),
   `tests/test_query.py` (the intensity property tests worth porting) in
   `github.com/mwang87/MassQueryLanguage` @ pinned SHA
@@ -632,6 +609,3 @@ typing `scan` as String while results carry Integer — the most likely real bug
 - MSDK parsers (read before deciding to depend vs. vendor):
   `github.com/msdk/msdk/blob/master/msdk-io-mzml/src/main/java/io/github/msdk/io/mzml/data/MzMLParser.java`,
   `.../msdk-io-mzxml/.../MzXMLFileParser.java`
-- Phase-2 patterns: `../open-cyweb/pom.xml:116-132` (bundle config),
-  `../cytoscape-mcp/src/main/java/edu/ucsd/idekerlab/cytoscapemcp/CyActivator.java`,
-  `../cytoscape-mcp/build.gradle:143-200` (OSGi exclusion list)

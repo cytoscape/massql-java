@@ -3,8 +3,8 @@
 ## Goal
 
 A buildable, empty `massql-java` repo whose dependency closure is measured, minimal, and provably compliant with
-the Phase-2 OSGi constraints — so that no later step can accidentally introduce a dependency that blocks the
-Cytoscape app.
+the dependency constraints — so that no later step can accidentally introduce a dependency that makes this
+library hard to embed.
 
 ## Prerequisites
 
@@ -13,8 +13,8 @@ Cytoscape app.
 ## Context
 
 The library's dependency choices get locked in during this spike and are the hardest thing to change later.
-`massql-java` never sees OSGi, but `massql-app` will embed it as a nested jar on `Bundle-ClassPath`, and the
-failure modes there (thread-context classloader can't see `ServiceLoader` providers inside a bundle; Felix
+This library is meant to be embedded — shaded into a fat jar, nested inside one, or simply added to a
+classpath — and the failure modes there (a thread-context classloader that cannot see `ServiceLoader` providers;
 rejects multi-release jars and split packages) are expensive to diagnose and cheap to prevent. This step
 converts [`SPIKE.md`](SPIKE.md) §9's constraint list from prose into build configuration and a measured number.
 
@@ -36,14 +36,14 @@ Governing sections: [`SPIKE.md`](SPIKE.md) §4 (layout), §5 (readers), §6d (bu
 - Any grammar content — [Step 4](Tech_Step4.md). This step only wires the ANTLR plugin and commits a
   placeholder `.g4` that generates a trivial parser, proving the toolchain works.
 - Any reader implementation — Steps [6](Tech_Step6.md) and [7](Tech_Step7.md).
-- The scripted OSGi-readiness *check* — [Step 13](Tech_Step13.md). This step establishes the *policy* the
+- Any packaging or container check — out of scope entirely. This step establishes the *policy* the
   check will later verify.
 
 ## Deliverables
 
 | Path | Content |
 |---|---|
-| `/Users/shreuland/dev/massql-java/` | New git repo; remote `github.com/cytoscape/massql-java` |
+| `/Users/shreuland/dev/massql-java/` | New git repo |
 | `build.gradle`, `cli/build.gradle`, `settings.gradle`, `gradle.properties` | Full build as specified below |
 | `.gitignore` | build output, IDE files |
 | `Makefile` | `verify` target stub. ⚠ **Filled out at Step 9**, not Step 13 — the build tool is never invoked directly; the Makefile is the only entry point and both workflows call its targets. See [`README.md`](README.md) |
@@ -52,7 +52,7 @@ Governing sections: [`SPIKE.md`](SPIKE.md) §4 (layout), §5 (readers), §6d (bu
 | `src/main/antlr/edu/ucsd/idekerlab/massql/lang/Massql.g4` | Placeholder grammar; real content in Step 4 |
 | `src/main/java/.../massql/MassqlException.java`, `MassqlParseException.java`, `MassqlOptions.java` | See Specification §5 |
 | `.github/workflows/ci.yml` | Full suite on every push to master and every PR — see §8 |
-| `.github/workflows/release.yml` | Version-stamped artifacts from a prefixed semver tag, attached to the release and deployed to the Cytoscape nexus — see §8 |
+| `.github/workflows/release.yml` | Version-stamped artifacts from a prefixed semver tag, attached to the release and deployed to the Nexus — see §8 |
 | `scripts/dependency-audit.sh` | Regenerates `dependency-audit.txt`; **exits non-zero** on a constraint violation or budget breach, so it works as a CI gate |
 
 ## Specification
@@ -88,9 +88,9 @@ tree knows where work belongs.
 **This section originally specified `msdk-io-mzml` as a dependency. It is not one.** `msdk-datamodel` cannot
 link without Guava — `MsScan` declares `Range<Double> getScanningRange()` in the **interface**, and
 `SimpleMsScan` holds a `Range` field and calls `Preconditions`. Guava + its annotation satellites are
-2,992,669 B (2.85 MB), which took the closure to **3.97 MB**, and the OSGi hazards mattered more than the size:
-Cytoscape exports Guava **9.0.0** against MSDK's **27.1**; Guava 27.1 is itself a bundle exporting
-`com.google.common.*`, so embedding makes bnd emit an `Import-Package` Felix cannot satisfy; and `jsr305` rides
+2,992,669 B (2.85 MB), which took the closure to **3.97 MB**, and the version conflict mattered more than the
+size: MSDK needs **27.1** while a plausible host provides **9.0.0**, an 18-major-version gap nothing can
+reconcile; and `jsr305` rides
 along exporting `javax.annotation`. Full analysis in `DEPENDENCY_POLICY.md`.
 
 **Resolution: MSDK is a vendoring source, never a dependency.** Both parsers are vendored — mzML in
@@ -107,11 +107,11 @@ along exporting `javax.annotation`. Full analysis in `DEPENDENCY_POLICY.md`.
 Plus `org.junit.jupiter:junit-jupiter` at **test scope only**.
 
 Both shipping artifacts audited: **zero** `META-INF/services`, **zero** `META-INF/versions`, zero native
-libraries. javolution is a proper OSGi bundle with a unique symbolic name, nothing else in Cytoscape provides
-`javolution.*`, and its `org.osgi.core` dependency is not compile-scope so it never enters the closure.
+libraries. Neither shares a package with anything else here, and javolution's one optional framework
+dependency is not compile-scope, so it never enters the closure.
 
 **Banned via the `checkBannedDependencies` task, wired into `check`**, so the build fails rather than the
-bundle:
+consumer:
 `io.github.msdk:*`, `com.google.guava:guava`, `jsr305`, `checker-qual`, `error_prone_annotations`,
 `j2objc-annotations`, `it.unimi.dsi:*`, `org.slf4j:*`, `ch.qos.logback:*`, all JAXB coordinates,
 `org.openscience.cdk:*`.
@@ -130,18 +130,18 @@ Moot. Those arrived via MSDK, which is no longer a dependency. `commons-io` is g
 These bind every later step. State them, with the reason attached, because a reason-free rule gets bumped.
 
 1. **No `ServiceLoader` / `META-INF/services`** anywhere in the closure. The thread-context classloader cannot
-   see inside an OSGi bundle. (cytoscape-mcp hit this twice — Lucene and the MCP SDK.)
+   see the caller's classes. (A sibling project hit this twice — Lucene and the MCP SDK.)
 2. **`slf4j-api` is pinned to 1.7.26. Do not upgrade to 2.x.** 1.7 uses static binding; **2.x uses
    `ServiceLoader`**, violating rule 1. This is the single most likely way a routine dependency bump silently
-   breaks Phase 2. (Correction C4.)
+   breaks embedding. (Correction C4.)
 3. **No JAXB, no native code, no `sun.misc.Unsafe`.**
-4. **No `META-INF/versions/**`** (multi-release jars) in embedded deps — they break Felix resolution on
-   Cytoscape 3.10.x.
+4. **No `META-INF/versions/**`** (multi-release jars) in embedded deps — they break any consumer that reads
+   class entries directly rather than through a multi-release-aware loader.
 5. **No logging framework beyond the pinned `slf4j-api`.** The SDK itself logs **nothing** — return diagnostics
-   and let the caller log. (`cy-ndex-2` embeds slf4j+logback while cytoscape-mcp deliberately excludes
+   and let the caller log. (A library that brings its own logging framework fights whatever the host uses;
    `org/slf4j/**`; do not add to that conflict.)
 6. **Total embedded closure under ~1.5 MB.**
-7. **`<release>17</release>`** — matches Cytoscape 3.10.4's parent pom.
+7. **`<release>17</release>`**.
 8. **No split packages.**
 9. **No network access in any test.** The 46 parse goldens are checked-in files; never call
    `massql.gnps2.org/parse` from a test. Flaky CI destroys the credibility of a conformance number.
@@ -227,8 +227,8 @@ matters:
 | # | cy-ndex-2 | massql-java | Why |
 |---|---|---|---|
 | 1 | unit tests only | **unit + integration** | A unit-only run skips the separate `integrationTest` suite. **All three gates of this spike live in `*IT.java`** (reader parity, differential, CLI contract), so it would report green while skipping every one of them. |
-| 2 | JDK 11 | **JDK 17** | Constraint 7 — matches Cytoscape 3.10.4's parent pom. |
-| 3 | `xvfb-run` | *(none)* | cy-ndex-2 needs a virtual display because Cytoscape touches AWT. Nothing here does ([`SPIKE.md`](SPIKE.md) §6d: "No display needed"). |
+| 2 | JDK 11 | **JDK 17** | Constraint 7. |
+| 3 | `xvfb-run` | *(none)* | A virtual display is only needed for AWT. Nothing here touches it ([`SPIKE.md`](SPIKE.md) §6d: "No display needed"). |
 | 4 | release uses `-DskipTests` | **runs the full suite** | For an SDK whose entire value is bug-for-bug agreement with one pinned MassQL commit, publishing an unverified jar defeats the purpose. `verify` also packages, so it is one build, not two. |
 
 **`ci.yml`** — push to `master` + PRs against `master`: checkout, JDK 17 with the Gradle cache,
@@ -266,21 +266,21 @@ reference, so there is no prose to drift from it (C45).
 > behaviour in prose. A genuinely unresolvable `@link` still fails the build.
 
 The publishing repository is declared in `build.gradle` / `cli/build.gradle`, pointing at
-`nrnb-nexus.ucsd.edu/repository/cytoscape_releases` exactly as cy-ndex-2 does, so `massql-app` needs no extra
+the NRNB-hosted Nexus, which related projects already resolve against, so a consumer needs no extra
 repo config. Credentials come from `REPO_USER` / `REPO_PWD` in the environment — Gradle has no `settings.xml`,
 so there is no `<server>` id to match. ⚠ The GitHub *environment* holding those secrets is still named `MVN`;
 renaming it here would break the binding, so it keeps its name.
 
 ## Known traps
 
-- **Putting the `.g4` in `src/main/resources/`.** Cytoscape app poms set `<filtering>true</filtering>` on
+- **Putting the `.g4` in `src/main/resources/`.** Some build setups enable `<filtering>true</filtering>` on
   resources, and a grammar containing `${...}` gets **silently corrupted** — a grammar that compiles today and
   breaks when the app embeds it. `src/main/antlr/` only.
 - **Letting a dependency-update bot bump slf4j-api to 2.x.** See constraint 2. The `checkBannedDependencies`
-  task rejects `org.slf4j:*` outright, so the build fails rather than the bundle.
+  task rejects `org.slf4j:*` outright, so the build fails rather than the consumer.
 - **Assuming an exclusion is safe because the parser doesn't import it.** Another class in the same artifact may.
   Verify by building and running (§3).
-- **Adding `junit` at compile scope.** It must never leak into the artifact `massql-app` embeds.
+- **Adding `junit` at compile scope.** It must never leak into the published artifact.
 
 ## Tests required
 
@@ -303,7 +303,7 @@ renaming it here would break the binding, so it keeps its name.
 - [x] `.github/workflows/ci.yml` runs `mvn verify` (not `mvn test`) on JDK 17, plus the dependency audit and
       the "assert tests actually ran" guard. Valid YAML; the guard verified locally at 10 tests.
 - [x] `.github/workflows/release.yml` validates the tag as semver, stamps the version, runs the full suite,
-      uploads `massql-java-X.Y.Z.jar`, and deploys to `cytoscape_releases`. `distributionManagement` present.
+      uploads `massql-java-X.Y.Z.jar`, and deploys to the Nexus. `distributionManagement` present.
 - [x] The `commons-codec` / `commons-pool2` / `cdk-formula` open item is **closed as moot** — MSDK is no longer
       a dependency.
 
@@ -313,7 +313,6 @@ See Correction **C16** in [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md).
 ## References
 
 - [`SPIKE.md`](SPIKE.md) §4 (layout and public API), §5 (reader dependency analysis — **see Correction C1**), §6d (build
-  wiring), §9 (constraints), §10 (how Phase 2 embeds this)
+  wiring), §9 (constraints)
 - Corrections C1, C2, C4, C5 in [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md)
-- `../open-cyweb/pom.xml:116-132` (bundle config), `../cytoscape-mcp/build.gradle:143-200` (OSGi exclusion list)
 - Released poms: `repo1.maven.org/maven2/io/github/msdk/msdk-io-mzml/0.0.27/msdk-io-mzml-0.0.27.pom`

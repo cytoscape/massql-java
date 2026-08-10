@@ -15,8 +15,9 @@ Everything under `src/main/java/edu/ucsd/idekerlab/massql/io/vendor/`.
 ## Why anything is vendored at all
 
 **MSDK cannot be a dependency** (Corrections **C16**, **C1**, **C21**, **C23**). The blocking problem is
-Guava, not size: `msdk-datamodel` drags it in unavoidably, Cytoscape exports Guava **9.0.0** against MSDK's
-**27.1**, and an embedded copy makes bnd emit an `Import-Package` range Felix cannot satisfy at runtime. So the
+Guava, not size: `msdk-datamodel` drags it in unavoidably at **27.1**, which conflicts irreconcilably with the
+**9.0.0** a likely host already provides — and a library that forces its host's Guava version is not safely
+embeddable. So the
 **decode path only** is vendored — the smallest set that decodes an mzML binary array — and everything above it
 (readers, the store, the engine) is written here.
 

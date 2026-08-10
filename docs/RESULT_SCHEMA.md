@@ -35,8 +35,8 @@ scan, precmz, ms1scan, rt, charge, tic, mslevel, base_peak_i, base_peak_mz, ms1_
 > absent, not null"*), the oracle's own `RESULT_SCHEMA.md`, and the `small_mzml_ms1_results.json` golden, which
 > shipped 9 keys. All are now aligned; **Correction C40** has the analysis.
 >
-> **Why uniform is the right contract, not merely the specified one.** The Phase-2 app writes this string into
-> a Cytoscape node table verbatim and `MASSQL_PARSE` reads it back. One stable key set means the write-back is
+> **Why uniform is the right contract, not merely the specified one.** A consumer may write this string into
+> a table column verbatim and read back later. One stable key set means that round-trip is
 > a fixed-arity loop with no branch on query type; a variable key set makes every consumer discriminate before
 > it can read a row. Absent-vs-null is a contract difference, not a formatting choice.
 

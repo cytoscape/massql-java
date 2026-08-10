@@ -18,7 +18,7 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
  * <h2>Why per-scan rather than whole-file</h2>
  *
  * <p>Correction C22: there is no whole-file table. A 500 MB input projects to 1.0–1.9 GB of heap if
- * materialised, which OOMs inside Cytoscape. The executor advances a {@link SpectraStream} cursor and retains
+ * materialised, which OOMs the host. The executor advances a {@link SpectraStream} cursor and retains
  * exactly <b>one</b> MS1 scan — which the document-order {@code ms1scan} rule makes sufficient, since the
  * linked MS1 is always the most recent preceding one.
  *

@@ -2,7 +2,7 @@
 
 ## Goal
 
-The public API `massql-app` will code against, plus a standalone CLI whose **argv shape, flags and stream
+The public API consumers will code against, plus a standalone CLI whose **argv shape, flags and stream
 discipline** mirror `massql_query.py` — so [Step 12](Tech_Step12.md) can drive both with the same command line
 and compare their outputs.
 
@@ -25,7 +25,7 @@ and compare their outputs.
 
 ## Context
 
-The public API is the contract with `massql-app`; everything behind it can churn. [`SPIKE.md`](SPIKE.md) §4 says to design it
+The public API is the contract with every consumer; everything behind it can churn. [`SPIKE.md`](SPIKE.md) §4 says to design it
 deliberately for that reason. Two API rules matter downstream, and both are already satisfied by
 [Step 10](Tech_Step10.md): boxed types so null is testable, and `ResultJson` as a published string contract the
 app stores verbatim.
@@ -55,7 +55,7 @@ Governing sections: [`SPIKE.md`](SPIKE.md) §4.
 - Any new semantics. This step is wiring; a behavioural change here means a rule was missed in Steps 9 or 10 and
   belongs there.
 - The integration tests that exercise the CLI contract — [Step 12](Tech_Step12.md) layer 4.
-- Anything Cytoscape — Phase 2.
+- Anything a consumer application would own.
 
 ## Deliverables
 
@@ -70,7 +70,7 @@ Governing sections: [`SPIKE.md`](SPIKE.md) §4.
 
 ### 1. The public surface
 
-The **shape** sketched in [`SPIKE.md`](SPIKE.md) §4 — `massql-app` is written against this, so keep it. Two of
+The **shape** sketched in [`SPIKE.md`](SPIKE.md) §4 — consumers are written against this, so keep it. Two of
 §4's details are wrong and are corrected below; "keep the shape" means the try-with-resources pattern and the
 one-shot convenience method, not §4's literal types.
 
@@ -102,7 +102,7 @@ this spec demanded and nothing previously delivered.
 >   `SpectraFile.open(path)` per query, each in its own try-with-resources.
 >
 > Say this in `docs/SDK.md` explicitly. The old whole-file design made re-querying free; this does not, and
-> a Phase-2 author who assumes otherwise gets an exception rather than a wrong answer.
+> a caller who assumes otherwise gets an exception rather than a wrong answer.
 
 ```java
 public final class Massql {
@@ -148,7 +148,7 @@ Rules on this surface:
 ### 2. Diagnostics
 
 The SDK logs nothing (`DEPENDENCY_POLICY.md` **constraint 2**). [Step 9](Tech_Step9.md) §5 produces diagnostics for
-valid-but-degenerate queries; surface them on the API so the CLI can print them to stderr and the Phase-2 app can
+valid-but-degenerate queries; surface them on the API so the CLI can print them to stderr and a GUI can
 show them in a dialog:
 
 ```java
@@ -174,13 +174,13 @@ Do not make callers parse diagnostics out of a log they cannot see.
 > `qualifyingScans` and `scansExamined` are **not** part of `ExecutionResult`: the row count already gives the
 > first, and the second is a progress statistic with no consumer in the published contract. If the CLI ever
 > wants "examined N scans, matched M", read it from the summary rather than widening the SDK's result record —
-> the record is a contract the Phase-2 app depends on, and `ResultJson`'s 12 keys are frozen at
+> the record is a contract consumers depend on, and `ResultJson`'s 12 keys are frozen at
 > [Step 10](Tech_Step10.md) §5.
 
 ### 3. The CLI
 
 > **Layer note (Correction C25).** This section governs the **Java CLI** only. The **SDK** (§1–§2)
-> writes to no stream at all — `DEPENDENCY_POLICY.md` constraint 2 — and the Phase-2 app consumes
+> writes to no stream at all — `DEPENDENCY_POLICY.md` constraint 2 — and a consumer uses
 > `Massql.execute` in-process, never this CLI. See *Terminology* in
 > [`Tech_Step_INDEX.md`](Tech_Step_INDEX.md).
 
@@ -287,8 +287,8 @@ and exit 2. [Step 12](Tech_Step12.md) asserts the construct name appears in the 
 **Never print a Java stack trace to stdout.** A stack trace on stdout corrupts the JSON payload for any consumer
 piping the output.
 
-Use `System.exit()` only from `main`, never from library code — the Phase-2 app embeds this jar and an exit call
-in a library path would kill Cytoscape.
+Use `System.exit()` only from `main`, never from library code — an exit call reachable from a library path would
+take down any application that embedded it.
 
 **Which requires a seam this spec never gave** (Correction **C42**): `MainExitCodeTest` has to assert all four
 exit codes, and it cannot do that if the only entry point terminates the JVM. Split it:
@@ -311,7 +311,7 @@ stay apart — see the note below.
 
 ### 4. Resource lifecycle
 
-[Step 12](Tech_Step12.md) tests opening and closing many files without leaking, and Phase 2's `shutDown()` depends
+[Step 12](Tech_Step12.md) tests opening and closing many files without leaking, and a host's own shutdown depends
 on it. So:
 
 - `SpectraFile.close()` is idempotent (established in [Step 6](Tech_Step6.md)).
@@ -332,7 +332,7 @@ on it. So:
 - **`run` leaking the file it opened** on the exception path.
 - **Exit non-zero when a query matched nothing.** An empty result is a valid answer: `[]`, exit 0.
 - **Returning `null` for an empty result** instead of an empty list.
-- **`System.exit` reachable from library code.** Fatal in an embedded OSGi context.
+- **`System.exit` reachable from library code.** Fatal to any application that embedded this jar.
 - **Argument order swapped** relative to Python. The differential invokes both with the same argv shape.
 
 ## Tests required
@@ -406,4 +406,4 @@ on it. So:
   `sys.stdout.write("\n")` for the payload. ⚠ The line numbers this entry used to carry had already
   drifted — `:194-195` pointed at the C40 base-peak comment, not at `json.dump`.
 - [Step 10](Tech_Step10.md) §5 — the JSON contract this prints
-- Consumer: [Step 12](Tech_Step12.md) layer 4 asserts the CLI contract; Phase 2 codes against this surface
+- Consumer: [Step 12](Tech_Step12.md) layer 4 asserts the CLI contract; downstream code uses this surface

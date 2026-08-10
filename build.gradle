@@ -1,8 +1,8 @@
 // massql-java -- the SDK. The CLI is a separate, independently versioned project in cli/.
 //
-// Build/lint conventions follow ../cytoscape-mcp so both projects behave the same way, taking
-// only what applies here: java, spotless, jacoco, maven-publish. Its OSGi/BND bundling, the
-// Cytoscape repositories and its embed configuration are all irrelevant to a plain library.
+// Build/lint conventions follow a sibling project so both behave the same way, taking only what
+// applies here: java, spotless, jacoco, maven-publish. Its packaging and extra repositories are
+// irrelevant to a plain library.
 //
 // Code style is NOT documented in prose anywhere. Spotless below is the whole specification:
 // `make lint` reports, `make lint-fix` fixes.
@@ -12,7 +12,7 @@ plugins {
     id 'antlr'
     id 'jacoco'
     id 'maven-publish'
-    // 8.9.0, not ../cytoscape-mcp's 6.25.0: forbidWildcardImports arrived in 7.1.0 and
+    // 8.9.0, not the sibling project's 6.25.0: forbidWildcardImports arrived in 7.1.0 and
     // expandWildcardImports in 8.2.0, and this project relies on both.
     id 'com.diffplug.spotless' version '8.9.0' apply false
     // Dead-code detection at compile time -- see the ErrorProne block below.
@@ -155,7 +155,7 @@ allprojects {
     dependencies {
         // 2.39.0 is the NEWEST release still compiled for Java 17. From 2.40 onward ErrorProne
         // targets Java 21 (class file 65) and fails here with UnsupportedClassVersionError, because
-        // this project is pinned to JDK 17 by DEPENDENCY_POLICY.md constraint 7 (Cytoscape 3.10.4).
+        // this project is pinned to JDK 17 by DEPENDENCY_POLICY.md constraint 7.
         // Do not bump this without changing that constraint first.
         errorprone 'com.google.errorprone:error_prone_core:2.39.0'
     }
@@ -185,9 +185,9 @@ dependencies {
     //
     // This reverses the convention in ParityDump, which parses JSON with a regex citing
     // DEPENDENCY_POLICY constraint 1 ("Jackson discovers modules via ServiceLoader"). That
-    // constraint's stated failure mechanism is "the thread-context classloader cannot see inside an
-    // OSGi bundle" -- a test in a plain JVM has no bundle, so the rule was applied outside its own
-    // mechanism (C46). The decisive argument is C44: that same regex silently stopped at `polarity`
+    // constraint's stated failure mechanism is a thread-context classloader that cannot see the
+    // caller's classes -- a test in a plain JVM with a flat classpath has no such split, so the rule
+    // was applied outside its own mechanism (C46). The decisive argument is C44: that same regex silently stopped at `polarity`
     // and dropped three columns, letting a reader bug survive a GREEN gate for five steps. For the
     // artifact that IS the exit criterion, silent truncation is the wrong failure mode.
     //
@@ -242,6 +242,15 @@ testing {
     suites {
         test {
             useJUnitJupiter(junitVersion)
+            targets.configureEach {
+                testTask.configure {
+                    // Forwarded explicitly: `gradle -D...` sets the property on the DAEMON, and the
+                    // test task forks its own JVM that never sees it. `make feature-matrix` relies on
+                    // this to rewrite docs/FEATURE_MATRIX.md instead of asserting against it.
+                    systemProperty 'massql.regenerate.matrix',
+                            System.getProperty('massql.regenerate.matrix') ?: 'false'
+                }
+            }
         }
 
         // *IT.java, in src/integrationTest/java. These read real spectra fixtures and the
@@ -351,8 +360,8 @@ ext.bannedDependencies = [
     'it.unimi.dsi:dsiutils',
     'it.unimi.dsi:fastutil',
     'com.google.guava:guava',
-    // Guava's annotation satellites. jsr305 exports javax.annotation (69 classes) -- a
-    // duplicate-exporter conflict source under OSGi.
+    // Guava's annotation satellites. jsr305 ships javax.annotation (69 classes), which collides
+    // with anything else providing that package.
     'com.google.code.findbugs:jsr305',
     'org.checkerframework:checker-qual',
     'com.google.errorprone:error_prone_annotations',
@@ -402,8 +411,8 @@ allprojects {
     }
 }
 
-// Feeds scripts/dependency-audit.sh. ROOT PROJECT ONLY -- this measures the SDK closure that
-// massql-app embeds under OSGi, which is what DEPENDENCY_POLICY.md's size budget is about. The
+// Feeds scripts/dependency-audit.sh. ROOT PROJECT ONLY -- this measures the SDK closure a host
+// application embeds, which is what DEPENDENCY_POLICY.md's size budget is about. The
 // CLI uber-jar is a standalone download and deliberately not an audited number.
 // Machine-readable TSV -- `coord <TAB> bytes <TAB> absolute-path` -- so the script can unzip each
 // artifact for the META-INF/services, META-INF/versions and native-library constraint checks. Under
@@ -443,10 +452,9 @@ publishing {
     }
     repositories {
         maven {
-            // Matches cy-ndex-2 and the other Cytoscape repos, so massql-app resolves this with
-            // no extra repo config. Credentials come from the environment: Gradle has no
-            // settings.xml, so there is no <server> id to match.
-            name = 'cytoscape'
+            // The NRNB-hosted Nexus this project publishes to. Credentials come from the
+            // environment: Gradle has no settings.xml, so there is no <server> id to match.
+            name = 'nexus'
             url = version.toString().endsWith('SNAPSHOT')
                     ? 'https://nrnb-nexus.ucsd.edu/repository/cytoscape_snapshots/'
                     : 'https://nrnb-nexus.ucsd.edu/repository/cytoscape_releases/'

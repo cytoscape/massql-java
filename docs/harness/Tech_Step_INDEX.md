@@ -41,7 +41,7 @@ owning step.
 | [10](Tech_Step10.md) | `scaninfo` collation, result model, JSON | 9, 5 | 1.5 d | | ✅ **DONE 2026-08-06 — 542 tests** |
 | [11](Tech_Step11.md) | Public API surface + CLI | 10 | 0.5 d | | ✅ **DONE 2026-08-08 — 587 tests** |
 | [12](Tech_Step12.md) | Integration layers 2–4 + error paths | 11, 2, 8 | 1.5 d | ⛔ **GATE** | ✅ **DONE 2026-08-08 — 699 tests, [GREEN](DIFFERENTIAL_REPORT.md)** |
-| [13](Tech_Step13.md) | Harden, document, hand off | 12 | 2 d | ⛔ **REVIEW** | not started |
+| [13](Tech_Step13.md) | Harden, document, hand off | 12 | 2 d | ⛔ **REVIEW** | ✅ **DONE 2026-08-10 — 731 tests; awaiting manual review** |
 
 **Total ≈ 16 days** (SPIKE.md §7 estimated ~12; the delta is the finer integration split, plus what was
 originally scoped as mzXML *vendoring* in Step 7 — now hand-written per **C23** — both of which were
@@ -93,13 +93,12 @@ These are decided. Specs implement them; they are not open for re-litigation ins
 | 1 | Function axis | **`scaninfo` only.** The other 5 functions reject cleanly (Step 4) |
 | 2 | Condition axis | **Both 9a and 9b** — the full `WHERE`/`FILTER` set (Step 9) |
 | 3 | Repo on disk | `/Users/shreuland/dev/massql-java`, sibling to `massql/` |
-| 4 | Repo home + publishing | `github.com/cytoscape/massql-java` → nrnb-nexus `cytoscape_releases`, as two independently versioned artifacts (`massql-java`, `massql-java-cli`). Publish to a local repo during the spike |
+| 4 | Repo home + publishing | GitHub → the NRNB-hosted Nexus, as two independently versioned artifacts (`massql-java`, `massql-java-cli`). Publish to a local repo during the spike |
 | 5 | MGF fixture | Commit the full 14 MB `PlusRise.mgf`. **Do not trim** — the 664-record golden belongs to the full file |
 | 6 | Parser | **ANTLR 4.13.2**, embedded |
 | 7 | mzML + MGF readers | **Vendor** MSDK's `MzMLParser` + `MSNumpress` (Correction C16 — Guava); MGF hand-written |
 | 8 | mzXML reader | **Vendor** MSDK's `MzXMLFileParser`, dsiutils import swapped out (Step 7) |
 | 9 | MSDK license | **Elect EPL-1.0** from the dual LGPL-2.1 / EPL-1.0 offer |
-| 10 | OSGi canary | Presented as a decision *at* the review gate, not done unasked |
 | 11 | MSDK overall | **Vendoring source, never a dependency** (C16). Shipping closure is 2 artifacts — javolution + antlr = **785,599 B (0.749 MB), 49.9% of budget**. Measured, not estimated. |
 
 ---
@@ -165,7 +164,7 @@ authoritative**.
 
 **C4 — pin `slf4j-api` at 1.7.26 and forbid 2.x.**
 Not in [`SPIKE.md`](SPIKE.md). slf4j **1.7 uses static binding; 2.x uses `ServiceLoader`**, which §9 forbids outright. A
-routine dependency bump would silently break Phase 2 OSGi resolution with no obvious cause. This is a hard
+routine dependency bump would silently break a consumer's packaging with no obvious cause. This is a hard
 build constraint with the reason recorded, not a version preference (Step 3).
 
 **C5 — `msdk-spectra-centroidprofiledetection` exists in the closure.** Not mentioned in §5. Only the mzXML
@@ -249,7 +248,7 @@ correct" and "are the streams clean" — by testing correctness *through a pipe*
 differential runs `--output <tmp>` and diffs the **file**; stream hygiene stays in Step 11's
 `MainStreamDisciplineTest` / `MainNoStackTraceOnStdoutTest`, cross-referenced not duplicated.
 
-**Not affected: the SDK.** The Cytoscape app calls `Massql.execute` and writes the JSON into the node
+**Not affected: the SDK.** A consumer calls `Massql.execute` and writes the JSON into its own
 table in-process. There is no stdout, no temp file and no process boundary anywhere in the app's data
 path — the layer the reader assumed was at issue was never involved.
 
@@ -536,7 +535,7 @@ left behind.
 four artifacts above moved into `docs/harness/oracle/`. The redundant outside copies are deleted, not stubbed.
 
 **Two documents deliberately stayed in `docs/`**: [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md), the published
-contract the Phase-2 app consumes, and [`VENDORED.md`](../VENDORED.md), the EPL-1.0 election a redistributor
+contract consumers depend on, and [`VENDORED.md`](../VENDORED.md), the EPL-1.0 election a redistributor
 needs. Both are also **read at runtime by tests**, so their paths are code rather than prose.
 
 **The boundary is now a rule, not a judgement call:**
@@ -581,8 +580,8 @@ re-measured against the goldens and matched what the spec already stated, includ
 **A JSON parser replaces hand-rolled regex for the goldens**, and the reasoning is worth recording because it
 reverses a convention. Three existing places parse JSON with regex, `ParityDump` citing
 `DEPENDENCY_POLICY.md` constraint 1 — *"Jackson discovers modules via ServiceLoader"*. But that constraint's
-**stated failure mechanism** is *"the thread-context classloader cannot see inside an OSGi bundle"*, and a test
-running under Gradle in a plain JVM has no bundle. The rule was applied outside its own mechanism, which the
+**stated failure mechanism** is a thread-context classloader that cannot see the caller's classes, and a test
+running under Gradle on a flat classpath has no such split. The rule was applied outside its own mechanism, which the
 policy's preamble specifically warns against. `checkBannedDependencies` inspects `runtimeClasspath`, so a
 `testImplementation` dependency provably cannot reach the shipping closure.
 
@@ -1206,8 +1205,8 @@ reuses it.
 **C22 — execution is STREAMING, not whole-file. The store is never materialised for a whole file.**
 Prompted by a direct question about 500 MB inputs. Calibrating from the fixtures (10.7–20.0 bytes of
 file per loaded peak) against the store's 41 bytes/peak, a **500 MB input projects to 1.0–1.9 GB of
-heap** — an OOM or GC-thrash lockup inside Cytoscape, not a graceful failure. **This is a gap in
-SPIKE.md itself**: §9's constraints are entirely about bundle size and OSGi resolution; there is no
+heap** — an OOM or GC-thrash lockup in the host, not a graceful failure. **This is a gap in
+SPIKE.md itself**: §9's constraints are entirely about dependency size and shape; there is no
 heap constraint and no target file size anywhere in the document.
 
 Streaming works because **every v1 condition is a per-scan computation** (`i_norm` is `i/max(scan)`,
@@ -1307,23 +1306,23 @@ C1 under-credited that line by tracing Guava only through the mzXML path.
 Guava + annotation satellites = **2,992,669 B (2.85 MB)**, taking the closure to **3.97 MB** (2.65× budget).
 **Size was the least of it:**
 
-- Cytoscape exports **Guava 9.0.0** (`guava-osgi:9.0.0`, circa 2011); MSDK compiles against **27.1**.
+- MSDK compiles against **Guava 27.1**, while a plausible host provides **9.0.0** (circa 2011).
   Importing cannot satisfy an 18-major-version gap.
-- Guava 27.1 **is itself an OSGi bundle** exporting `com.google.common.*` at `version="27.1.0"`, so embedding
-  makes bnd emit `Import-Package: com.google.common.collect;version="[27.1,28)"` by default — Felix tries to
-  satisfy it from the runtime, finds Guava 9, and **fails to resolve the bundle** unless the imports are
+- An 18-major-version gap is not a version range anything can reconcile, so embedding Guava 27.1 forces the
+  host's Guava version — which a library has no business doing, and which breaks the host unless its own
+  packaging is
   explicitly negated. The classic `Embed-Dependency` footgun.
 - `jsr305` rides along exporting `javax.annotation` (69 classes), a known duplicate-exporter conflict source.
 
 `cy-ndex-2` does embed Guava 30.1.1 alongside core's 9.0.0, so private embedding is proven here — but it hands
-Phase 2 three standing obligations. **Resolution: vendor the mzML parser too** ([Step 6](Tech_Step6.md)),
+consumers standing obligations about how they repackage us. **Resolution: vendor the mzML parser too** ([Step 6](Tech_Step6.md)),
 exactly as [Step 7](Tech_Step7.md) already does for mzXML, replacing Guava `Range` with a plain pair.
 
 **Shipping closure is now two artifacts — 785,599 B (0.749 MB), 49.9% of budget:**
 `javolution-core-java-msftbx` 459,292 (the ServiceLoader-free `XMLStreamReaderImpl`) + `antlr4-runtime`
 326,307. Both audited: zero `META-INF/services`, zero `META-INF/versions`, zero native libs. **No Guava, no
 slf4j, no MSDK, no commons-io, no JAXB, no CDK.** Enforced by `checkBannedDependencies`, wired into `check`, so the
-build fails rather than the bundle.
+build fails rather than the consumer.
 
 > Also worth recording: **JUnit itself violates constraints 1 and 4** (`junit-platform-commons` ships 10
 > `META-INF/versions` entries, `junit-jupiter-engine` 2 `META-INF/services`). Correct and harmless — but it is
@@ -1355,8 +1354,8 @@ test is viable exactly as specified.
 (`COM=` header) and `TITLE=DP00570_F02.0003.0003.2` holds the original scan number, but there is no `SCANS=`
 so MassQL uses the block index; charge filtering also dropped 62 of 687 MS2 scans (625 blocks remain).
 → [Step 12](Tech_Step12.md) Pair B is a **population-pattern** comparison, not a join. **Carry to
-Phase 2:** for MGF without `SCANS=`, `scan` is a positional index, not the instrument scan number — and the
-Cytoscape app joins the node table on `scan`.
+consumers:** for MGF without `SCANS=`, `scan` is a positional index, not the instrument scan number — and a
+consumer joining its own table on `scan` needs to know that.
 
 **C14 — both MGF loaders are live, depending on the file.** `_load_data_mgf` falls back to the manual parser
 when pyteomics yields zero rows. `PlusRise.mgf` → **manual** (pyteomics cannot index it), `scan` dtype
@@ -1451,7 +1450,7 @@ shorthand for "reference implementation".** An unqualified claim about output or
 |---|---|---|
 | **reference implementation** | `../massql/massql_query.py` — the Python oracle. Generates goldens; **never ships** | JSON → stdout, by its own deliberate choice (`contextlib.redirect_stdout(sys.stderr)` at `:141`). We inherit the diff contract, not the convention |
 | **Java CLI** | `cli.Main` ([Step 11](Tech_Step11.md)) — a thin wrapper that mirrors the reference's interface so [Step 12](Tech_Step12.md) can diff | JSON → stdout **or** `--output FILE`; diagnostics → stderr |
-| **SDK** | `Massql.parse/execute/run` — the programmatic API the Cytoscape app codes against | **Neither.** Returns objects; `DEPENDENCY_POLICY.md` constraint 2 says it logs nothing at all |
+| **SDK** | `Massql.parse/execute/run` — the programmatic API consumers code against | **Neither.** Returns objects; `DEPENDENCY_POLICY.md` constraint 2 says it logs nothing at all |
 
 Two conventions are in play and they govern different layers. The **Unix filter convention** (stdout =
 the program's data, stderr = diagnostics) governs the Java CLI — it is what makes `| jq` work.

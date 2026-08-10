@@ -21,8 +21,8 @@ import org.junit.jupiter.params.provider.ValueSource;
  * <p>The mzML and mzXML readers <b>memory-map</b> their input (Step 6), so a leak costs a file
  * descriptor <i>and</i> address space. Neither shows up in a single-file test: the symptom is "too many
  * open files" much later, in unrelated code, after a user has opened a few hundred files in one
- * session. Phase 2's {@code shutDown()} depends directly on release working, and Cytoscape is a
- * long-lived process — the exact environment where a slow leak is worst.
+ * session. A long-lived host process is the exact environment where a slow leak is worst, and it is
+ * also the one least able to recover from it.
  *
  * <p>The cycle count is deliberately above the common 256-descriptor soft limit, so a reader that never
  * released would fail here rather than surviving on headroom.
@@ -173,7 +173,7 @@ class ResourceLeakIT {
                                 + " across "
                                 + opens
                                 + " open/close cycles. Even one leaked per open exhausts a long-lived"
-                                + " Cytoscape session, which is what Phase 2's shutDown() depends on.");
+                                + " host process, which is where this SDK is expected to live.");
     }
 
     private static long openDescriptors() {

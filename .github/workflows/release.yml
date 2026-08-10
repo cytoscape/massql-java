@@ -1,9 +1,9 @@
 # Builds a version-stamped artifact, attaches it to the GitHub release, and publishes to the
-# Cytoscape nexus (settled decision 4).
+# NRNB-hosted Nexus repository.
 #
 # TWO ARTIFACTS, VERSIONED INDEPENDENTLY, so the tag has to say which one it releases:
 #
-#     sdk-v1.2.3   ->  massql-java 1.2.3        (the thin jar massql-app embeds)
+#     sdk-v1.2.3   ->  massql-java 1.2.3        (the thin jar consumers embed)
 #     cli-v1.2.3   ->  massql-java-cli 1.2.3    (the standalone uber-jar)
 #
 # A bare `v1.2.3` tag is REJECTED. It was unambiguous when there was one artifact; now it would
@@ -111,7 +111,7 @@ jobs:
 
       # Gradle has no settings.xml, so there is no <server> id to match: the repository block in
       # build.gradle / cli/build.gradle reads REPO_USER and REPO_PWD straight from the environment.
-      - name: Publish to Cytoscape nexus
+      - name: Publish to Nexus
         run: make publish-${{ steps.rel.outputs.artifact }}
         env:
           REPO_USER: ${{ secrets.REPO_USER }}

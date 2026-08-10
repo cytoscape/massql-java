@@ -5,8 +5,8 @@ import java.util.List;
 /**
  * Serializes {@link ScanInfoResult} rows to the published JSON contract.
  *
- * <p><b>This output is a published contract, not an implementation detail.</b> The Phase-2 app writes the
- * string into a Cytoscape node table verbatim and {@code MASSQL_PARSE} reads it back, so the key names,
+ * <p><b>This output is a published contract, not an implementation detail.</b> A consumer may write the
+ * string into a table column verbatim and read it back later, so the key names,
  * the key set and the key order are frozen. They are defined in {@code docs/RESULT_SCHEMA.md} and pinned
  * by {@code ResultSchemaContractTest}.
  *
@@ -18,7 +18,8 @@ import java.util.List;
  * <h2>Written by hand — no Jackson, no Gson</h2>
  *
  * The output is 12 fixed keys. Jackson discovers modules through {@code ServiceLoader}, which
- * {@code DEPENDENCY_POLICY.md} constraint 1 forbids outright (it does not work reliably under OSGi), and
+ * {@code DEPENDENCY_POLICY.md} constraint 1 forbids outright (provider lookup is unreliable whenever the
+ * thread-context classloader cannot see the caller's classes, which is any non-flat classpath), and
  * constraint 6 caps the dependency budget that a JSON library would consume for no benefit here.
  *
  * <h2>Number formatting</h2>

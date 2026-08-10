@@ -5,8 +5,8 @@
 ## Why this is written rather than imported
 
 No Java dataframe library is usable here. Tablesaw pulls ~44 MB and finds its I/O registry by
-**classpath scanning**, which breaks `DEPENDENCY_POLICY.md` constraint 1 inside an OSGi
-bundle. Arrow has split packages and needs `sun.misc.Unsafe` plus JVM flags we do not control.
+**classpath scanning**, which breaks `DEPENDENCY_POLICY.md` constraint 1. Arrow has split
+packages and needs `sun.misc.Unsafe` plus JVM flags we do not control.
 So the dataframe is ours: parallel primitive arrays plus per-scan reductions. It is ordinary
 Java, and it is the bulk of the production LOC.
 

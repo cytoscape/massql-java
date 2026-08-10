@@ -14,7 +14,8 @@ GRADLE := ./gradlew --console=plain
 
 .DEFAULT_GOAL := help
 .PHONY: help all build test it verify lint lint-fix coverage cli audit spec-audit fixtures \
-        report clean test-one it-one set-version-sdk set-version-cli publish-sdk publish-cli
+        report clean test-one it-one set-version-sdk set-version-cli publish-sdk publish-cli \
+        feature-matrix
 
 ## help: list the targets (default)
 help:
@@ -45,11 +46,12 @@ test:
 it:
 	$(GRADLE) integrationTest :cli:integrationTest
 
-## verify: unit + integration + coverage gate + lint + banned deps, then audit and spec-audit. What the reviewer runs.
+## verify: unit + integration + coverage gate + lint + banned deps, audit, spec-audit, then the differential table. What the reviewer runs.
 verify:
 	$(GRADLE) check
 	@$(MAKE) --no-print-directory audit
 	@$(MAKE) --no-print-directory spec-audit
+	@bash scripts/differential-table.sh
 
 ## lint: report style violations (Spotless is the whole style specification)
 lint:
@@ -63,6 +65,11 @@ lint-fix:
 coverage:
 	$(GRADLE) jacocoTestReport
 	@echo "  -> build/reports/jacoco/test/html/index.html"
+
+## feature-matrix: regenerate docs/FEATURE_MATRIX.md from the code (run after changing the enums)
+feature-matrix:
+	$(GRADLE) :test --tests '*FeatureMatrixTest*' -Dmassql.regenerate.matrix=true --rerun-tasks
+	@echo "  -> docs/FEATURE_MATRIX.md"
 
 ## cli: build the standalone CLI uber-jar
 cli:
@@ -114,11 +121,11 @@ stamp:
 	@sed -i.bak "s|^$(KEY)=.*|$(KEY)=$(V)|" gradle.properties && rm -f gradle.properties.bak
 	@grep "^$(KEY)=" gradle.properties | sed 's/^/  /'
 
-## publish-sdk: publish the SDK jar to the Cytoscape nexus. Needs REPO_USER / REPO_PWD.
+## publish-sdk: publish the SDK jar to the Nexus repository. Needs REPO_USER / REPO_PWD.
 publish-sdk:
 	$(GRADLE) :publish
 
-## publish-cli: publish the CLI uber-jar to the Cytoscape nexus. Needs REPO_USER / REPO_PWD.
+## publish-cli: publish the CLI uber-jar to the Nexus repository. Needs REPO_USER / REPO_PWD.
 publish-cli:
 	$(GRADLE) :cli:publish
 

@@ -184,7 +184,7 @@ silently leave `MS2NL=-18` unfolded (Correction C35e).
 
 The SDK **logs nothing** — `DEPENDENCY_POLICY.md` **constraint 2** (Tech_Step9 §5 cited constraint 5, which is
 "No split packages"). A valid-but-degenerate query returns its explanation in `ExecutionSummary.diagnostics()`
-instead: the CLI writes them to stderr, the Phase-2 app can show them in a dialog.
+instead: the CLI writes them to stderr; a GUI could show them in a dialog.
 
 An empty result set is a legitimate answer. A **silent** empty result set is a poor one.
 

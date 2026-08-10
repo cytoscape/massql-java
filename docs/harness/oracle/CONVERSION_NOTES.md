@@ -150,10 +150,10 @@ Pair B's actual purpose — pinning the format distinction — needs no join. As
 per file instead: the mzXML populates `ms1scan`/`ms1_*` by document order while the MGF nulls them and
 reports `rt` as `0.0`. That is exactly what the two goldens show.
 
-> **Carry this to Phase 2 (Tech_Step13 known deviations):** for MGF input without `SCANS=`, MassQL's `scan`
+> **Carry this to Tech_Step13's known deviations:** for MGF input without `SCANS=`, MassQL's `scan`
 > is a *positional index*, not the instrument scan number — even though the real number sits in `TITLE`. The
-> Cytoscape app joins results to the node table on `scan`, so MGF-derived results cannot be joined back to
-> instrument scan numbers. This is a genuine trap for that feature.
+> A consumer joining results to its own table on `scan` therefore cannot join MGF-derived results back to
+> instrument scan numbers. This is a genuine trap for any such feature.
 
 ---
 

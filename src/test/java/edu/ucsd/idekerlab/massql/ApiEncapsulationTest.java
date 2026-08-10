@@ -46,10 +46,10 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
 class ApiEncapsulationTest {
 
     /**
-     * The published surface — what {@code massql-app} and the CLI actually code against.
+     * The published surface — what a consumer, including the CLI, actually codes against.
      *
      * <p>{@code exec.*} is deliberately absent: those classes are public for the CLI project to
-     * reach across the module boundary, not because Phase 2 should call them. {@code docs/SDK.md}
+     * reach across the module boundary, not because a consumer should call them. {@code docs/SDK.md}
      * documents this list as the contract.
      */
     private static final List<Class<?>> PUBLIC_API =

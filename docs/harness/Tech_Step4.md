@@ -312,7 +312,7 @@ An empty or unreadable `reference_parses/` directory must **fail** `ParseConform
 - [x] The full §2 case matrix passes in both directions (30 cells).
 - [x] No third-party type appears in any public signature — `AstEncapsulationTest` reflects over the API and
       bans `org.antlr.*`, `io.github.msdk.*`, `io.vendor.*`, `com.google.common.*`, `org.slf4j.*`,
-      `org.cytoscape.*`. This is what keeps the parser swappable.
+      any third-party package. This is what keeps the parser swappable.
 - [x] [`GRAMMAR_NOTES.md`](GRAMMAR_NOTES.md) (196 lines) records: the line count (**165**, confirmed), **all 5** deliberate
       divergences, the `MS2MZ` alias resolution, the canonical-order-preserving decision, and the lexer-modes
       fallback for `formula()`/`peptide()`/`aminoaciddelta()` if they are ever brought in scope.
@@ -328,7 +328,7 @@ from the Lark source.
 `https://massql.gnps2.org/parse?query=<urlencoded>` returns the canonical AST as JSON (verified live; the
 documented `msql.ucsd.edu/parse` now serves a deprecation redirect). Parsing remotely and executing locally
 would remove all parser risk, but it puts a network dependency in an SDK that must work offline and makes the
-test suite non-hermetic, violating `DEPENDENCY_POLICY.md` constraint 9. **Price it only if the grammar fights
+test suite non-hermetic, violating `DEPENDENCY_POLICY.md` constraint 8 (no network access in any test). **Price it only if the grammar fights
 back** — and if it is ever taken, it is a change to this spec, not a quiet implementation choice.
 
 ## References

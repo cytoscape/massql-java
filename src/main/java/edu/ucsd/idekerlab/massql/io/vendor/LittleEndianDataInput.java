@@ -12,8 +12,8 @@ import java.io.InputStream;
  * <p><b>Not vendored — written for this project</b> as a drop-in replacement for Guava's
  * {@code com.google.common.io.LittleEndianDataInputStream}, which {@code MzMLPeaksDecoder}
  * used. Guava cannot be a dependency here (Correction C16: it is unavoidable via
- * {@code msdk-datamodel}, costs 2.85 MB, and Cytoscape exports version 9.0.0 against MSDK's
- * 27.1, so an embedded copy makes bnd emit an {@code Import-Package} Felix cannot satisfy).
+ * {@code msdk-datamodel}, costs 2.85 MB, and its major version conflicts irreconcilably with the
+ * 9.0.0 a likely host already provides).
  *
  * <p>Only the four methods {@code MzMLPeaksDecoder} actually calls are implemented —
  * {@link #readInt}, {@link #readLong}, {@link #readFloat}, {@link #readDouble}. Anything else

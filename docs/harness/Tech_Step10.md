@@ -3,7 +3,7 @@
 ## Goal
 
 Turn qualifying scans into the exact 12-key result contract — including the five columns MassQL does **not**
-produce and the SDK must compute itself — and serialize it as the published JSON that `massql-app` will store
+produce and the SDK must compute itself — and serialize it as the published JSON a consumer will store
 verbatim.
 
 ## Prerequisites
@@ -17,7 +17,7 @@ verbatim.
 
 **Only 7 of the 12 result keys come from MassQL. The SDK must compute the other 5** — this is the most
 easily-missed part of the whole contract. `massql_query.py` computes them in Python on top of MassQL's raw output;
-here they move into the SDK so they are unit-tested outside OSGi and the Phase-2 app's node-table write-back stays
+here they move into the SDK so they are unit-tested directly and a consumer's own write-back stays
 a dumb loop.
 
 | Source | Columns |

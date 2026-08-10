@@ -4,7 +4,7 @@ Regenerate with: make audit
 Answers SPIKE.md §11 Q3 and "did dependency complexity stay bounded?" at the review gate.
 
 ================================================================
-SHIPPING CLOSURE  (the SDK's runtime closure = what massql-app embeds)
+SHIPPING CLOSURE  (the SDK's runtime closure = what a consumer embeds)
 ================================================================
   ARTIFACT                                            SIZE  SERVICES  VERSIONS  NATIVE
   javolution-core-java-msftbx-6.11.8.jar            459292         0         0       0

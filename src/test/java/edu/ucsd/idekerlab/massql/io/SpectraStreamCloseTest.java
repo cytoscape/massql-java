@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * {@code close()} is load-bearing, not ceremony: the cursor holds a memory mapping (mzML) or an open
- * reader (MGF) for its whole lifetime. Phase 2's {@code shutDown()} depends on release, and
+ * reader (MGF) for its whole lifetime. A host's own shutdown path depends on release, and
  * Tech_Step12 tests this at the integration level.
  */
 class SpectraStreamCloseTest {
@@ -32,7 +32,7 @@ class SpectraStreamCloseTest {
     void twoHundredOpenCloseCyclesDoNotExhaustDescriptors() {
         // The leak this guards is real for mzML: each open maps the file. Without release, 200
         // cycles
-        // exhaust descriptors or address space -- and inside Cytoscape that surfaces as an
+        // exhaust descriptors or address space -- and in a long-lived host that surfaces as an
         // unrelated
         // failure much later.
         Path mzml = Fixtures.require("data/small.mzML");

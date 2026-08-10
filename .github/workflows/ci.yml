@@ -9,9 +9,8 @@
 #      live in *IT.java files run by the separate integrationTest suite (reader parity, the
 #      differential, the CLI contract), so a unit-test-only run would report green while
 #      skipping every gate.
-#   2. JDK 17, not 11 — DEPENDENCY_POLICY.md constraint 7 (matches Cytoscape 3.10.4).
-#   3. No `xvfb-run`. cy-ndex-2 needs a virtual display because Cytoscape touches AWT;
-#      nothing in massql-java does (SPIKE.md §6d: "No display needed").
+#   2. JDK 17, not 11 — DEPENDENCY_POLICY.md constraint 7.
+#   3. No `xvfb-run`: nothing here touches AWT, so no virtual display is needed.
 name: Continuous Integration
 
 on:
@@ -55,7 +54,11 @@ jobs:
         run: make fixtures
 
       # Unit + integration tests, Spotless, the banned-dependency rule and the 90% coverage gate,
-      # then the dependency audit and spec-audit.
+      # then the dependency audit, spec-audit and the differential table.
+      #
+      # The table is deliberately NOT a separate step: `make verify` runs it (Tech_Step13 §3). A step
+      # that re-ran it would create a second definition of what CI checks, which is the drift the
+      # Makefile-only rule exists to prevent.
       #
       # `make verify` rather than `./gradlew check`: the Makefile is the ONLY entry point, so what
       # CI runs and what a developer runs cannot drift.

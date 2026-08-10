@@ -1,30 +1,40 @@
 # Dependency policy
 
-**These constraints bind every later step.** `massql-java` never sees OSGi, but `massql-app` embeds it as a
-nested jar on `Bundle-ClassPath`, and the failure modes there are expensive to diagnose and cheap to prevent.
+**These constraints bind every later step.** This library is meant to be *embedded* — dropped into another
+application's classpath, shaded into a fat jar, or nested inside one. The failure modes that come with being
+embedded are expensive to diagnose and cheap to prevent, and every rule below exists because of one.
 
 Each rule states its **failure mechanism**. A rule without one gets bumped by the next person who finds it
 inconvenient — which is exactly how this project nearly shipped Guava (see §Guava below).
 
-Most of these are enforced by the `checkBannedDependencies` task in `build.gradle`, wired into `check`, so
-**the build fails rather than the bundle**. `scripts/check-osgi-readiness.sh` (Tech_Step13) checks the rest against the packaged artifact.
+Most of these are enforced mechanically, so **the build fails rather than the consumer**:
+`checkBannedDependencies` in `build.gradle` (wired into `check`) rejects the banned coordinates, and
+`scripts/dependency-audit.sh` fails on the size budget and on any `META-INF/services`, `META-INF/versions`
+or native library inside a resolved artifact.
+
+⚠ **Two are policy only, held by review rather than by the build:** that *our own* code never calls
+`ServiceLoader` or `Class.forName` (§1's second half), and §5's no-split-packages rule. A script once
+checked both; it was removed because a library asserting facts about its future container has taken on a
+dependency on that container (Tech_Step13 §5). Violate either and nothing will fail — worth knowing before
+relaxing them.
 
 ---
 
 ## The constraints
 
 **1. No `ServiceLoader`, no `META-INF/services`, no `Class.forName` anywhere in the shipping closure.**
-The thread-context classloader cannot see inside an OSGi bundle, so provider lookup silently finds nothing.
-cytoscape-mcp hit this twice — Lucene and the MCP SDK.
+Provider lookup goes through the thread-context classloader, which in an embedding host frequently cannot see
+this library's own classes — so it silently finds nothing rather than failing. A sibling project hit this twice,
+with Lucene and the MCP SDK.
 *Consequence for us:* we cannot use `javax.xml.stream.XMLInputFactory`, which is why `javolution` is a
 dependency at all — the vendored parsers instantiate `javolution.xml.internal.stream.XMLStreamReaderImpl`
 **directly**. Instantiating the JDK's internal implementation by name would need `Class.forName`, also banned.
-*Enforced:* the banned-dependency rule rejects known offenders; the readiness script unpacks the closure and
-greps.
+*Enforced:* the banned-dependency rule rejects known offenders, and `scripts/dependency-audit.sh` fails on any
+`META-INF/services` inside a resolved artifact. ⚠ That *our own* code never calls either is policy only.
 
 **2. No logging framework. The SDK logs nothing at all.**
-Return diagnostics to the caller and let them log. `cy-ndex-2` embeds slf4j+logback while cytoscape-mcp
-deliberately excludes `org/slf4j/**`; do not add to that conflict. Note slf4j **2.x** switched to
+Return diagnostics to the caller and let them log. A library that brings its own logging framework picks a
+fight with whatever the host already uses, and the host always wins. Note slf4j **2.x** switched to
 `ServiceLoader`, so a future "harmless" logging addition would breach constraint 1 as well.
 *Enforced:* the banned-dependency rule rejects `org.slf4j:*` and `ch.qos.logback:*`.
 
@@ -32,30 +42,29 @@ deliberately excludes `org/slf4j/**`; do not add to that conflict. Note slf4j **
 JAXB is not in the JDK from 11 onward and drags a provider-lookup stack. Native libraries cannot be loaded
 from inside a nested jar. `Unsafe` needs JVM flags we do not control.
 *Note:* MSDK's mzXML pom declares JAXB but the code only touches `javax.xml.datatype`, still in the JDK on 17.
-*Enforced:* the banned-dependency rule rejects the JAXB coordinates; the readiness script scans for
-`.so`/`.dylib`/`.dll` and `Unsafe`.
+*Enforced:* the banned-dependency rule rejects the JAXB coordinates, and `scripts/dependency-audit.sh` scans
+resolved artifacts for `.so`/`.dylib`/`.dll`.
 
 **4. No `META-INF/versions/**` (multi-release jars) in the shipping closure.**
-They break Felix resolution on Cytoscape 3.10.x.
+They break any consumer that reads class entries directly instead of through a multi-release-aware loader —
+which includes common shading and repackaging tooling.
 *Note:* JUnit violates this (`junit-platform-commons` ships 10 such entries) — which is fine, and precisely why
 the check must be scoped to compile+runtime and never to test.
-*Enforced:* readiness script + `dependency-audit.txt`'s per-artifact table.
+*Enforced:* `scripts/dependency-audit.sh` + `dependency-audit.txt`'s per-artifact table.
 
-**5. No split packages.** Two bundles exporting the same package makes Felix pick one wiring framework-wide.
-*Enforced:* readiness script.
+**5. No split packages.** Two artifacts providing the same package leaves the winner to classpath order, and on
+the module path it is an outright error. It is also why the vendored decoder lives under our own package rather
+than upstream's.
+*Enforced:* policy only — nothing in the build checks it.
 
 **6. Shipping closure under ~1.5 MB.** Currently **785,599 B (0.749 MB), 49.9% of budget** — see
 `dependency-audit.txt`. This is the one constraint with no hard failure mechanism; it is a bloat guideline. Do
 not let that make it feel negotiable, because the artifacts that blow it tend to breach constraints 1–5 too.
 
-**7. Java 17.** Matches Cytoscape 3.10.4's parent pom. Class file major version ≤ 61.
+**7. Java 17.** Class file major version ≤ 61. Raising it strands any consumer still on 17.
 
 **8. No network access in any test.** The 46 parse goldens are checked-in files; never call
 `massql.gnps2.org/parse` from a test. Flaky CI destroys the credibility of a conformance number.
-
-**9. No Cytoscape or OSGi dependency, ever.** `massql-java` must be physically unable to compile against
-Cytoscape. That compile-time firewall is the only thing that reliably keeps `org.cytoscape` imports out of
-engine code — it is the reason this repo is separate from `massql-app`.
 
 ---
 
@@ -66,10 +75,9 @@ engine code — it is the reason this repo is separate from `massql-app`.
 | `com.github.chhh:javolution-core-java-msftbx:6.11.8` | 459,292 | The `ServiceLoader`-free `XMLStreamReaderImpl` the vendored parsers instantiate directly (constraint 1) |
 | `org.antlr:antlr4-runtime:4.13.2` | 326,307 | Parser runtime (Tech_Step4) |
 
-Both audited 2026-07-30: zero `META-INF/services`, zero `META-INF/versions`, zero native libraries. javolution
-is a proper OSGi bundle with a unique symbolic name, and nothing else in Cytoscape provides `javolution.*`, so
-there is no split package or version conflict. Its `org.osgi.core` dependency is not compile-scope and does not
-enter the closure.
+Both audited 2026-07-30: zero `META-INF/services`, zero `META-INF/versions`, zero native libraries. Neither
+shares a package with anything else here, so constraint 5 holds. javolution's one optional framework dependency
+is not compile-scope and does not enter the closure.
 
 ### ⛔ A build tool is not a dependency
 
@@ -104,20 +112,15 @@ portability is proven by construction.
 Guava plus its annotation satellites is **2,992,669 B (2.85 MB)**, taking the closure to 3.97 MB — 2.65× the
 budget. But size was the least of it:
 
-- **Cytoscape exports Guava 9.0.0** (`guava-osgi:9.0.0`, circa 2011). MSDK compiles against **27.1**. Importing
-  cannot satisfy that; an 18-major-version gap is not a version range.
-- **Guava 27.1 is itself an OSGi bundle** — `Bundle-SymbolicName: com.google.guava`,
-  `Bundle-Version: 27.1.0.jre` — exporting `com.google.common.*` at `version="27.1.0"`. Embedding it therefore
-  makes bnd emit `Import-Package: com.google.common.collect;version="[27.1,28)"` **by default**. Felix tries to
-  satisfy that from the runtime, finds Guava 9, and **fails to resolve the bundle** unless the imports are
-  explicitly negated. This is the classic `Embed-Dependency` footgun.
-- **`jsr305` rides along exporting `javax.annotation`** (69 classes) — a known duplicate-exporter conflict
-  source, since `javax.*` packages are provided from several places.
+- **An 18-major-version conflict.** MSDK compiles against Guava **27.1**, while a plausible host provides
+  **9.0.0** (circa 2011). That gap is not a version range anything can reconcile — a library that forces its
+  host's Guava version is not embeddable.
+- **`jsr305` rides along shipping `javax.annotation`** (69 classes), a package provided from several places, so
+  it collides with whatever else supplies it (constraint 5).
 
-`cy-ndex-2` does embed plain Guava 30.1.1 successfully alongside core's 9.0.0, so private embedding is a proven
-pattern here. But it hands Phase 2 three standing obligations (negate the imports, suppress the
-`javax.annotation` export, never re-export `com.google.common.*`). Vendoring removes all three, and 2.85 MB,
-on a code path where we were already vendoring the sibling parser.
+Private embedding *can* be made to work, but only by handing every consumer standing obligations about how they
+repackage us. Vendoring removes those obligations and 2.85 MB, on a code path where we were already vendoring
+the sibling parser.
 
 ---
 
@@ -131,8 +134,8 @@ Before adding anything, in this order:
    reading `MsScan.java`, not from a dependency tree.
 3. **Trace it transitively.** Guava arrives via `msdk-datamodel`, not via the artifact you name. Run
    `./gradlew dependencies --configuration runtimeClasspath` and read the whole thing.
-4. **Check what Cytoscape already exports, and at what version.** A package the framework provides at an
-   incompatible version is worse than one it does not provide at all.
+4. **Check what the embedding application is likely to provide already, and at what version.** A package the
+   host supplies at an incompatible version is worse than one it does not supply at all.
 5. **Add it to `bannedDependencies`** in `build.gradle` for whatever you decided to keep out, so the decision
    survives you.
 6. **Regenerate `dependency-audit.txt`** (`make audit`) and commit it.

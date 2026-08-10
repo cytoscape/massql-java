@@ -25,8 +25,8 @@ import edu.ucsd.idekerlab.massql.lang.ast.MassqlQuery;
  * assert and easy to violate by accident, e.g. by returning an ANTLR {@code ParserRuleContext}
  * or accepting a {@code Token} in a helper that later becomes public.
  *
- * <p>It also guards {@code DEPENDENCY_POLICY.md} constraint 9 in spirit: the same check will
- * catch an MSDK or vendored reader type leaking out in Tech_Step6/7.
+ * <p>The same check catches an MSDK or vendored reader type leaking out of Tech_Step6/7's readers, which is
+ * why the forbidden list is a prefix allowlist rather than a list of the types known today.
  */
 class AstEncapsulationTest {
 
@@ -37,8 +37,7 @@ class AstEncapsulationTest {
                     "io.github.msdk.", // vendoring source, never a dependency
                     "edu.ucsd.idekerlab.massql.io.vendor.", // vendored parser internals
                     "com.google.common.", // Guava is deliberately absent
-                    "org.slf4j.", // the SDK logs nothing
-                    "org.cytoscape." // the compile-time firewall
+                    "org.slf4j." // the SDK logs nothing
                     );
 
     private static final List<Class<?>> PUBLIC_API =

@@ -157,7 +157,7 @@ whose root is neither mzML nor mzXML *does* fail and names the file.
 
 **Handle leak: none.** 250 open/close cycles per format, plus 750 interleaved and 250 on `PlusRise.mgf`,
 with no descriptor growth; `close()` is idempotent, and opening without reading releases just as cleanly.
-Phase 2's `shutDown()` depends on this directly.
+A host's own shutdown depends on this directly.
 
 ## Performance
 
@@ -181,7 +181,7 @@ jvm                 : OpenJDK 64-Bit Server VM 17.0.18
 
 In-process and single-run, so these include JIT warm-up. ⚠ Peak heap of 127 MB sits against a **0.5 GB**
 ceiling — that is the test JVM's default, not a measured requirement, but it is thinner headroom than the
-numbers alone suggest and is worth sizing deliberately for the Cytoscape app.
+numbers alone suggest and is worth sizing deliberately in whatever embeds this.
 
 **vs the pandas path — same host, same file, same query, same 664 rows.** Both measured under
 `/usr/bin/time -l`, process to process, so JVM startup and interpreter startup are both included:

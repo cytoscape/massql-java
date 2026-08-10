@@ -37,7 +37,7 @@ by tests, so their paths are code:
 
 | | |
 |---|---|
-| [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) | the frozen 12-key result contract the Phase-2 app consumes and `MASSQL_PARSE` reads back. `ResultSchemaContractTest` parses it |
+| [`RESULT_SCHEMA.md`](../RESULT_SCHEMA.md) | the frozen 12-key result contract consumers depend on. `ResultSchemaContractTest` parses it |
 | [`VENDORED.md`](../VENDORED.md) | the EPL-1.0 election and vendored-code provenance a redistributor needs. `VendoredProvenanceTest` asserts it |
 
 ## Building and testing — `make` only, never `./gradlew`
@@ -46,7 +46,7 @@ by tests, so their paths are code:
 `release.yml` call the same targets, so what you run locally and what runs on a push cannot drift.
 
 The build produces **two independently versioned artifacts** (`gradle.properties`): `massql-java`, the thin SDK
-jar `massql-app` embeds, and `massql-java-cli`, a standalone uber-jar. Neither version forces the other.
+jar consumers embed, and `massql-java-cli`, a standalone uber-jar. Neither version forces the other.
 
 | | |
 |---|---|

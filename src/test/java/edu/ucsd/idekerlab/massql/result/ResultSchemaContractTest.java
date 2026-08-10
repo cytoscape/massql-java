@@ -95,7 +95,7 @@ class ResultSchemaContractTest {
                 List.of(ScanInfoResult.KEYS),
                 "docs/RESULT_SCHEMA.md and ScanInfoResult.KEYS disagree. The DOCUMENT is the contract "
                         + "(C40) -- if the change was intentional, it belongs in the document first, and "
-                        + "the goldens and Phase-2 app consumers change with it.");
+                        + "the goldens and every downstream consumer change with it.");
     }
 
     @Test
@@ -129,7 +129,7 @@ class ResultSchemaContractTest {
         assertEquals(
                 12,
                 declaredKeyOrder(schemaDoc()).size(),
-                "the contract is 12 keys; a change in arity is a breaking change for the Phase-2 app");
+                "the contract is 12 keys; a change in arity is a breaking change for every consumer");
     }
 
     // ---------------------------------------------------------------- the document's internal

@@ -22,11 +22,11 @@ import edu.ucsd.idekerlab.massql.io.SpectraStream;
 import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
 
 /**
- * The four public entry points, and the resource rules a Phase-2 author will otherwise get wrong.
+ * The four public entry points, and the resource rules a caller will otherwise get wrong.
  *
  * <p>Two of these assertions are about <b>ownership</b> rather than results, and they matter more
  * than they look: {@code execute} closing the caller's stream would break the multi-query-per-file
- * pattern the Cytoscape app needs, and {@code run} leaking on the exception path would exhaust file
+ * pattern a long-lived host needs, and {@code run} leaking on the exception path would exhaust file
  * handles in a long-running session — which surfaces nowhere near the cause.
  */
 class MassqlApiTest {

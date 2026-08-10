@@ -35,9 +35,9 @@ import javolution.xml.stream.XMLStreamException;
  *
  * <p><b>{@link XMLStreamReaderImpl} is instantiated DIRECTLY</b>, exactly as upstream does. That is the
  * entire reason javolution is a dependency: the JDK's {@code XMLInputFactory} discovers implementations
- * via {@code ServiceLoader}, banned by `DEPENDENCY_POLICY.md` constraint 1 because the thread-context
- * classloader cannot see inside an OSGi bundle, and naming the JDK's internal impl would need
- * {@code Class.forName}, also banned.
+ * via {@code ServiceLoader}, banned by `DEPENDENCY_POLICY.md` constraint 1 because provider lookup fails
+ * wherever the thread-context classloader cannot see the caller's classes, and naming the JDK's internal
+ * impl would need {@code Class.forName}, also banned.
  *
  * <p><b>Deferred decoding.</b> The walk captures each {@code <binary>} element's base64 text but does
  * not decode it; base64-decode, inflate and the {@code double[]} allocation all happen in

@@ -10,7 +10,7 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  *
  * <p><b>The SDK logs nothing</b> — {@code DEPENDENCY_POLICY.md} constraint 2. A valid-but-degenerate
  * query therefore returns its explanation here rather than printing it, and the caller decides what
- * to do with it: the CLI writes these to stderr, the Cytoscape app can show them in a dialog. An
+ * to do with it: the CLI writes these to stderr, a GUI could show them in a dialog. An
  * empty result set is a legitimate answer; a <i>silent</i> empty result set is a poor one.
  *
  * <p><b>{@code diagnostics} is passed straight through</b> from {@code ExecutionSummary}
@@ -20,7 +20,7 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  *
  * <p><b>Why {@code qualifyingScans} and {@code scansExamined} are not here.</b> The row count
  * already gives the first, and the second is a progress statistic with no consumer in the published
- * contract. This record is something the Phase-2 app depends on; widening it is a contract change,
+ * contract. Consumers depend on this record; widening it is a contract change,
  * so a caller wanting "examined N, matched M" should read the executor's summary rather than grow
  * this.
  *

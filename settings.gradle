@@ -1,6 +1,6 @@
 // Two projects, versioned independently (see gradle.properties):
 //
-//   :        the SDK -- publishes massql-java, the thin jar massql-app embeds under OSGi.
+//   :        the SDK -- publishes massql-java, the thin jar consumers embed.
 //   :cli     the standalone CLI -- publishes massql-java-cli, a Shadow uber-jar.
 //
 // The root IS the SDK rather than a third empty umbrella project, so no existing source

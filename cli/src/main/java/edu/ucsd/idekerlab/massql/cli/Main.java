@@ -108,10 +108,8 @@ public final class Main {
 
     /** Entry point. The only place in this project that calls {@code System.exit}. */
     public static void main(String[] args) {
-        // The ONLY System.exit in this project. Everything below returns a code instead, because
-        // the
-        // Phase-2 app embeds this jar and an exit call reachable from library code would kill
-        // Cytoscape.
+        // The ONLY System.exit in this project. Everything below returns a code instead: an exit
+        // call reachable from library code would take down any application that embedded it.
         System.exit(run(args, System.in, System.out, System.err));
     }
 

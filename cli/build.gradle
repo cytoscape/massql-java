@@ -3,12 +3,12 @@
 // Separate from the SDK for two reasons:
 //
 //   1. It is versioned and released independently (cliVersion in gradle.properties). A CLI fix
-//      does not force massql-app to resolve a new SDK coordinate, and vice versa.
+//      does not force consumers to resolve a new SDK coordinate, and vice versa.
 //   2. It can only compile against the SDK's PUBLIC API. The encapsulation boundary Tech_Step11
 //      cares about is therefore a compile error, not something a test has to catch.
 //
 // Shadow lives HERE and only here. Applied at the root it could make a fat jar the SDK's published
-// artifact, which would hand OSGi consumers a bundle with javolution baked inside.
+// artifact, which would hand every SDK consumer a jar with javolution baked inside.
 
 plugins {
     id 'java'
@@ -182,7 +182,7 @@ publishing {
     }
     repositories {
         maven {
-            name = 'cytoscape'
+            name = 'nexus'
             url = version.toString().endsWith('SNAPSHOT')
                     ? 'https://nrnb-nexus.ucsd.edu/repository/cytoscape_snapshots/'
                     : 'https://nrnb-nexus.ucsd.edu/repository/cytoscape_releases/'

@@ -17,7 +17,7 @@
  *      VARIABLE PLUS FLOAT(2), breaking every additive expression in the corpus.
  *   2. Compound literals like "(min=" are split into LPAREN + MIN_EQ.
  *
- * NOTE: this file must stay under src/main/antlr4/. Cytoscape app poms set
+ * NOTE: this file must stay under src/main/antlr4/. Some build setups override
  * <filtering>true</filtering> on resources and would silently corrupt ${...} here.
  */
 grammar Massql;

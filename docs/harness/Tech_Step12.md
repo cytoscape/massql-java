@@ -20,7 +20,7 @@ the same rows across formats, that the CLI honours its contract, and that every 
 
 Three of [`SPIKE.md`](SPIKE.md) §6b's four layers land here (layer 1 was [Step 8](Tech_Step8.md)). Their jobs differ: the
 **differential** proves we match Python; **cross-format equivalence** catches reader-specific bugs a per-format
-golden structurally cannot see; the **CLI contract** protects the interface Phase 2 and the differential both
+golden structurally cannot see; the **CLI contract** protects the interface consumers and the differential both
 depend on.
 
 Layer 3 is worth more than its size suggests. [`SPIKE.md`](SPIKE.md) §6b: *"Both are stronger than any single golden."* A
@@ -321,7 +321,7 @@ Each of these, for each of the three formats where applicable:
 | Query matching nothing | **Empty JSON array, exit 0** — not a crash, not exit 1 |
 | Missing / empty `msLevel` tag | Handled per [Step 7](Tech_Step7.md) §4, using `empty_msLevel_tag.mzXML` |
 | Missing file / directory / empty file | Clear error naming the path, exit 2 |
-| **Handle leak** | Open and close **200+** files across all three formats without exhausting descriptors. Phase 2's `shutDown()` depends on this |
+| **Handle leak** | Open and close **200+** files across all three formats without exhausting descriptors. A host's own shutdown depends on this |
 
 ### 5. Performance measurement
 
