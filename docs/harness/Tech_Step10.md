@@ -1,5 +1,8 @@
 # Tech Step 10 — `scaninfo` collation, result model, JSON
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 ## Goal
 
 Turn qualifying scans into the exact 12-key result contract — including the five columns MassQL does **not**

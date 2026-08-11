@@ -1,5 +1,8 @@
 # Condition semantics
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 Every rule the engine implements, with the source line that establishes it. **Where this document and the
 pinned Python source disagree, the source wins** — and it has, five times.
 

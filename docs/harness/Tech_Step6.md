@@ -1,5 +1,8 @@
 # Tech Step 6 — Reader interface, MGF reader, mzML reader
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 ## Goal
 
 `SpectraFile.open(path)` sniffs the format and produces MS1/MS2 `SpectrumTable`s whose decoded values are

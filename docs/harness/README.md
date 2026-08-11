@@ -1,5 +1,8 @@
 # Harness specs
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 The execution record for this SDK: one spec per implementation step, written to be handed to
 one engineer and finished without reading the others.
 

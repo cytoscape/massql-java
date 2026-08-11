@@ -1,5 +1,8 @@
 # Spike: `massql-java` — a pure-Java MassQL SDK
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 **Audience:** the developer building the prototype.
 **Spike scope:** finish **`massql-java`** only, verified by **unit and integration tests inside the SDK**,
 green at the CLI layer against **all three input formats** (`.mgf`, `.mzML`, `.mzXML`). That proves the

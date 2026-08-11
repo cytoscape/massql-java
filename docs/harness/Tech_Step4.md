@@ -1,5 +1,8 @@
 # Tech Step 4 — Grammar, typed AST, `Massql.parse()`
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 ## Goal
 
 `Massql.parse(String)` returns a typed, immutable AST for every supported MassQL query and throws a

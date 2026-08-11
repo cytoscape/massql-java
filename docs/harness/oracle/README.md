@@ -1,5 +1,8 @@
 # Oracle records and artifacts
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 The **records** the harness design references, and the **artifacts** it was derived from. Everything here is
 input to, or evidence for, the step specs one directory up.
 

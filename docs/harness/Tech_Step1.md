@@ -1,5 +1,8 @@
 # Tech Step 1 — Restore the Python oracle
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 > **⛔ THIS STEP IS A GATE.** If the two checked-in goldens do not reproduce float-identically, **stop and
 > escalate**. Do not adjust the goldens to match, and do not proceed to any other step that consumes them.
 

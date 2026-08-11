@@ -1,5 +1,8 @@
 # Grammar notes
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 Every deliberate divergence between `src/main/antlr/…/Massql.g4` ([C43](Tech_Step_INDEX.md#c43) moved it from `src/main/antlr4/`) and the Lark source it was
 translated from, plus the facts a future re-sync will need.
 

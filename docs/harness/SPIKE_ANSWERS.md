@@ -1,5 +1,8 @@
 # The eight spike questions, answered
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 [`SPIKE.md`](SPIKE.md) §11 asked eight questions. This file answers all eight and cites the
 evidence for each, so a reviewer can check the answer rather than take it.
 

@@ -1,5 +1,8 @@
 # Reader parity report — integration layer 1 (Tech_Step8, the gate)
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 **Verdict: GREEN.** All three readers decode **bit-identically** to MassQL's own Python loader across
 **16 fixtures**, with no tolerance on any individual `mz`, `i` or `rt` value.
 

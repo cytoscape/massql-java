@@ -1,5 +1,8 @@
 # Store design
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 `SpectrumTable` and friends: the hand-written replacement for MassQL's pandas dataframe.
 
 ## Why this is written rather than imported

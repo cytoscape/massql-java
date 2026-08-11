@@ -1,5 +1,8 @@
 # Tech Step 5 — Columnar store and per-scan reductions
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 ## Goal
 
 A primitive-array columnar peak store with the per-scan reductions and windowed lookups the query engine needs —

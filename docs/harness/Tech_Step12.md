@@ -1,5 +1,8 @@
 # Tech Step 12 — Integration layers 2–4 and error paths
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 > **⛔ THIS STEP IS A GATE.** Its differential table *is* the spike's exit criterion. Green means the SDK
 > reproduces MassQL; anything less is a finding to report, not a threshold to adjust.
 

@@ -1,5 +1,8 @@
 # Tech Step 11 — Public API surface and CLI
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 ## Goal
 
 The public API consumers will code against, plus a standalone CLI whose **argv shape, flags and stream

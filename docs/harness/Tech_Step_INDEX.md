@@ -1,5 +1,8 @@
 # Tech Step Index — `massql-java` spike
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 Execution index for the spike defined in [`SPIKE.md`](SPIKE.md). [`SPIKE.md`](SPIKE.md) remains the source of record for
 **rationale**; these 13 specs are the source of record for **what to build**. Where they disagree, the specs
 win — they incorporate findings that post-date [`SPIKE.md`](SPIKE.md) (see [Corrections](#corrections-to-spikemd)).
@@ -41,7 +44,7 @@ owning step.
 | [10](Tech_Step10.md) | `scaninfo` collation, result model, JSON | 9, 5 | 1.5 d | | ✅ **DONE 2026-08-06 — 542 tests** |
 | [11](Tech_Step11.md) | Public API surface + CLI | 10 | 0.5 d | | ✅ **DONE 2026-08-08 — 587 tests** |
 | [12](Tech_Step12.md) | Integration layers 2–4 + error paths | 11, 2, 8 | 1.5 d | ⛔ **GATE** | ✅ **DONE 2026-08-08 — 699 tests, [GREEN](DIFFERENTIAL_REPORT.md)** |
-| [13](Tech_Step13.md) | Harden, document, hand off | 12 | 2 d | ⛔ **REVIEW** | ✅ **DONE 2026-08-10 — 731 tests; awaiting manual review** |
+| [13](Tech_Step13.md) | Harden, document, hand off | 12 | 2 d | ⛔ **REVIEW** | ✅ **DONE — 723 tests; reviewed and passed at the gate** |
 
 **Total ≈ 16 days** (SPIKE.md §7 estimated ~12; the delta is the finer integration split, plus what was
 originally scoped as mzXML *vendoring* in Step 7 — now hand-written per **C23** — both of which were

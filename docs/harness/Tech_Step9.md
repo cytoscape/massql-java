@@ -1,5 +1,8 @@
 # Tech Step 9 — Condition filters
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 ## Goal
 
 Evaluate a parsed `WHERE`/`FILTER` clause against the loaded store, producing the set of qualifying scans —

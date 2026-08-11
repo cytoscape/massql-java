@@ -1,5 +1,8 @@
 # Test fixtures and goldens
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 Everything the test suite reads lives under `src/test/resources/`. **One exception**, at the bottom.
 
 This file exists because of **Correction C26**: fixtures used to live in a sibling `../massql` oracle

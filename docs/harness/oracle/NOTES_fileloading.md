@@ -1,5 +1,8 @@
 # `msql_fileloading.py` — verification notes
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 Findings from reading `massql/msql_fileloading.py` at pinned SHA `dad2a28c01e6e5132240270fc6700fbae29f1652`.
 **892 lines**, matching SPIKE.md's claim. This file is the authoritative reader specification for
 [Tech_Step6](../Tech_Step6.md) and [Tech_Step7](../Tech_Step7.md).

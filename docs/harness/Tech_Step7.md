@@ -1,5 +1,8 @@
 # Tech Step 7 — mzXML reader (hand-written)
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 ## Goal
 
 An `MzxmlReader` that decodes mzXML bit-identically to MassQL's Python loader — **hand-written, vendoring

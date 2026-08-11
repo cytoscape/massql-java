@@ -1,5 +1,8 @@
 # Reader rules
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 The per-format rule table, and the single reference for Tech_Step6 (MGF, mzML) and Tech_Step7 (mzXML).
 
 **`massql/msql_fileloading.py` is the authority**, not the format specifications and not pyteomics' API

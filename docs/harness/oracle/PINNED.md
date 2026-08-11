@@ -1,5 +1,8 @@
 # Pinned Python oracle
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 The fixed yardstick for the whole spike. Everything in `massql-java` is measured against this and nothing else.
 
 ## The pin

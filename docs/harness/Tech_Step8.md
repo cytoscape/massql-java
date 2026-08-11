@@ -1,5 +1,8 @@
 # Tech Step 8 — Reader parity (integration layer 1)
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 > **⛔ THIS STEP IS A GATE.** If decoded intensities are not bit-identical to the Python loader's, the decoder is
 > wrong and every number produced downstream measures noise. **Do not proceed to [Step 9](Tech_Step9.md) until
 > this is green.** Do not loosen the comparison to make it pass.

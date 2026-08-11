@@ -1,5 +1,8 @@
 # Differential report — integration layers 2–4 (Tech_Step12, the gate)
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 **Verdict: GREEN.** The SDK reproduces MassQL's own Python implementation on **717 rows across 16
 fixture/golden pairs** in all three formats. **11 of the 12 result columns are bit-identical**; the sole
 divergence is `tic`, worst case **4.700e-8 relative**, and that error is in the *reference* rather than in

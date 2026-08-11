@@ -1,5 +1,8 @@
 # Fixture provenance and conversion notes (Tech_Step2)
 
+> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
+> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+
 Everything a later step needs to know about where each fixture came from, what was verified, and
 which SPIKE.md assumptions turned out not to hold.
 
