@@ -24,7 +24,8 @@ class RowMaskTest {
 
     @Test
     void operationsReturnNewInstancesAndLeaveOperandsUntouched() {
-        // Immutability is the point: Tech_Step9 composes conditions, and a mask mutated under
+        // Immutability is the point: the condition filters composes conditions, and a mask mutated
+        // under
         // one condition while another holds a reference is a wrong-answer bug with no
         // exception to point at it.
         RowMask a = RowMask.all(4);
@@ -77,7 +78,7 @@ class RowMaskTest {
     @Test
     void scansWithAnyRowIsTheShapeConditionsActuallyNeed() {
         // Most MassQL conditions mean "this scan contains a peak matching X", not "this row
-        // matches X" -- Tech_Step9 intersects these scan sets.
+        // matches X" -- the condition filters intersects these scan sets.
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
         b.startScan(1, 0.0, 1).addPeak(100, 1).addPeak(200, 2); // rows 0,1
         b.startScan(2, 0.1, 1).addPeak(300, 3); // row 2

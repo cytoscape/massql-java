@@ -6,10 +6,8 @@ import java.util.Map;
 /**
  * The single, authoritative list of MassQL constructs this version does not support.
  *
- * <p>It lives in one place for two reasons. Tech_Step13 generates the published feature
- * matrix from it rather than hand-maintaining a parallel list that would drift; and every
- * rejection carries the same explanation shape, so a user who hits one gets a message that
- * names the construct and points at the matrix instead of a bare syntax error.
+ * <p>It lives in one place so every rejection carries the same explanation shape: a user who hits
+ * one gets a message naming the construct, rather than a bare syntax error.
  *
  * <p>Each entry's key is exactly what {@code MassqlParseException.construct()} reports.
  */
@@ -17,7 +15,7 @@ public final class UnsupportedConstructs {
 
     private UnsupportedConstructs() {}
 
-    /** Construct name → why it is out of scope. Insertion-ordered for stable docs output. */
+    /** Construct name → why it is out of scope. */
     private static final Map<String, String> REASONS = new LinkedHashMap<>();
 
     static {
@@ -82,23 +80,6 @@ public final class UnsupportedConstructs {
         REASONS.put("nested subquery", "nested sub-queries are not supported in this version");
     }
 
-    /**
-     * Every unsupported construct, in stable insertion order, mapped to its reason.
-     *
-     * <p>⚠ Deliberately <b>not</b> {@code Map.copyOf}, which returns an unordered map whose iteration
-     * order is randomised per JVM run. The feature matrix is generated from this and committed, so an
-     * unordered source would reshuffle the file's rows on every regeneration and make its drift guard
-     * fail at random.
-     */
-    public static Map<String, String> all() {
-        return java.util.Collections.unmodifiableMap(new LinkedHashMap<>(REASONS));
-    }
-
-    /** Ordered construct names. Used by Tech_Step13 to generate the feature matrix. */
-    public static java.util.Set<String> names() {
-        return java.util.Collections.unmodifiableSet(REASONS.keySet());
-    }
-
     public static boolean isUnsupported(String construct) {
         return REASONS.containsKey(construct);
     }
@@ -106,8 +87,7 @@ public final class UnsupportedConstructs {
     /**
      * The user-facing message for a construct.
      *
-     * <p>Every rejection reads the same way and points at the feature matrix, so the CLI
-     * (Tech_Step11) can surface it verbatim on stderr.
+     * <p>Every rejection reads the same way, so the CLI can surface it verbatim on stderr.
      */
     public static String message(String construct) {
         String reason = REASONS.get(construct);
@@ -118,6 +98,6 @@ public final class UnsupportedConstructs {
                 + construct
                 + "`: "
                 + reason
-                + ". This build implements the MassQL scaninfo subset -- see the feature matrix in the README.";
+                + ". This build implements the MassQL scaninfo subset -- see docs/SDK.md.";
     }
 }

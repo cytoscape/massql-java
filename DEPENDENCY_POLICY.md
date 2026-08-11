@@ -9,14 +9,13 @@ inconvenient — which is exactly how this project nearly shipped Guava (see §G
 
 Most of these are enforced mechanically, so **the build fails rather than the consumer**:
 `checkBannedDependencies` in `build.gradle` (wired into `check`) rejects the banned coordinates, and
-`scripts/dependency-audit.sh` fails on the size budget and on any `META-INF/services`, `META-INF/versions`
-or native library inside a resolved artifact.
+the size budget and the per-artifact `META-INF`/native-library scan are **no longer checked by the build** —
+see below.
 
 ⚠ **Two are policy only, held by review rather than by the build:** that *our own* code never calls
 `ServiceLoader` or `Class.forName` (§1's second half), and §5's no-split-packages rule. A script once
 checked both; it was removed because a library asserting facts about its future container has taken on a
-dependency on that container (Tech_Step13 §5). Violate either and nothing will fail — worth knowing before
-relaxing them.
+dependency on that container. Violate either and nothing will fail — worth knowing before relaxing them.
 
 ---
 
@@ -29,8 +28,8 @@ with Lucene and the MCP SDK.
 *Consequence for us:* we cannot use `javax.xml.stream.XMLInputFactory`, which is why `javolution` is a
 dependency at all — the vendored parsers instantiate `javolution.xml.internal.stream.XMLStreamReaderImpl`
 **directly**. Instantiating the JDK's internal implementation by name would need `Class.forName`, also banned.
-*Enforced:* the banned-dependency rule rejects known offenders, and `scripts/dependency-audit.sh` fails on any
-`META-INF/services` inside a resolved artifact. ⚠ That *our own* code never calls either is policy only.
+*Enforced:* the banned-dependency rule rejects known offenders. ⚠ That *our own* code never calls either, and
+that no artifact ships `META-INF/services`, are policy only.
 
 **2. No logging framework. The SDK logs nothing at all.**
 Return diagnostics to the caller and let them log. A library that brings its own logging framework picks a
@@ -42,15 +41,14 @@ fight with whatever the host already uses, and the host always wins. Note slf4j 
 JAXB is not in the JDK from 11 onward and drags a provider-lookup stack. Native libraries cannot be loaded
 from inside a nested jar. `Unsafe` needs JVM flags we do not control.
 *Note:* MSDK's mzXML pom declares JAXB but the code only touches `javax.xml.datatype`, still in the JDK on 17.
-*Enforced:* the banned-dependency rule rejects the JAXB coordinates, and `scripts/dependency-audit.sh` scans
-resolved artifacts for `.so`/`.dylib`/`.dll`.
+*Enforced:* the banned-dependency rule rejects the JAXB coordinates. The native-library scan is policy only.
 
 **4. No `META-INF/versions/**` (multi-release jars) in the shipping closure.**
 They break any consumer that reads class entries directly instead of through a multi-release-aware loader —
 which includes common shading and repackaging tooling.
 *Note:* JUnit violates this (`junit-platform-commons` ships 10 such entries) — which is fine, and precisely why
 the check must be scoped to compile+runtime and never to test.
-*Enforced:* `scripts/dependency-audit.sh` + `dependency-audit.txt`'s per-artifact table.
+*Enforced:* policy only.
 
 **5. No split packages.** Two artifacts providing the same package leaves the winner to classpath order, and on
 the module path it is an outright error. It is also why the vendored decoder lives under our own package rather
@@ -58,7 +56,8 @@ than upstream's.
 *Enforced:* policy only — nothing in the build checks it.
 
 **6. Shipping closure under ~1.5 MB.** Currently **785,599 B (0.749 MB), 49.9% of budget** — see
-`dependency-audit.txt`. This is the one constraint with no hard failure mechanism; it is a bloat guideline. Do
+`docs/harness/dependency-audit.txt`, as measured at the review gate. This is a bloat guideline with no hard
+failure mechanism. Do
 not let that make it feel negotiable, because the artifacts that blow it tend to breach constraints 1–5 too.
 
 **7. Java 17.** Class file major version ≤ 61. Raising it strands any consumer still on 17.
@@ -73,15 +72,13 @@ not let that make it feel negotiable, because the artifacts that blow it tend to
 | Artifact | Bytes | Why it is here |
 |---|---|---|
 | `com.github.chhh:javolution-core-java-msftbx:6.11.8` | 459,292 | The `ServiceLoader`-free `XMLStreamReaderImpl` the vendored parsers instantiate directly (constraint 1) |
-| `org.antlr:antlr4-runtime:4.13.2` | 326,307 | Parser runtime (Tech_Step4) |
+| `org.antlr:antlr4-runtime:4.13.2` | 326,307 | Parser runtime |
 
 Both audited 2026-07-30: zero `META-INF/services`, zero `META-INF/versions`, zero native libraries. Neither
 shares a package with anything else here, so constraint 5 holds. javolution's one optional framework dependency
 is not compile-scope and does not enter the closure.
 
 ### ⛔ A build tool is not a dependency
-
-*Added by [C43](docs/harness/Tech_Step_INDEX.md#c43), with the Maven → Gradle migration.*
 
 `org.antlr:antlr4` — the **code generator** — must never reach the shipping closure. Only `antlr4-runtime`
 does, and the two are not interchangeable: the generator drags `ST4`, `antlr-runtime` **3.x** (a second major
@@ -93,13 +90,13 @@ the tool configuration, so it happens *by default*; `build.gradle` severs that i
 not occur under Maven, where a `<plugin>`'s dependencies live in the plugin's own classloader — it became
 possible only with the Gradle migration.
 
-`dependency-audit.txt` names all five artifacts as ones that must not appear, so removing the severing surfaces
-as a failing `make audit` rather than a jar that quietly grew.
+`checkBannedDependencies` names all five artifacts as ones that must not appear, so removing the severing
+fails the build rather than quietly growing the jar.
 
 ## MSDK is a vendoring source, not a dependency
 
 `SPIKE.md` §5 planned to depend on `io.github.msdk:msdk-io-mzml`. **We do not.** Both readers vendor MSDK's
-parser code instead — mzML in Tech_Step6, mzXML in Tech_Step7 — under the EPL-1.0 election, with provenance
+parser code instead, under the EPL-1.0 election, with provenance
 headers and the upstream diff recorded in `docs/VENDORED.md`. MZmine vendored these same parsers, so
 portability is proven by construction.
 
@@ -133,9 +130,9 @@ Before adding anything, in this order:
 2. **Unpack the jar and check constraints 1, 3, 4, 5** — do not trust the pom. The Guava finding came from
    reading `MsScan.java`, not from a dependency tree.
 3. **Trace it transitively.** Guava arrives via `msdk-datamodel`, not via the artifact you name. Run
-   `./gradlew dependencies --configuration runtimeClasspath` and read the whole thing.
+   `make deps` and read the whole thing.
 4. **Check what the embedding application is likely to provide already, and at what version.** A package the
    host supplies at an incompatible version is worse than one it does not supply at all.
 5. **Add it to `bannedDependencies`** in `build.gradle` for whatever you decided to keep out, so the decision
    survives you.
-6. **Regenerate `dependency-audit.txt`** (`make audit`) and commit it.
+6. **Re-run `make integration-test`** so `checkBannedDependencies` sees the change.

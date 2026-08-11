@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
 
 /**
- * ⛔ <b>Tests the test.</b> {@link ResultComparator} is the Tech_Step12 gate; a comparator that
+ * ⛔ <b>Tests the test.</b> {@link ResultComparator} is the differential gate; a comparator that
  * always passes yields a meaningless exit criterion.
  *
  * <p>Every case below perturbs exactly one thing and asserts the comparator <i>notices</i>. The
@@ -55,7 +55,7 @@ class ResultComparatorTest {
     @Test
     void aSingleBitIntensityDifferenceFails() {
         // THE assertion this class exists for. base_peak_i is a max() -- a selected value with no
-        // accumulation -- so C34's tic tolerance does not reach it and one ULP must fail.
+        // accumulation -- so the tic tolerance does not reach it and one ULP must fail.
         ScanInfoResult perturbed =
                 new ScanInfoResult(
                         3,
@@ -100,7 +100,7 @@ class ResultComparatorTest {
     @Test
     void nullVersusZeroFails() {
         // Not the same answer. 0.0 is a measurement; null means "no precursor peak matched". A
-        // comparator that treated them alike would hide the C37 window bug entirely.
+        // comparator that treated them alike would hide the window bug entirely.
         ScanInfoResult goldenNull =
                 new ScanInfoResult(3, 810.79, 2, 0.5, null, 1.0, 2, 1.0, 1.0, null, 810.7, 99.0);
         ScanInfoResult actualZero =
@@ -111,7 +111,7 @@ class ResultComparatorTest {
         assertTrue(diffs.get(0).contains("ms1_i"), diffs.get(0));
         assertTrue(diffs.get(0).contains("null-vs-value"), diffs.get(0));
 
-        // And symmetrically -- a null where the golden has a value is the C37 symptom.
+        // And symmetrically -- a null where the golden has a value is the symptom.
         assertTrue(compare(actualZero, goldenNull).get(0).contains("null-vs-value"));
     }
 
@@ -213,7 +213,7 @@ class ResultComparatorTest {
 
     @Test
     void ms1PrecmzTakesTheFloat32AllowanceOnlyInFloat32Mode() {
-        // The real measured divergence between small.mzML and small.mzXML is 2.9e-8 (C11): the
+        // The real measured divergence between small.mzML and small.mzXML is 2.9e-8: the
         // mzXML
         // stores m/z at precision="32", so the same peak's MEASURED centroid differs. That must
         // pass
@@ -257,7 +257,7 @@ class ResultComparatorTest {
 
     @Test
     void ticAbsorbsTheReferencesFloat32AccumulationButNotMore() {
-        // The measured worst case is 3.691e-08 on small.mzML (C34) -- the error is in the
+        // The measured worst case is 3.691e-08 on small.mzML -- the error is in the
         // REFERENCE,
         // not in us. 1e-6 must absorb that and nothing like a real bug.
         ScanInfoResult goldenTic =

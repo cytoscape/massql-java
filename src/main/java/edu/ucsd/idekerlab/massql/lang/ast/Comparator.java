@@ -9,7 +9,7 @@ package edu.ucsd.idekerlab.massql.lang.ast;
  * ({@code INTENSITYMATCHREFERENCE}, {@code EXCLUDED}, {@code CARDINALITY},
  * {@code MASSDEFECT}). SPIKE.md §3's "a missing comparator defaults to greater-than"
  * therefore refers to an <i>absent qualifier</i> — the implicit {@code > 0} the engine
- * applies to an unqualified intensity column (Tech_Step9 §3) — not to a qualifier that
+ * applies to an unqualified intensity column — not to a qualifier that
  * parsed without one. Adding {@code NONE} here would model a state the grammar cannot
  * reach.
  *

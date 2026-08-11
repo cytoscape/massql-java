@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 /**
  * {@code close()} is load-bearing, not ceremony: the cursor holds a memory mapping (mzML) or an open
  * reader (MGF) for its whole lifetime. A host's own shutdown path depends on release, and
- * Tech_Step12 tests this at the integration level.
+ * the differential tests this at the integration level.
  */
 class SpectraStreamCloseTest {
 

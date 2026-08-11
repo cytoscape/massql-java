@@ -20,7 +20,7 @@ import edu.ucsd.idekerlab.massql.lang.ast.Op;
 import edu.ucsd.idekerlab.massql.lang.ast.Polarity;
 import edu.ucsd.idekerlab.massql.lang.ast.QualifierType;
 
-/** Pins the AST decisions Tech_Step9 depends on. */
+/** Pins the AST decisions the condition filters depends on. */
 class AstShapeTest {
 
     private static Condition.Value firstValue(String q) {
@@ -43,7 +43,7 @@ class AstShapeTest {
 
     @Test
     void arithmeticStaysUnfolded() {
-        // 157.0857+10 must NOT become 167.0857 here. Folding is Tech_Step9's job, because
+        // 157.0857+10 must NOT become 167.0857 here. Folding is the job, because
         // that is where the numeric semantics live.
         Expr e = firstValue("QUERY scaninfo(MS2DATA) WHERE MS2PROD=157.0857+10").values().get(0);
         assertInstanceOf(Expr.Binary.class, e, "expected an unfolded Binary, got " + e);
@@ -118,7 +118,7 @@ class AstShapeTest {
         assertEquals(
                 Comparator.GT,
                 v.qualifiers().get(1).comparator(),
-                "'>' must survive as GT; Tech_Step9 treats '=' and '>' differently");
+                "'>' must survive as GT; the condition filters treats '=' and '>' differently");
     }
 
     @Test
@@ -187,10 +187,10 @@ class AstShapeTest {
 
     @Test
     void comparatorHasExactlyThreeConstantsAndNoNONE() {
-        // Correction C18 removed Comparator.NONE. Tech_Step4's AstShapeTest row previously required
+        // removed Comparator.NONE. the AstShapeTest row previously required
         // the
         // OPPOSITE -- "Comparator.NONE survives when the source omits a comparator" -- so the spec
-        // contradicted the code for five steps and C35(a) rediscovered the same fact from scratch
+        // contradicted the code for five steps and the same fact was rediscovered from scratch
         // at
         // Step 9. Asserting the enum's arity directly is what makes reintroducing NONE fail HERE,
         // rather
@@ -202,6 +202,6 @@ class AstShapeTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> Comparator.valueOf("NONE"),
-                "NONE models a state the grammar cannot produce -- see C18");
+                "NONE models a state the grammar cannot produce");
     }
 }

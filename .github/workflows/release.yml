@@ -16,7 +16,7 @@
 #   2. No `xvfb-run` — nothing here touches AWT.
 #   3. Runs the FULL suite instead of skipping tests. cy-ndex-2 skips tests on release; for an SDK
 #      whose whole value is bug-for-bug agreement with a pinned MassQL commit, publishing an
-#      unverified jar defeats the point. `verify` also assembles, so this costs one build, not two.
+#      unverified jar defeats the point.
 name: Release
 
 on:
@@ -67,8 +67,8 @@ jobs:
       - name: Stamp the version
         run: make set-version-${{ steps.rel.outputs.artifact }} V=${{ steps.rel.outputs.version }}
 
-      # REQUIRED, and it was once missing. Correction C26 made an absent fixture a HARD FAILURE
-      # rather than a skip, so `verify` cannot pass without the two gitignored Ewing files --
+      # REQUIRED, and it was once missing. An absent fixture is a HARD FAILURE
+      # rather than a skip, so the suite cannot pass without the two gitignored Ewing files --
       # Ms1ScanDocumentOrderIT and ReaderParityIT both need them. Cached, like ci.yml.
       - name: Cache the fetched Ewing fixtures
         uses: actions/cache@v4
@@ -81,11 +81,9 @@ jobs:
       - name: Fetch uncommitted fixtures
         run: make fixtures
 
-      # Full suite: unit + integration + Spotless + banned deps + the coverage gate, then the
-      # dependency audit and spec-audit. `make verify` runs the audit itself, so there is no
-      # separate audit step.
-      - name: Verify
-        run: make verify
+      # Full suite: unit + integration + Spotless + banned deps + the coverage gate, in one target.
+      - name: Test
+        run: make integration-test
 
       - name: Build the release artifact
         run: |

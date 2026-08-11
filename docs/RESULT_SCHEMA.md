@@ -4,7 +4,7 @@
 restating it. If you are about to write "the N-key shape" anywhere else in this repository, link instead.
 
 **Authority:** [cytoscape/cytoscape#26](https://github.com/cytoscape/cytoscape/issues/26). Where any other
-document disagrees with this one, this one wins — see [Correction C40](harness/Tech_Step_INDEX.md), which
+document disagrees with this one, this one wins — the analysis
 records the three places that had drifted.
 
 ---
@@ -33,7 +33,7 @@ scan, precmz, ms1scan, rt, charge, tic, mslevel, base_peak_i, base_peak_mz, ms1_
 >
 > This corrects three documents that specified otherwise — [`SPIKE.md`](harness/SPIKE.md) §3 (*"a different, smaller shape …
 > absent, not null"*), the oracle's own `RESULT_SCHEMA.md`, and the `small_mzml_ms1_results.json` golden, which
-> shipped 9 keys. All are now aligned; **Correction C40** has the analysis.
+> shipped 9 keys. All are now aligned.
 >
 > **Why uniform is the right contract, not merely the specified one.** A consumer may write this string into
 > a table column verbatim and read back later. One stable key set means that round-trip is
@@ -67,7 +67,7 @@ which the issue's MS2-centric wording leaves implicit.
 > **left-join artifact** in `massql_query.py`, not semantics: it computed base peaks from `ms2_df` and merged on
 > `scan`, so MS1 scan ids missed the join entirely. Proof it was an artifact rather than a rule — in
 > `micro.mgf` the phantom MS1 id (`3`) *collides* with a real MS2 id (`3`), and the same join attached an
-> unrelated MS2 scan's base peak to the MS1 row: a **wrong non-null**. Fixed in the wrapper; see C40.
+> unrelated MS2 scan's base peak to the MS1 row: a **wrong non-null**. Fixed in the wrapper.
 >
 > The rule the fix encodes: **MS1 ids join only to MS1 data, MS2 ids only to MS2 data.**
 
@@ -92,7 +92,7 @@ A consumer must therefore treat every nullable column as genuinely optional and 
 | `precmz` | ✔ (from `PEPMASS=`) | ✔ |
 | `ms1scan` | **null** — no survey scans exist | ✔ by **document order**, never the file's own `spectrumRef` / `precursorScanNum` |
 | `rt` | **`0.0`, not null** | ✔ |
-| `charge` | ⚠ **never null** — `CHARGE=` if present, else **`1`** (Correction **C6**; SPIKE.md §3 wrongly says null) | ✔ if recorded, else null via the `0` sentinel. ⚠ **mzXML's absent default is `0`, not MGF's `1`** (`msql_fileloading.py:451`); `DP00570_F02.mzxml` carries **zero** `precursorCharge` attributes, so every row from it is null — a **predicted difference**, not a shared column (Correction **C29**) |
+| `charge` | ⚠ **never null** — `CHARGE=` if present, else **`1`** (an absent `CHARGE=` defaults to 1, not null) | ✔ if recorded, else null via the `0` sentinel. ⚠ **mzXML's absent default is `0`, not MGF's `1`** (`msql_fileloading.py:451`); `DP00570_F02.mzxml` carries **zero** `precursorCharge` attributes, so every row from it is null — a **predicted difference**, not a shared column |
 | `tic` | ✔ sum of MS2 fragment intensities | ✔ |
 | `mslevel` | `2` | `2` for MS2DATA, `1` for MS1DATA |
 | `base_peak_i` / `base_peak_mz` | ✔ | ✔ |
@@ -150,12 +150,12 @@ easily-missed part of the whole contract.
 | **Computed by the SDK** | `ms1_i`, `ms1_precmz`, `ms1_base_peak_i` — the precursor lookup in the linked MS1 scan |
 
 The precursor lookup's exact rules — **closest to `precmz`, not most intense**; `ms1_base_peak_i` surviving a
-tolerance miss; ties → lower m/z; and the **inclusive** m/z window (Correction **C37**) — live in
-[Step 10](harness/Tech_Step10.md) §3, which is where they are implemented and tested.
+tolerance miss; ties → lower m/z; and the **inclusive** m/z window — live in `PrecursorLookup`, which is
+where they are implemented and tested.
 
 ## How this file is kept honest
 
-- **`make spec-audit` check 6** asserts every non-empty golden carries exactly these 12 keys in this order.
+- **`ResultSchemaContractTest`** asserts the serializer emits exactly these 12 keys, in this order, and
+  that this document declares the same twelve.
 - **`ResultSchemaContractTest`** parses the key table above and asserts `ResultJson` emits exactly those keys in
   that order — so this document is executable rather than decorative. Reordering a row here fails the build.
-- `spec-audit` check 5 asserts this file exists, since completed steps name it.

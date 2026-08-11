@@ -20,19 +20,19 @@ import edu.ucsd.idekerlab.massql.io.SpectraStream;
 /**
  * The intensity-algebra properties ported from {@code oracle/test_query_py_reference.py}.
  *
- * <p>Tech_Step9 called these *"pure profit — they need no reference data"*. Half right: the properties are
+ * <p>the condition filters called these *"pure profit — they need no reference data"*. Half right: the properties are
  * self-referential, but <b>the tests as written need two fixtures we do not have</b>
  * ({@code featurelist_pos.mgf}, {@code GNPS00002_A3_p.mzML} — MassQL's own test data, verified absent). So
  * they are reconstructed here on our fixtures rather than copied.
  *
- * <p><b>Two of the three properties have preconditions the spec did not mention</b> (Correction C37h):
+ * <p><b>Two of the three properties have preconditions the spec did not mention</b> (h):
  *
  * <ul>
  *   <li><b>Disjointness of {@code >} and {@code <} is NOT general.</b> Under scan-level semantics a scan may
  *       hold one peak above the threshold and another below it, putting it in <i>both</i> sets — correctly.
  *       The reference test avoids this with {@code TOLERANCEMZ=0.01}, narrow enough that at most one peak per
  *       scan falls in the window. That precondition is constructed explicitly below.</li>
- *   <li><b>There is no "tripartite partition".</b> Tech_Step9 described {@code <} ∪ {@code =} ∪ {@code >} as
+ *   <li><b>There is no "tripartite partition".</b> the condition filters described {@code <} ∪ {@code =} ∪ {@code >} as
  *       "covering everything exactly once". That is impossible: {@code =} means {@code >=}, which contains
  *       {@code >} by construction. The reference test asserts the real relationship — {@code >} ⊆ {@code =} —
  *       and that is what is asserted here.</li>

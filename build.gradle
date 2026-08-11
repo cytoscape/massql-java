@@ -47,13 +47,12 @@ allprojects {
             // ANTLR's generated lexer/parser. The antlr plugin adds build/generated-src as a java
             // source directory, so Spotless picks it up unless told otherwise -- and it is full of
             // wildcard imports that forbidWildcardImports cannot auto-fix and nobody should hand-fix.
-            // pom.xml:110 and Tech_Step3.md:189 both already required this exclusion.
                     'build/generated-src/**'
 
             // .aosp() = 4-space indent, 100-column limit -- what this codebase already uses.
             //
             // .skipJavadocFormatting() is deliberate: in this project the javadoc IS the
-            // specification (reader sentinel contracts, the C36 zero-intensity note, and so on),
+            // specification (reader sentinel contracts, the zero-intensity note, and so on),
             // written with intentional line breaks. Google's javadoc formatter would reflow ~1,965
             // lines of it -- harmless semantically, unreviewable as a diff.
             googleJavaFormat('1.17.0').aosp().skipJavadocFormatting()
@@ -78,8 +77,7 @@ allprojects {
 }
 
 // Shell scripts and the Makefile get no formatter otherwise. Markdown is deliberately EXCLUDED:
-// two trailing spaces is a semantic line break there, and scripts/spec-audit.sh matches exact
-// spec text, so reformatting docs could both change rendering and break the audit.
+// two trailing spaces is a semantic line break there, so reformatting docs would change how they render.
 spotless {
     format 'scripts', {
         target 'scripts/**/*.sh', 'Makefile'
@@ -112,7 +110,7 @@ tasks.named('javadoc') {
     // Keep the doclint groups that catch BROKEN javadoc -- bad HTML, unresolvable @link/@see,
     // malformed syntax -- and drop `missing`, which demands an @param/@return on every member.
     // This codebase documents behaviour in prose rather than in tags (the reader sentinel contracts,
-    // the C36 note, the two m/z window semantics), so `missing` reports ~100 non-problems and would
+    // the zero-intensity note, the two m/z window semantics), so `missing` reports ~100 non-problems and would
     // bury a real one. Removing `-missing` is a tag-completeness project, not a correctness fix.
     options.addStringOption('Xdoclint:all,-missing', '-quiet')
 
@@ -178,16 +176,16 @@ dependencies {
     // The ANTLR *tool*, used only by generateGrammarSource. See the severing below.
     antlr "org.antlr:antlr4:${antlrVersion}"
 
-    // ⚠ TEST SCOPE ONLY -- reads the query-result goldens for Tech_Step12's differential.
+    // ⚠ TEST SCOPE ONLY -- reads the query-result goldens for the differential.
     //
     // `checkBannedDependencies` inspects runtimeClasspath, so this provably cannot reach the 0.749 MB
-    // shipping closure, and `make audit` would fail if it did.
+    // shipping closure, and checkBannedDependencies would fail if it did.
     //
     // This reverses the convention in ParityDump, which parses JSON with a regex citing
     // DEPENDENCY_POLICY constraint 1 ("Jackson discovers modules via ServiceLoader"). That
     // constraint's stated failure mechanism is a thread-context classloader that cannot see the
     // caller's classes -- a test in a plain JVM with a flat classpath has no such split, so the rule
-    // was applied outside its own mechanism (C46). The decisive argument is C44: that same regex silently stopped at `polarity`
+    // was applied outside its own mechanism. The decisive argument: that same regex silently stopped at `polarity`
     // and dropped three columns, letting a reader bug survive a GREEN gate for five steps. For the
     // artifact that IS the exit criterion, silent truncation is the wrong failure mode.
     //
@@ -215,7 +213,7 @@ dependencies {
 // DEPENDENCY_POLICY.md exists to prevent.
 //
 // generateGrammarSource takes its tool classpath from the `antlr` configuration directly, so
-// severing the inheritance costs nothing. scripts/dependency-audit.sh is the regression test.
+// severing the inheritance costs nothing.
 configurations.configureEach { conf ->
     if (conf.name != 'antlr' && conf.extendsFrom.any { it.name == 'antlr' }) {
         conf.extendsFrom = conf.extendsFrom.findAll { it.name != 'antlr' }
@@ -242,20 +240,11 @@ testing {
     suites {
         test {
             useJUnitJupiter(junitVersion)
-            targets.configureEach {
-                testTask.configure {
-                    // Forwarded explicitly: `gradle -D...` sets the property on the DAEMON, and the
-                    // test task forks its own JVM that never sees it. `make feature-matrix` relies on
-                    // this to rewrite docs/FEATURE_MATRIX.md instead of asserting against it.
-                    systemProperty 'massql.regenerate.matrix',
-                            System.getProperty('massql.regenerate.matrix') ?: 'false'
-                }
-            }
         }
 
         // *IT.java, in src/integrationTest/java. These read real spectra fixtures and the
         // committed goldens, so they are slow and kept out of the edit loop -- `make test` runs
-        // the unit suite, `make it` runs these, `make verify` runs both.
+        // the unit suite, `make integration-test` runs everything.
         integrationTest(JvmTestSuite) {
             useJUnitJupiter(junitVersion)
             dependencies {
@@ -354,7 +343,7 @@ tasks.named('check') {
 // The pom's companion `requireUpperBoundDeps` rule has no equivalent here because it needs none:
 // Gradle's conflict resolution already selects the highest requested version by default.
 ext.bannedDependencies = [
-    // MSDK is a VENDORING SOURCE, never a dependency (C1, C16). Depending on any MSDK artifact
+    // MSDK is a VENDORING SOURCE, never a dependency. Depending on any MSDK artifact
     // drags Guava back in via msdk-datamodel.
     'io.github.msdk:*',
     'it.unimi.dsi:dsiutils',
@@ -408,30 +397,6 @@ allprojects {
 
     tasks.named('check') {
         dependsOn tasks.named('checkBannedDependencies')
-    }
-}
-
-// Feeds scripts/dependency-audit.sh. ROOT PROJECT ONLY -- this measures the SDK closure a host
-// application embeds, which is what DEPENDENCY_POLICY.md's size budget is about. The
-// CLI uber-jar is a standalone download and deliberately not an audited number.
-// Machine-readable TSV -- `coord <TAB> bytes <TAB> absolute-path` -- so the script can unzip each
-// artifact for the META-INF/services, META-INF/versions and native-library constraint checks. Under
-// Maven the script reconstructed paths as ~/.m2/repository/g/a/v/a-v.jar; Gradle's cache inserts a
-// SHA-1 directory, so paths cannot be derived and are emitted here instead.
-tasks.register('dependencyAudit') {
-    group = 'verification'
-    description = 'Emits the SDK runtime closure as TSV for scripts/dependency-audit.sh.'
-    doLast {
-        configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts
-                .collect { artifact ->
-                    def id = artifact.moduleVersion.id
-                    [coord: "${id.group}:${id.name}:${id.version}", file: artifact.file]
-                }
-        // Sorted so the committed dependency-audit.txt changes only when the closure does.
-                .sort { it.coord }
-                .each { row ->
-                    println "${row.coord}\t${row.file.length()}\t${row.file.absolutePath}"
-                }
     }
 }
 

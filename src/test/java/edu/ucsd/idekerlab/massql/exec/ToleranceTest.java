@@ -14,8 +14,8 @@ import edu.ucsd.idekerlab.massql.lang.ast.QualifierType;
 /**
  * The tolerance rules, from {@code _get_mz_tolerance} (`msql_engine_filters.py:5-17`).
  *
- * <p>That file — not `msql_engine.py` — is the authority for this rule, which Tech_Step9 §3 did not say
- * (Correction C37). Getting any of these wrong is a silent wrong answer: no exception, just a different set of
+ * <p>That file — not `msql_engine.py` — is the authority for this rule. Getting any of these wrong is a
+ * silent wrong answer: no exception, just a different set of
  * rows than MassQL returns.
  */
 class ToleranceTest {

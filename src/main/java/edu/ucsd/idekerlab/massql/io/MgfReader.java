@@ -149,7 +149,7 @@ final class MgfReader extends AbstractSpectraStream {
                         "unparseable peak in " + path + " block " + blockIndex + ": " + t, e);
             }
 
-            // Correction C36: MGF drops ZERO-INTENSITY peaks. `_load_data_mgf_pyteomics` opens its
+            // MGF drops ZERO-INTENSITY peaks. `_load_data_mgf_pyteomics` opens its
             // peak
             // loop with `if intensity == 0: continue` (msql_fileloading.py), so such a peak never
             // becomes
@@ -275,7 +275,7 @@ final class MgfReader extends AbstractSpectraStream {
             explicitScanId = 0;
             scanId = 0;
             precmz = 0.0; // 0 sentinel: not recorded
-            // ⚠ MGF charge is NEVER null and never 0 (C6/C44). A block with no CHARGE= of its own
+            // ⚠ MGF charge is NEVER null and never 0. A block with no CHARGE= of its own
             // takes the file-level header's charge, and 1 only when the file declares none either.
             // A genuine 1+ is therefore indistinguishable from an absent one -- deliberately, since
             // that is what the reference produces.
@@ -285,7 +285,7 @@ final class MgfReader extends AbstractSpectraStream {
         }
 
         void finish(int blockIndex, double[] mz, double[] in, int n) {
-            // Correction C7: SCANS= when present, else the 1-based block index.
+            // SCANS= when present, else the 1-based block index.
             this.scanId = explicitScanId > 0 ? explicitScanId : blockIndex;
             this.mz = mz;
             this.in = in;
@@ -308,9 +308,9 @@ final class MgfReader extends AbstractSpectraStream {
         }
 
         /**
-         * MGF polarity is a hardcoded <b>1</b>, not 0 — Correction C33.
+         * MGF polarity is a hardcoded <b>1</b>, not 0.
          *
-         * <p>Correction C8 said MGF polarity "is not read on the live path" and inferred 0 from that. The
+         * <p>It is tempting to reason that MGF polarity "is not read on the live path" and infer 0 from that. The
          * first half is true: no MGF header supplies polarity. The inference was wrong. Both MGF loaders
          * write {@code "polarity": 1  # Default} into every peak dict
          * (`msql_fileloading.py:67` and `:86`), so MassQL reports **positive** for every MGF row.

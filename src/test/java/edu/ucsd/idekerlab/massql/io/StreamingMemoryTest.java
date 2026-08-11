@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
 
 /**
- * Proves Correction C22's memory claim instead of restating it.
+ * Proves Correction the memory claim instead of restating it.
  *
  * <p>The whole justification for the streaming redesign is that retained memory is bounded by the
  * largest <b>scan</b>, not by the file. That claim came from arithmetic — 10.7–20.0 bytes of file per
@@ -66,7 +66,7 @@ class StreamingMemoryTest {
 
         assertEquals(34_513, scans, "every block must be yielded, including the 12,571 empty ones");
         // 758,544 real MS2 peak rows. The parity dump reports 758,545 because MassQL's MGF loader
-        // synthesises a 1-row all-zero MS1 placeholder (Correction C14) -- mz=0, i=0, scan=1, its
+        // synthesises a 1-row all-zero MS1 placeholder -- mz=0, i=0, scan=1, its
         // digests are the SHA of a zero. That row is not a peak, and our reader correctly omits it.
         // Step 8's parity comparison must exclude it too, or it will report a phantom MS1 scan.
         assertEquals(

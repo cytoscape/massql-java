@@ -42,15 +42,15 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  *
  * <p>Both hold, because the distinction is <b>file</b> versus <b>stream</b>. A spent stream handed
  * to a second {@code execute} fails loudly rather than returning an empty list that reads as
- * "matched nothing" — {@link SpectraStream} is single-pass by type, not by convention
- * (Correction C42). An earlier whole-file design made re-querying free; this one does not.
+ * "matched nothing" — {@link SpectraStream} is single-pass by type, not by convention. An earlier
+ * whole-file design made re-querying free; this one does not.
  *
  * <h2>The SDK writes to no stream</h2>
  *
  * <p>Nothing here prints, logs, or touches {@code System.out} — {@code DEPENDENCY_POLICY.md}
  * constraint 2. Notes about a valid-but-degenerate query come back through
- * {@link #executeWithDiagnostics}. Treating stdout as a data pipe is the <b>CLI's</b> contract
- * (Correction C25), never the SDK's.
+ * {@link #executeWithDiagnostics}. Treating stdout as a data pipe is the <b>CLI's</b> contract, never
+ * the SDK's.
  */
 public final class Massql {
 
@@ -121,7 +121,7 @@ public final class Massql {
      * it opened, including when the query throws</i>. That is a resource-leak guarantee a long-lived
      * {@code shutDown()} depends on, and with the opener hard-wired there is no way to observe
      * whether {@code close} ran. Counting file descriptors was the alternative and is not portable —
-     * and a test that skips on some platforms is exactly what Correction C26 forbids.
+     * and a test that skips on some platforms proves nothing.
      *
      * <p>Package-private on purpose: it is invisible to consumers, so it widens no contract.
      */

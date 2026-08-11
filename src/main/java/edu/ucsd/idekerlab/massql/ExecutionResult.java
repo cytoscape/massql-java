@@ -14,7 +14,7 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  * empty result set is a legitimate answer; a <i>silent</i> empty result set is a poor one.
  *
  * <p><b>{@code diagnostics} is passed straight through</b> from {@code ExecutionSummary}
- * (Correction C35(b)). Tech_Step11 neither generates nor reformats diagnostic text — doing so would
+ * The SDK neither generates nor reformats diagnostic text — doing so would
  * put the same message in two places with two wordings. Its only job is to carry the list from the
  * executor to the caller.
  *

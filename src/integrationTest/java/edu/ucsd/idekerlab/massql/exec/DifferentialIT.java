@@ -29,7 +29,7 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  * <p>This table <i>is</i> the spike's exit criterion. Green means the SDK reproduces MassQL on real
  * files in all three formats; anything less is a finding to report, not a threshold to adjust.
  *
- * <h2>What makes this different from Tech_Step8's parity gate</h2>
+ * <h2>What makes this different from the parity gate</h2>
  *
  * <p>Step 8 proves the three <b>readers</b> decode bit-identically. This proves the whole
  * <b>pipeline</b> — parse, filter, collate, precursor lookup — arrives at the same rows. A decode
@@ -42,7 +42,7 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  * the <i>reference</i> rather than in us.
  *
  * <p>Goldens are read by {@code GoldenResults}, which rejects a truncated or short file rather than
- * comparing fewer rows (C44/C46). Both matter: a lenient reader and a lenient comparator fail the
+ * comparing fewer rows. Both matter: a lenient reader and a lenient comparator fail the
  * same way, by reporting green.
  */
 class DifferentialIT {
@@ -51,7 +51,7 @@ class DifferentialIT {
      * One fixture/golden pair.
      *
      * @param float32Mz true for mzXML, whose {@code precision="32"} truncates a measured
-     *     {@code ms1_precmz} — the only column that allowance touches (C11)
+     *     {@code ms1_precmz} — the only column that allowance touches
      */
     private record Pair(
             String fixture,
@@ -81,7 +81,7 @@ class DifferentialIT {
     }
 
     /**
-     * All 16 pairs from Tech_Step12 §1, with the row count the spec states.
+     * All 16 pairs from the differential, with the row count the spec states.
      *
      * <p>The counts are asserted, not derived from the golden — otherwise a golden regenerated to
      * zero rows would agree with a broken engine that also returns none.
@@ -114,7 +114,7 @@ class DifferentialIT {
                         "test_micro",
                         "micro_mzml_rtseconds_results",
                         2),
-                // The STRICT half of C37: the condition window's bound sits exactly on scan 3's
+                // The STRICT half of the condition window's bound sits exactly on scan 3's
                 // 201.0
                 // peak and MassQL excludes it. Inclusive bounds here would return 1 row, not 0.
                 new Pair(
@@ -127,7 +127,8 @@ class DifferentialIT {
                         "test_micro_ms1var",
                         "micro_ms1var_results",
                         1),
-                // The INCLUSIVE half of C37, at the lookup rather than the condition. Its MS1 peak
+                // The INCLUSIVE half of the window rule, at the lookup rather than the condition.
+                // Its MS1 peak
                 // sits at 499.99 -- exactly the 20 ppm lower bound for precmz 500.0, and the same
                 // bits on both sides. The reference's `>=` matches it, so ms1_i is 7000.0; the
                 // exclusive variant yields null, which the null-vs-value rule reports. Its
@@ -147,7 +148,7 @@ class DifferentialIT {
                 pair.rows(),
                 golden.size(),
                 pair.golden()
-                        + ": the golden itself changed shape -- Tech_Step12 §1 states "
+                        + ": the golden itself changed shape -- the differential states "
                         + pair.rows()
                         + " rows. Regenerate the spec or the golden, deliberately.");
 
@@ -172,7 +173,7 @@ class DifferentialIT {
                                         : "")
                                 + "\n\nDo NOT loosen a tolerance to make this pass. If ms1_i or ms1_precmz"
                                 + " is null where the golden has a value, check the m/z window method"
-                                + " first (C37): Step 10's lookup must use the INCLUSIVE mzWindow.");
+                                + " first: Step 10's lookup must use the INCLUSIVE mzWindow.");
     }
 
     /** The two empty goldens deserve their own assertion, so `[]` can never read as "not checked". */
@@ -188,7 +189,7 @@ class DifferentialIT {
                                 + ": expected no matches, got "
                                 + actual.size()
                                 + " row(s). For micro_mzml_edge this means condition windows became"
-                                + " INCLUSIVE -- the exact regression C37 records.");
+                                + " INCLUSIVE -- the exact regression this pair guards.");
         assertTrue(GoldenResults.of(pair.golden()).isEmpty(), "and the golden agrees");
     }
 
@@ -199,14 +200,14 @@ class DifferentialIT {
     @ParameterizedTest(name = "{0}")
     @MethodSource("pairs")
     void everyRowCarriesTheTwelveKeyShape(Pair pair) {
-        // C40: one union schema discriminated by mslevel, no key ever absent. The MS1DATA pair is
+        // one union schema discriminated by mslevel, no key ever absent. The MS1DATA pair is
         // the one that used to disagree -- precursor columns present and null, base_peak_* real.
         for (ScanInfoResult r : GoldenResults.of(pair.golden())) {
             assertNotNull(r.scan(), "scan is never null");
             assertNotNull(r.rt(), "rt is never null -- 0.0 is a real retention time");
             assertNotNull(r.tic(), "tic is never null");
             assertNotNull(r.mslevel(), "mslevel is the discriminator");
-            assertNotNull(r.basePeakI(), "base_peak_i is non-null even on an MS1 row (C40)");
+            assertNotNull(r.basePeakI(), "base_peak_i is non-null even on an MS1 row");
             assertNotNull(r.basePeakMz(), "base_peak_mz likewise");
             if (r.mslevel() == 1) {
                 assertNull(r.precmz(), "an MS1 survey scan has no precursor");
@@ -226,7 +227,7 @@ class DifferentialIT {
                 url,
                 "fixture missing from src/test/resources: "
                         + relative
-                        + " -- fixtures are committed in-repo (C26). Restore it, or run"
+                        + " -- fixtures are committed in-repo. Restore it, or run"
                         + " `make fixtures` for the two Ewing files. Never skip.");
         try {
             return Paths.get(url.toURI());

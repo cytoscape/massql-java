@@ -170,7 +170,7 @@ class MassqlApiTest {
 
     @Test
     void anEmptyResultIsAnEmptyImmutableListNeverNull() {
-        // C37's strict-window evidence: this query's window excludes a peak sitting exactly on the
+        // the strict-window evidence: this query's window excludes a peak sitting exactly on the
         // bound, so it legitimately matches nothing. An empty answer is a valid answer.
         Path micro = fixture("fixtures/micro/micro.mzML");
         List<ScanInfoResult> rows =
@@ -187,7 +187,8 @@ class MassqlApiTest {
 
     @Test
     void rowsAreAscendingByScanId() {
-        // Tech_Step12 §1 compares position by position, so ordering is part of the contract rather
+        // the differential compares position by position, so ordering is part of the contract
+        // rather
         // than an accident of iteration.
         List<ScanInfoResult> rows = Massql.run(Q, smallMzml(), null);
         for (int i = 1; i < rows.size(); i++) {
@@ -213,7 +214,7 @@ class MassqlApiTest {
 
     @Test
     void aSpentStreamFailsLoudlyRatherThanReturningNothing() {
-        // C42's reshape made single-pass a property of the TYPE. Before it, a second execute
+        // the reshape made single-pass a property of the TYPE. Before it, a second execute
         // returned an empty list that read as "matched nothing" -- a wrong answer that looked like
         // a
         // right one. Several queries over one file means reopening the file.

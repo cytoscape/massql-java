@@ -5,7 +5,7 @@
 #   0. Every step calls `make`, never `./gradlew`. The Makefile is the only entry point, so what
 #      CI runs and what a developer runs cannot drift — and a guard like the coverage gate is
 #      reachable locally rather than only here.
-#   1. `make verify` runs `gradle check`, NOT just `gradle test`. All three of this spike's gates
+#   1. `make integration-test` runs `gradle check`, NOT just `gradle test`. The three verification gates
 #      live in *IT.java files run by the separate integrationTest suite (reader parity, the
 #      differential, the CLI contract), so a unit-test-only run would report green while
 #      skipping every gate.
@@ -35,7 +35,7 @@ jobs:
           cache: 'gradle'
 
       # The two Ewing-lab fixtures are the only test data not committed: ewinglab.org states no
-      # redistribution terms (Correction C26). Everything else lives in src/test/resources.
+      # redistribution terms. Everything else lives in src/test/resources.
       # Cached so the flaky upstream is contacted once rather than on every run -- SPIKE.md §9
       # warns that flaky CI destroys the credibility of a conformance number.
       - name: Cache the fetched Ewing fixtures
@@ -47,29 +47,25 @@ jobs:
           key: ewing-fixtures-3761778-2196881   # sizes are the identity; a changed upstream = a new key
 
       # Required, not best-effort: Ms1ScanDocumentOrderIT is the only test that can distinguish
-      # document-order ms1scan from precursorScanNum resolution, and under C26 it FAILS rather than
+      # document-order ms1scan from precursorScanNum resolution, and it FAILS rather than
       # skipping when the fixture is absent. Letting this step pass on error would only move the
       # failure later and make it look like a reader bug.
       - name: Fetch uncommitted fixtures
         run: make fixtures
 
-      # Unit + integration tests, Spotless, the banned-dependency rule and the 90% coverage gate,
-      # then the dependency audit, spec-audit and the differential table.
+      # Unit + integration tests, Spotless, the banned-dependency rule and the 90% coverage gate --
+      # everything, in one target.
       #
-      # The table is deliberately NOT a separate step: `make verify` runs it (Tech_Step13 §3). A step
-      # that re-ran it would create a second definition of what CI checks, which is the drift the
-      # Makefile-only rule exists to prevent.
-      #
-      # `make verify` rather than `./gradlew check`: the Makefile is the ONLY entry point, so what
+      # `make integration-test` rather than `./gradlew check`: the Makefile is the ONLY entry point, so what
       # CI runs and what a developer runs cannot drift.
       #
-      # The coverage gate is what keeps a green build meaningful (Correction C26): fixtures once
+      # The coverage gate is what keeps a green build meaningful: fixtures once
       # lived outside the repo and Fixtures.require() used assumeTrue, so every parity assertion
       # SKIPPED while the test counter stayed healthy. CI was green for four steps while proving
       # only that the code compiled. A test that stops running now shows up as lost coverage, with
       # no hand-maintained count to rot.
-      - name: Verify
-        run: make verify
+      - name: Test
+        run: make integration-test
 
       - name: Upload reports on failure
         if: failure()

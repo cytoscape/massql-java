@@ -11,7 +11,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * When an MS2 scan declares more than one precursor, the <b>FIRST</b> one wins — Correction C31.
+ * When an MS2 scan declares more than one precursor, the <b>FIRST</b> one wins.
  *
  * <p><b>Both readers had this wrong.</b> MassQL hard-indexes {@code [0]} at every level —
  * {@code spectrum["precursorList"]["precursor"][0]["selectedIonList"]["selectedIon"][0]} for mzML
@@ -22,13 +22,13 @@ import org.junit.jupiter.api.Test;
  * <p><b>Why nothing caught it.</b> Every fixture in the project is single-precursor — measured
  * {@code max=1} on {@code small.mzML}, {@code small.mzXML} and the Ewing file — so first-wins and
  * last-wins are indistinguishable across the entire suite. The bug was found by asking whether mzML
- * <i>can</i> carry multiple precursors, not by any failing test. Same shape as C27(b), C28 and C29: a rule
+ * <i>can</i> carry multiple precursors, not by any failing test. Same recurring shape: a rule
  * with no fixture that could discriminate.
  *
  * <p>Multiple precursors are not pathological. <b>Multiplexed (MSX) acquisition deliberately
  * co-fragments several precursors into one MS2 scan</b>, and DIA/SWATH uses wide isolation windows with no
  * single selected ion. MassQL simply keeps the first and discards the rest — so these fixtures are
- * <b>parity</b> fixtures, unlike the C27(c) pair that MassQL cannot load at all.
+ * <b>parity</b> fixtures, unlike the pair that MassQL cannot load at all.
  *
  * <p>Ground truth, from MassQL's own loader over these two fixtures:
  * <pre>
@@ -75,7 +75,7 @@ class MultiPrecursorTest {
                                     + " reported the SECOND <precursorMz> ("
                                     + DECOY_MZ
                                     + "). MassQL "
-                                    + "hard-indexes precursorMz[0] -- first wins, not last (C31)");
+                                    + "hard-indexes precursorMz[0] -- first wins, not last");
                     assertNotEquals(
                             7.0,
                             pc[1],
@@ -109,7 +109,7 @@ class MultiPrecursorTest {
                                     + " reported the second <selectedIon> ("
                                     + DECOY_MZ
                                     + "); MassQL "
-                                    + "reads selectedIon[0] (C31)");
+                                    + "reads selectedIon[0]");
                     assertNotEquals(
                             DECOY_MZ_2,
                             pc[0],
@@ -118,7 +118,7 @@ class MultiPrecursorTest {
                                     + " reported the second <precursor> ("
                                     + DECOY_MZ_2
                                     + "); MassQL "
-                                    + "reads precursor[0] (C31)");
+                                    + "reads precursor[0]");
                     assertNotEquals(7.0, pc[1], "charge came from the second selectedIon");
                     assertNotEquals(8.0, pc[1], "charge came from the second precursor");
                 });
@@ -127,7 +127,7 @@ class MultiPrecursorTest {
     @Test
     void theFixturesReallyDoCarryMultiplePrecursors() {
         // Guards the premise. If the generator stopped emitting decoys, both tests above would pass
-        // vacuously against a last-wins reader -- exactly the hole C31 came out of.
+        // vacuously against a last-wins reader -- exactly the hole this came out of.
         String mzxml = read("micro_multiprec.mzXML");
         assertTrue(
                 countOf(mzxml, "<precursorMz") >= 6,

@@ -25,8 +25,8 @@ import org.junit.jupiter.api.Test;
  * Diagnostics are returned via {@link SpectraStream#diagnostics()} for the caller to route.
  *
  * <p>Stray stdout output would <i>also</i> corrupt the <b>Java CLI</b>'s JSON payload in its default
- * output mode (Tech_Step11), but that is a different layer, and a consequence rather than the reason.
- * See Correction C25(a) in {@code docs/harness/Tech_Step_INDEX.md}.
+ * output mode (the public API), but that is a different layer, and a consequence rather than the reason.
+ * See in the engineering record.
  *
  * <p>{@code JavolutionQuiet} suppresses it by raising {@code LogContext.LEVEL} above {@code INFO}.
  * Nothing else in the test suite would notice if that stopped working.

@@ -179,7 +179,7 @@ class ReaderParityHarnessTest {
 
     @Test
     void everyExpectedDumpLoadsAndIsNonEmpty() {
-        // Folds in the old ParityCoverageTest (C32): a dump that failed to parse would yield an
+        // Folds in the old ParityCoverageTest: a dump that failed to parse would yield an
         // empty map
         // and make every downstream assertion vacuous. ParityDump.of() fails on empty; this asserts
         // the
@@ -197,7 +197,7 @@ class ReaderParityHarnessTest {
 
     @Test
     void aMissingDumpFailsRatherThanSkipping() {
-        // C26 again: absence must be loud. If this ever returns instead of throwing, the gate can
+        // absence must be loud. If this ever returns instead of throwing, the gate can
         // be
         // silently disabled by deleting a file.
         assertThrows(AssertionError.class, () -> ParityDump.of("no_such_fixture.mzML"));
@@ -205,7 +205,7 @@ class ReaderParityHarnessTest {
 
     @Test
     void theDumpKeyIsMslevelPlusScanNotScanAlone() {
-        // C32a, asserted rather than trusted: micro.mgf's synthetic MS1 has scan id 3, which is
+        // Asserted rather than trusted: micro.mgf's synthetic MS1 has scan id 3, which is
         // ALSO a
         // real MS2 id. Under a scan-id-only key one of the two would overwrite the other and the
         // harness
@@ -219,7 +219,7 @@ class ReaderParityHarnessTest {
         assertNotNull(real, "micro.mgf's real MS2 scan 3 should be present");
         assertNotSame(phantom, real, "these must be two distinct entries sharing one scan id");
 
-        // Correction C33: the fake MS1 row is NOT always an all-zero placeholder. MassQL's
+        // the fake MS1 row is NOT always an all-zero placeholder. MassQL's
         // pyteomics MGF
         // loader ends with `ms1_df = pd.DataFrame([peak_dict])` where peak_dict LEAKS from the MS2
         // peak
@@ -240,7 +240,7 @@ class ReaderParityHarnessTest {
         assertNotEquals(
                 0.0,
                 phantom.iSum(),
-                "micro.mgf's fake MS1 duplicates a real peak, so its intensity is non-zero (C33)");
+                "micro.mgf's fake MS1 duplicates a real peak, so its intensity is non-zero");
 
         // PlusRise is the other flavour: the genuine all-zero synthetic row.
         ParityDump.Scan plusRiseFake =
@@ -249,7 +249,7 @@ class ReaderParityHarnessTest {
         assertEquals(
                 0.0,
                 plusRiseFake.iSum(),
-                "PlusRise takes the manual-loader path, whose fake MS1 IS all zeros (C33)");
+                "PlusRise takes the manual-loader path, whose fake MS1 IS all zeros");
     }
 
     @Test

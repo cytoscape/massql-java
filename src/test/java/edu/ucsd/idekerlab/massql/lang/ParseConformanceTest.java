@@ -22,7 +22,7 @@ import edu.ucsd.idekerlab.massql.lang.ast.MassqlQuery;
  * The parser conformance suite: every reference parse either builds an AST or rejects with
  * a named construct.
  *
- * <p>⚠ Correction C17: an earlier draft of Tech_Step4 said "every {@code scaninfo} golden
+ * <p>⚠ an earlier draft of the parser said "every {@code scaninfo} golden
  * must parse to a canonical-equal AST". That is wrong — 20 of the 35 {@code scaninfo}
  * goldens contain out-of-scope constructs (variables, {@code MOBILITY}, {@code formula()},
  * the intensity-match family) and must reject. The real split is 15 parse / 31 reject, and
@@ -99,7 +99,7 @@ class ParseConformanceTest {
 
     @Test
     void noGoldenCausesAnUnexpectedExceptionType() {
-        // "Never a crash" is a Tech_Step4 requirement: every failure must be a
+        // "Never a crash" is a the parser requirement: every failure must be a
         // MassqlParseException, never an NPE, ISE or ArrayIndexOutOfBounds.
         for (Corpus.Entry e : Corpus.load()) {
             try {

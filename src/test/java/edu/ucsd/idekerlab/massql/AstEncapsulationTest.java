@@ -25,7 +25,7 @@ import edu.ucsd.idekerlab.massql.lang.ast.MassqlQuery;
  * assert and easy to violate by accident, e.g. by returning an ANTLR {@code ParserRuleContext}
  * or accepting a {@code Token} in a helper that later becomes public.
  *
- * <p>The same check catches an MSDK or vendored reader type leaking out of Tech_Step6/7's readers, which is
+ * <p>The same check catches an MSDK or vendored reader type leaking out of the readers/7's readers, which is
  * why the forbidden list is a prefix allowlist rather than a list of the types known today.
  */
 class AstEncapsulationTest {

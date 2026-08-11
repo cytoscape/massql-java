@@ -51,7 +51,7 @@ class ScanIndexTest {
     @Test
     void retentionTimeIsExactAtDoublePrecision() {
         // The mzML golden's rt does NOT survive a float round-trip, so a float-only design
-        // fails the Tech_Step12 differential with a tiny, confusing delta.
+        // fails the differential with a tiny, confusing delta.
         double golden = 0.011218333333333334;
         ScanIndex x = sparse().index();
         assertEquals(golden, x.rtOf(0), "must be bit-exact");
@@ -63,7 +63,7 @@ class ScanIndexTest {
     @Test
     void perScanMetadataIsCarriedIncludingTheZeroSentinels() {
         // precmz/ms1scan/charge are per-SCAN (verified against the loader: exactly one
-        // distinct value each per scan), and the raw 0 sentinel survives -- Tech_Step10 owns
+        // distinct value each per scan), and the raw 0 sentinel survives -- the collation owns
         // the 0-to-null conversion, not this layer.
         ScanIndex x = sparse().index();
         assertEquals(810.79, x.precmzOf(0));

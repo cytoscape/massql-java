@@ -10,10 +10,10 @@ import java.util.List;
  * the key set and the key order are frozen. They are defined in {@code docs/RESULT_SCHEMA.md} and pinned
  * by {@code ResultSchemaContractTest}.
  *
- * <p><b>One shape, always</b> (Correction C40): every row carries the same 12 keys in the same order,
+ * <p><b>One shape, always</b>: every row carries the same 12 keys in the same order,
  * whether the query was {@code MS1DATA} or {@code MS2DATA}. No key is ever omitted; an inapplicable field
- * is present with the value {@code null}. Hence no shape parameter — Tech_Step10 §5 originally specified
- * one, and C40 removed the second shape it would have selected.
+ * is present with the value {@code null}. Hence no shape parameter: there is no second shape for one to
+ * select.
  *
  * <h2>Written by hand — no Jackson, no Gson</h2>
  *
@@ -27,7 +27,7 @@ import java.util.List;
  * {@code Double.toString} / {@code Integer.toString} — shortest round-trip-exact form, compact, no
  * indentation. <b>Round-trip bit-exactness is the requirement</b>, not byte-matching Python: Java differs
  * from Python's {@code repr} in known ways (exponents {@code 1.0E-5} vs {@code 1e-05}; always emitting
- * {@code .0} on integral values), which is exactly why Tech_Step12 compares <b>parsed values, never
+ * {@code .0} on integral values), which is exactly why the differential compares <b>parsed values, never
  * text</b>. Never round, truncate or reformat — that would destroy the bit-identity Steps 8 and 12
  * establish.
  */
@@ -115,7 +115,7 @@ public final class ResultJson {
                         "non-finite value "
                                 + d
                                 + " reached the serializer; ScaninfoCollation must "
-                                + "convert NaN and infinity to null first (Tech_Step10 §4)");
+                                + "convert NaN and infinity to null first");
             }
             sb.append(d.doubleValue());
         } else {

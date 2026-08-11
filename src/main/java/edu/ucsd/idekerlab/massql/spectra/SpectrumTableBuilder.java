@@ -23,7 +23,7 @@ public final class SpectrumTableBuilder {
     /**
      * Default peak capacity.
      *
-     * <p>Deliberately small. Under the streaming design (Correction C22) this builder runs once
+     * <p>Deliberately small. Under the streaming design this builder runs once
      * <b>per scan</b>, not once per file, so an over-large default is pure allocation churn:
      * at 1024 it cost 16 KB of arrays for a 22-peak MGF spectrum, which measured as ~190 MB of
      * garbage across PlusRise.mgf's 34,513 scans. Readers that know the peak count up front should
@@ -193,7 +193,7 @@ public final class SpectrumTableBuilder {
             }
             for (int r = from; r < to; r++) {
                 // An all-zero scan divides by zero and yields NaN. That is deliberate: NaN is
-                // the correct in-band "undefined", and Tech_Step10 maps NaN to JSON null.
+                // the correct in-band "undefined", and the collation maps NaN to JSON null.
                 // Substituting 0 here would report a real value where there is none.
                 iNorm[r] = iOut[r] / max;
                 iTicNorm[r] = iOut[r] / sum;

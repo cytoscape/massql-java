@@ -25,7 +25,7 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
  * (`msql_engine_filters.py:283-288`, `:557-562`), so the next condition sees every peak of each surviving
  * scan. A consequence worth knowing: because no predicate ever sees a reduced peak list, each condition is a
  * pure set intersection and **condition order is irrelevant** — proven, and pinned by
- * {@code micro_ms1var.mzML}, the only fixture that can discriminate (Correction C37g).
+ * {@code micro_ms1var.mzML}, the only fixture that can discriminate.
  *
  * <h2>Scan-level vs peak-level</h2>
  *
@@ -148,7 +148,7 @@ public final class ConditionFilters {
 
     private static boolean matchesWindow(
             SpectrumTable t, Condition.Value cv, double lo, double hi) {
-        // mzWindowExclusive, NOT mzWindow: condition windows are strict (C37a). A single-scan
+        // mzWindowExclusive, NOT mzWindow: condition windows are strict. A single-scan
         // table's only
         // ordinal is 0.
         IntRange r = t.mzWindowExclusive(0, lo, hi);

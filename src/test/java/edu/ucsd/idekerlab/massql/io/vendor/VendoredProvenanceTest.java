@@ -18,11 +18,9 @@ import edu.ucsd.idekerlab.massql.TestPaths;
 /**
  * Makes the vendoring obligation a <b>build-enforced fact rather than a convention</b>.
  *
- * <p>Tech_Step7 required this class and it was never written — found by {@code make spec-audit}
- * check 4 (Correction <b>C38</b>), which fails the build when a completed step's spec names a test
- * class that does not exist. All twelve files under {@code io/vendor/} did in fact carry their
- * headers, so nothing was wrong; what was missing was anything that would <i>notice</i> if a
- * thirteenth arrived without one, or if someone tidied a header away.
+ * <p>All twelve files under {@code io/vendor/} carry their headers, so nothing is wrong today. What
+ * was missing for a long time was anything that would <i>notice</i> if a thirteenth arrived without
+ * one, or if someone tidied a header away — which is the whole reason this class exists.
  *
  * <p>That distinction matters more here than in most tests. MSDK is dual-licensed
  * <b>LGPL-2.1 OR EPL-1.0</b> and this project elects EPL-1.0 — an election that only has effect if
@@ -39,7 +37,7 @@ class VendoredProvenanceTest {
      *
      * <p><b>Not everything in that package is upstream code</b>, and this test's first version assumed
      * it was — failing on {@code LittleEndianDataInput}, which was written here as a Guava replacement
-     * (Correction C16) and correctly carries no provenance header. It lives in {@code io/vendor/}
+     * and correctly carries no provenance header. It lives in {@code io/vendor/}
      * because it exists solely to serve the vendored decoder.
      *
      * <p>The exclusion is driven by an explicit <b>"Not vendored"</b> marker in the file's own javadoc
@@ -147,7 +145,8 @@ class VendoredProvenanceTest {
 
     @Test
     void everyVendoredFileStatesWhatWasModified() {
-        // The whole vendoring argument (Tech_Step7 §1, C23) rests on the changes being trivial and
+        // The whole vendoring argument (see the mzXML reader) rests on the changes being trivial
+        // and
         // enumerated. An unstated modification is how a local fix silently becomes permanent.
         for (Path p : vendoredSources()) {
             String h = head(p);
@@ -163,7 +162,8 @@ class VendoredProvenanceTest {
     void theProvenanceDocumentExistsAndListsEveryVendoredFile() {
         // Every vendored header says "See docs/VENDORED.md for the rationale and the full
         // modification
-        // list". That document DID NOT EXIST until C38 -- it was a Step 6 deliverable, Step 7
+        // list". That document DID NOT EXIST for a long time -- it was an early deliverable that
+        // later steps
         // ticked
         // "docs/VENDORED.md unchanged", and Step 13 lists it as a review artifact, while eleven
         // files
@@ -182,7 +182,7 @@ class VendoredProvenanceTest {
                     "docs/VENDORED.md does not mention the vendored file "
                             + p.getFileName()
                             + " -- the per-file headers and the central record have drifted apart, "
-                            + "which is C38's own failure shape one layer down");
+                            + "which is the own failure shape one layer down");
         }
     }
 

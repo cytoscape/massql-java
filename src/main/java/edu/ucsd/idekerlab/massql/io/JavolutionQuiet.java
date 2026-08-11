@@ -18,9 +18,9 @@ import javolution.context.LogContext;
  * asserts <i>both</i> streams stay silent.
  *
  * <p>Secondarily, and at a <b>different layer</b>: stray stdout output would also corrupt the <b>Java
- * CLI</b>'s JSON payload in its default output mode (Tech_Step11; the Tech_Step12 differential is such a
+ * CLI</b>'s JSON payload in its default output mode (the differential is such a
  * consumer). Real, but not the governing rule here. See <i>Terminology</i> in
- * {@code docs/harness/Tech_Step_INDEX.md} and Correction C25(a) — this justification was originally
+ * the SDK/CLI layer distinction — this justification was originally
  * written the other way round, which read as "the SDK treats stdout as a data pipe". It does not.
  *
  * <p>{@code LogContext.LEVEL} is a {@code Configurable}, so raising it above {@code INFO} suppresses these

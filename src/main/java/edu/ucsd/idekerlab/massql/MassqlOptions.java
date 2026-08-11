@@ -5,11 +5,11 @@ package edu.ucsd.idekerlab.massql;
  *
  * <p>{@code precursorTolPpm} is a SEPARATE knob from a query's own
  * {@code TOLERANCEPPM}/{@code TOLERANCEMZ}: the query tolerance selects scans, this one
- * matches the precursor peak within an already-selected MS1 scan (Tech_Step10 §3).
+ * matches the precursor peak within an already-selected MS1 scan.
  * Conflating them is a silent wrong-answer bug.
  *
  * <p>The default of 20.0 is the documented default in SPIKE.md §4, RESULT_SCHEMA.md and
- * massql_query.py. Tech_Step1 §3a found the original mzML golden had been generated at an
+ * massql_query.py. The original mzML golden was found to have been generated at an
  * unrecorded ~60 ppm instead, so goldens now record their flags explicitly.
  */
 public final class MassqlOptions {

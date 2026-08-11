@@ -19,13 +19,13 @@ import org.junit.jupiter.api.io.TempDir;
 import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
 
 /**
- * ⛔ <b>Tests the test.</b> A golden reader that silently returns fewer rows turns the Tech_Step12
+ * ⛔ <b>Tests the test.</b> A golden reader that silently returns fewer rows turns the differential
  * differential — the spike's exit criterion — into a green light that proves nothing.
  *
  * <p>This is not a hypothetical failure mode in this repository. {@code ParityDump}'s hand-rolled
  * regex stopped at {@code polarity} and silently dropped {@code charge}, {@code ms1scan} and
  * {@code precmz}; three columns went uncompared, and an MGF charge bug survived a <b>green</b>
- * Tech_Step8 gate for five steps before surfacing at Step 11 (Correction C44). Every rejection below
+ * the parity gate gate for five steps before surfacing at Step 11. Every rejection below
  * is one that regex-shaped parsing would have let through.
  */
 class GoldenResultsTest {
@@ -70,8 +70,9 @@ class GoldenResultsTest {
 
     @Test
     void anEmptyGoldenIsARealResultNotAFailure() {
-        // Two goldens are deliberately `[]` -- the C37 strict-window evidence and the empty-result
-        // case. Reading them must succeed and yield zero rows, because Tech_Step12 asserts against
+        // Two goldens are deliberately `[]` -- the strict-window evidence and the empty-result
+        // case. Reading them must succeed and yield zero rows, because the differential asserts
+        // against
         // them.
         assertTrue(GoldenResults.of("micro_mzml_edge_results").isEmpty());
         assertTrue(GoldenResults.of("dp00570_mzxml_empty_results").isEmpty());
@@ -106,7 +107,7 @@ class GoldenResultsTest {
 
     @Test
     void theMs1dataGoldenCarriesTheSameTwelveKeys() {
-        // C40: one union schema discriminated by mslevel, no key ever absent. The precursor columns
+        // one union schema discriminated by mslevel, no key ever absent. The precursor columns
         // are PRESENT and null on an MS1 row, while base_peak_* carry real values.
         List<ScanInfoResult> rows = GoldenResults.of("small_mzml_ms1_results");
         assertEquals(14, rows.size());

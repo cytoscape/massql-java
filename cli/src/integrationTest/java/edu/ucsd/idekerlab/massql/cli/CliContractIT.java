@@ -38,14 +38,14 @@ import com.google.gson.JsonParser;
  * establish that — and only against the shadow jar can it establish that the assembled artifact runs
  * at all.
  *
- * <p>⚠ <b>The two properties are tested separately</b> (Correction C25c). An earlier design asserted
+ * <p>⚠ <b>The two properties are tested separately</b>. An earlier design asserted
  * correctness by reading the payload off the pipe, which made a stream-hygiene regression present as a
  * data mismatch and vice versa. Here: correctness reads {@code --output FILE}, hygiene inspects the
  * pipes, and one test bridges them by proving the two modes emit identical bytes.
  *
  * <p>The jar path arrives as the {@code cliJar} system property, resolved by {@code cli/build.gradle}
  * from {@code shadowJar} itself. It is never reconstructed from a version string — {@code cliVersion}
- * is a Gradle property, and {@code System.getProperty("cliVersion")} is {@code null} (C46).
+ * is a Gradle property, and {@code System.getProperty("cliVersion")} is {@code null}.
  */
 class CliContractIT {
 
@@ -59,14 +59,14 @@ class CliContractIT {
                 "system property 'cliJar' is not set -- cli/build.gradle's integrationTest suite must"
                         + " pass the resolved shadowJar path. Do NOT rebuild it from a version string:"
                         + " cliVersion is a Gradle property, not a JVM one, and yields"
-                        + " massql-java-cli-null.jar (C46).");
+                        + " massql-java-cli-null.jar.");
         Path jar = Path.of(p);
         assertTrue(
                 Files.isRegularFile(jar),
                 "the CLI uber-jar is missing: "
                         + jar
                         + " -- the suite declares dependsOn shadowJar, so"
-                        + " this should be impossible. Never skip on it (C26).");
+                        + " this should be impossible. Never skip on it.");
         return jar;
     }
 
@@ -446,7 +446,7 @@ class CliContractIT {
                 () -> "the message must name the construct it rejected:\n" + r.err());
     }
 
-    /** {@code --help} is asked for, so it is the program's output: stdout, exit 0 (C25). */
+    /** {@code --help} is asked for, so it is the program's output: stdout, exit 0. */
     @Test
     void helpGoesToStdoutAndExitsZero() {
         Run r = fork("--help");

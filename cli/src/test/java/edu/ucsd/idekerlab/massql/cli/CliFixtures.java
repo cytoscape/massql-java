@@ -24,7 +24,7 @@ import java.nio.file.Paths;
  * the real fixtures rather than synthetic ones is what makes {@code MainOutputFileTest}'s
  * byte-identity check meaningful: it compares two renderings of an actual 6-row result.
  *
- * <p><b>A missing fixture is a hard failure, never a skip</b> — Correction C26. There is no skip
+ * <p><b>A missing fixture is a hard failure, never a skip</b>. There is no skip
  * path here, and adding one would recreate the failure where CI was green for four steps while
  * proving only that the code compiled.
  */
@@ -47,7 +47,7 @@ final class CliFixtures {
         return require("goldens/queries/test_mzml.massql");
     }
 
-    /** A query whose strict window matches nothing — the C37 evidence, and the `[]` + exit 0 case. */
+    /** A query whose strict window matches nothing — the `[]` + exit 0 case. */
     static Path emptyResultQuery() {
         return require("goldens/queries/test_micro_edge.massql");
     }
@@ -60,7 +60,7 @@ final class CliFixtures {
                         + relative
                         + "\nThe cli project gets the SDK's test resources via testRuntimeOnly in "
                         + "cli/build.gradle; if that wiring was removed, restore it rather than "
-                        + "making this test conditional (C26).");
+                        + "making this test conditional.");
         try {
             return Paths.get(url.toURI());
         } catch (URISyntaxException e) {

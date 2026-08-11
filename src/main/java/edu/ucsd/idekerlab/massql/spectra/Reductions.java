@@ -59,7 +59,7 @@ public final class Reductions {
      *
      * <p><b>Returns a ROW INDEX, not a value</b>, so the caller can read a <i>different</i>
      * column at that row. That is exactly what {@code base_peak_mz} needs: argmax over
-     * intensity, then read m/z (Tech_Step10 §3).
+     * intensity, then read m/z.
      *
      * <p><b>Ties resolve to the LOWEST row index</b> — i.e. the lowest m/z, given the store's
      * ascending-m/z invariant. This matches pandas {@code idxmax}, which returns the first

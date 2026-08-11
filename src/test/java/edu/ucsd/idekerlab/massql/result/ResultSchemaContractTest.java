@@ -21,8 +21,8 @@ import edu.ucsd.idekerlab.massql.TestPaths;
 /**
  * Makes {@code docs/RESULT_SCHEMA.md} <b>executable</b> rather than decorative.
  *
- * <p>Correction C40 happened because the result contract was <i>specifiable in four places</i> — SPIKE.md,
- * the oracle's `RESULT_SCHEMA.md`, Tech_Step10 and the goldens — and so it drifted into three different
+ * <p>happened because the result contract was <i>specifiable in four places</i> — SPIKE.md,
+ * the oracle's `RESULT_SCHEMA.md`, the collation and the goldens — and so it drifted into three different
  * answers. The fix was to define it once. This test is what makes "once" hold: it parses the key order out
  * of that document and asserts the serializer emits exactly those keys, in exactly that order.
  *
@@ -94,7 +94,7 @@ class ResultSchemaContractTest {
                 declared,
                 List.of(ScanInfoResult.KEYS),
                 "docs/RESULT_SCHEMA.md and ScanInfoResult.KEYS disagree. The DOCUMENT is the contract "
-                        + "(C40) -- if the change was intentional, it belongs in the document first, and "
+                        + " -- if the change was intentional, it belongs in the document first, and "
                         + "the goldens and every downstream consumer change with it.");
     }
 
@@ -139,7 +139,7 @@ class ResultSchemaContractTest {
     void theFieldDefinitionsTableCoversExactlyTheDeclaredKeys() {
         // Catches a doc that adds a key to the order line but never describes it, or describes one
         // it
-        // does not emit -- the document drifting from itself, which is how C40 started.
+        // does not emit -- the document drifting from itself, which is how the drift started.
         Set<String> declared = new LinkedHashSet<>(declaredKeyOrder(schemaDoc()));
         Set<String> described = new LinkedHashSet<>(fieldTableKeys(schemaDoc()));
         assertEquals(
@@ -158,19 +158,19 @@ class ResultSchemaContractTest {
 
     @Test
     void theDocumentStatesTheUnionRuleSoTheOneShapeCannotBeQuietlyForgotten() {
-        // The specific thing C40 corrected. If someone reintroduces a second shape, they have to
+        // The specific case. If someone reintroduces a second shape, they have to
         // delete
         // this sentence to make the test pass -- which is a visible act rather than an omission.
         String doc = schemaDoc();
         assertTrue(
                 doc.contains("SAME 12 keys") || doc.contains("same 12 keys"),
-                "docs/RESULT_SCHEMA.md must state that MS1DATA and MS2DATA emit the same 12 keys (C40)");
+                "docs/RESULT_SCHEMA.md must state that MS1DATA and MS2DATA emit the same 12 keys");
         assertTrue(doc.contains("mslevel"), "and that mslevel is the discriminator");
     }
 
     @Test
     void theDocumentRecordsThatBasePeaksAreNeverNull() {
-        // The half of C40 that was a join artifact. A future reader tempted to "restore" the old
+        // The half that was a join artifact. A future reader tempted to "restore" the old
         // nulls
         // has to contradict the document to do it.
         String doc = schemaDoc();
@@ -179,7 +179,6 @@ class ResultSchemaContractTest {
         String row = doc.substring(i, doc.indexOf('\n', i));
         assertTrue(
                 row.contains("**No**"),
-                "base_peak_i must be documented as never null, including for MS1DATA (C40): "
-                        + row);
+                "base_peak_i must be documented as never null, including for MS1DATA: " + row);
     }
 }

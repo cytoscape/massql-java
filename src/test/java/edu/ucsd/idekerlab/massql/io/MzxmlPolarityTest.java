@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 /**
  * mzXML polarity, with the parity claims and the non-parity ones deliberately kept apart.
  *
- * <p><b>Why the split matters (Correction C27c).</b> Tech_Step7 originally specified
+ * <p><b>Why the split matters.</b> the mzXML reader originally specified
  * {@code "+"} → 1, {@code "-"} → 2, <i>absent</i> → 0 as one rule. But
  * {@code _determine_scan_polarity_mzXML} reads {@code spec["polarity"]} <b>unguarded</b>
  * (`msql_fileloading.py:517-523`), so an absent attribute raises {@code KeyError} and MassQL produces no

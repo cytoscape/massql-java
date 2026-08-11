@@ -26,19 +26,19 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
  *
  * <h2>How the comparison works, and the three traps it navigates</h2>
  *
- * <p><b>Digests, not multisets</b> (Correction C32d). The dumps store SHA-256 over each array packed as
+ * <p><b>Digests, not multisets</b> (d). The dumps store SHA-256 over each array packed as
  * big-endian IEEE754 doubles. That is strictly stronger than comparing a multiset, because it pins the
  * array's <b>order</b> too. {@code PeakOrderPreconditionTest} asserts the precondition that makes
  * order-sensitivity correct: no fixture has descending m/z, so {@code SpectrumTableBuilder}'s sort never
  * fires and our order is MassQL's file order.
  *
- * <p><b>Keyed by {@code (mslevel, scan)}</b> (C32a). MassQL synthesises an all-zero MS1 placeholder for MGF
+ * <p><b>Keyed by {@code (mslevel, scan)}</b>. MassQL synthesises an all-zero MS1 placeholder for MGF
  * whose scan id <b>collides with a real MS2 id</b> — {@code micro.mgf} at 3, {@code DP00570_F02.mgf} at 625.
  * Keying by scan id compares a real spectrum against a row of zeros.
  *
- * <p><b>The dumps omit zero-peak scans; our readers yield them</b> (C32c). MassQL's loaders {@code continue}
+ * <p><b>The dumps omit zero-peak scans; our readers yield them</b>. MassQL's loaders {@code continue}
  * on an empty intensity array, so its dataframe has no rows for those scans, while our readers emit them and
- * let the engine filter (C24b, C27b). {@code PlusRise.mgf} is <b>34,513 reader scans against 21,942 dump
+ * let the engine filter. {@code PlusRise.mgf} is <b>34,513 reader scans against 21,942 dump
  * entries</b>. The count of reader-only scans is therefore <b>asserted</b>, not tolerated — otherwise a
  * reader that dropped real spectra would pass this gate silently.
  */
@@ -55,7 +55,7 @@ class ReaderParityIT {
     /**
      * Relative tolerance for the intensity <b>sum</b> only.
      *
-     * <p><b>1e-6, and the reason is dtype rather than ordering.</b> Tech_Step8 §1 attributed the sum
+     * <p><b>1e-6, and the reason is dtype rather than ordering.</b> the parity gate attributed the sum
      * exception to numpy's pairwise accumulation and proposed 1e-15. Measured, that is far too tight:
      * MassQL's intensity column is <b>float32</b>, and {@code dump_loader_parity.py:81} records
      * {@code g["i"].sum()} — a <b>float32 accumulation</b>. On {@code small.mzML} MS1 scan 1 that gives
@@ -77,7 +77,7 @@ class ReaderParityIT {
 
         // MGF: the dump's single MS1 entry is MassQL's synthetic all-zero placeholder, which our
         // reader
-        // correctly omits (C32b). Drop it from the expectation rather than asserting a count of 1.
+        // correctly omits. Drop it from the expectation rather than asserting a count of 1.
         Set<ParityDump.Key> expected = new LinkedHashSet<>();
         for (ParityDump.Key k : dump.scans().keySet()) {
             if (isMgf && k.mslevel() == 1) continue;
@@ -96,7 +96,7 @@ class ReaderParityIT {
         // the
         // dump's counts directly: the dump omits zero-peak scans, so e.g. micro.mzML has 2 MS1
         // scans on
-        // our side but ms1_scan_count == 1 in the dump (its scan-4 MS1 is empty). C32c.
+        // our side but ms1_scan_count == 1 in the dump (its scan-4 MS1 is empty).
         int matchedMs1 = 0, matchedMs2 = 0;
         long peaks = 0;
 
@@ -154,7 +154,7 @@ class ReaderParityIT {
         assertEquals(expected.size(), seen.size(), fixture + ": scan-set size");
 
         // Compare the dump's counts against MATCHED scans, not raw reader totals -- the dump omits
-        // zero-peak scans (C32c), so the raw totals legitimately exceed it.
+        // zero-peak scans, so the raw totals legitimately exceed it.
         assertEquals(dump.ms2ScanCount(), matchedMs2, fixture + ": MS2 scan count (dump-matched)");
         if (isMgf) {
             assertEquals(
@@ -162,7 +162,7 @@ class ReaderParityIT {
                     ms1,
                     fixture
                             + ": MGF has no survey scans, so our reader must yield ZERO MS1 scans -- the "
-                            + "dump's single MS1 entry is MassQL's fake row (C32b/C33)");
+                            + "dump's single MS1 entry is MassQL's fake row");
             assertEquals(0, matchedMs1, fixture + ": no MGF MS1 entry should ever be matched");
         } else {
             assertEquals(
@@ -188,7 +188,7 @@ class ReaderParityIT {
                         + " reader-only (zero-peak) scan(s), saw "
                         + readerOnly
                         + ". This count is ASSERTED, not tolerated: a reader that dropped real spectra "
-                        + "would otherwise pass this gate silently (C32c)");
+                        + "would otherwise pass this gate silently");
 
         System.out.printf(
                 "  %-24s %4d scans (%3d MS1 / %5d MS2) | %,10d peaks | %,6d reader-only%n",
@@ -203,7 +203,7 @@ class ReaderParityIT {
         assertEquals(want.peakCount(), t.rowCount(), at + ": peak count");
         assertEquals(want.polarity(), v.polarity(), at + ": polarity");
 
-        // ⛔ The PRECURSOR metadata, on MS2 scans (Correction C44).
+        // ⛔ The PRECURSOR metadata, on MS2 scans.
         //
         // The dumps have always carried these three; nothing compared them. So the gate proved
         // bit-identity of peaks, rt and polarity while leaving charge, precmz and ms1scan entirely

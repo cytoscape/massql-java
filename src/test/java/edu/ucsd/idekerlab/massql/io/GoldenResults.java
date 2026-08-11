@@ -28,14 +28,14 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  * their parsing, {@code ParityDump} citing {@code DEPENDENCY_POLICY.md} constraint 1 — <i>"Jackson
  * discovers modules via ServiceLoader"</i>. But that constraint's stated <b>failure mechanism</b> is a
  * thread-context classloader that cannot see the caller's classes, and a test running under Gradle on a
- * flat classpath has no such split. The rule was being applied outside its own mechanism
- * (Correction C46). {@code gson} is {@code testImplementation} only, and
+ * flat classpath has no such split. The rule was being applied outside its own mechanism.
+ * {@code gson} is {@code testImplementation} only, and
  * {@code checkBannedDependencies} inspects {@code runtimeClasspath}, so it provably cannot reach the
  * shipping closure.
  *
- * <p>⛔ <b>The decisive argument is Correction C44.</b> {@code ParityDump}'s regex stopped at
+ * <p>⛔ <b>The decisive argument is.</b> {@code ParityDump}'s regex stopped at
  * {@code polarity} and silently dropped {@code charge}, {@code ms1scan} and {@code precmz} — which let
- * an MGF charge bug survive a <b>green</b> Tech_Step8 gate for five steps. This file feeds the
+ * an MGF charge bug survive a <b>green</b> the parity gate gate for five steps. This file feeds the
  * differential that <i>is</i> the spike's exit criterion. A parser whose failure mode is silent
  * truncation is the wrong tool for that job.
  *
@@ -78,7 +78,7 @@ public final class GoldenResults {
     /**
      * Reads the golden named by its bare stem, e.g. {@code "small_mzml_results"}.
      *
-     * @throws AssertionError if the golden is missing or malformed — never a skip (C26)
+     * @throws AssertionError if the golden is missing or malformed — never a skip
      */
     public static List<ScanInfoResult> of(String name) {
         return read(Fixtures.require("goldens/query-results/" + name + ".json"));
@@ -130,7 +130,7 @@ public final class GoldenResults {
                             + "\n  actual:   "
                             + o.keySet()
                             + "\nSee docs/RESULT_SCHEMA.md -- the contract is one union schema with no key"
-                            + " ever absent (C40).");
+                            + " ever absent.");
         }
 
         return new ScanInfoResult(
@@ -177,8 +177,6 @@ public final class GoldenResults {
                 GoldenResults.class
                         .getClassLoader()
                         .getResource("goldens/query-results/" + name + ".json"),
-                "golden missing: "
-                        + name
-                        + ".json -- goldens are committed to this repository (C26)");
+                "golden missing: " + name + ".json -- goldens are committed to this repository");
     }
 }

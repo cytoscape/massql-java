@@ -6,6 +6,5 @@
  * swappable (hand-written, or the remote {@code /parse} escape hatch) without touching
  * the engine, and it is asserted by {@code AstEncapsulationTest}.
  *
- * <p><b>Owned by Tech_Step4.</b> Consumed by Tech_Step9.
  */
 package edu.ucsd.idekerlab.massql.lang.ast;

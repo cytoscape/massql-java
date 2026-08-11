@@ -25,7 +25,7 @@ import edu.ucsd.idekerlab.massql.Massql;
 import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
 
 /**
- * Wall-clock and peak heap per fixture — <b>recorded, not gated</b> (Tech_Step12 §5).
+ * Wall-clock and peak heap per fixture — <b>recorded, not gated</b> (the differential).
  *
  * <h2>Why the assertions are deliberately loose</h2>
  *
@@ -177,7 +177,7 @@ class PerformanceIT {
             throw new UncheckedIOException(e);
         }
 
-        // Tests may print; the SDK may not (C25). This is what makes `make it` output usable
+        // Tests may print; the SDK may not. This is what makes `make it` output usable
         // directly.
         System.out.println(sb);
     }
@@ -212,7 +212,7 @@ class PerformanceIT {
                     "fixture missing from src/test/resources: "
                             + relative
                             + " -- fixtures are committed"
-                            + " in-repo (C26). Run `make fixtures` for the two Ewing files. Never skip.");
+                            + " in-repo. Run `make fixtures` for the two Ewing files. Never skip.");
         }
         try {
             return Paths.get(url.toURI());

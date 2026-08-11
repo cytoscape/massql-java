@@ -18,10 +18,10 @@ import edu.ucsd.idekerlab.massql.MassqlException;
  * {@code float} rt per peak for cheap row-level filtering, but every {@code rt} that reaches
  * the result JSON comes from {@link #rtOf}. The mzML golden's
  * {@code rt = 0.011218333333333334} does not survive a float round-trip, so a float-only
- * design fails the Tech_Step12 differential with a tiny, confusing delta.
+ * design fails the differential with a tiny, confusing delta.
  *
  * <p>{@code precmz}, {@code ms1scan} and {@code charge} carry MassQL's raw <b>0 sentinel</b>
- * when the file recorded nothing. The 0-to-null conversion is Tech_Step10's job, not this
+ * when the file recorded nothing. The 0-to-null conversion is the collation's job, not this
  * layer's — converting early would lose the ability to tell "absent" from "converted".
  */
 public final class ScanIndex {
@@ -88,7 +88,7 @@ public final class ScanIndex {
         return polarity[check(ordinal)];
     }
 
-    /** Raw value including MassQL's 0 sentinel; Tech_Step10 converts 0 to null. */
+    /** Raw value including MassQL's 0 sentinel; the collation converts 0 to null. */
     public double precmzOf(int ordinal) {
         return precmz[check(ordinal)];
     }

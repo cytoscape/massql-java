@@ -1,21 +1,21 @@
 # massql-java — the ONLY entry point for building and testing.
 #
 # Do not invoke `gradlew` directly. Every command a developer or CI runs has a target here, so
-# "build", "test" and "verify" mean one thing in a terminal, in the docs and in CI. If you
-# need something this file does not do, ADD A TARGET rather than running Gradle by hand.
+# "build" and "test" mean one thing in a terminal, in the docs and in CI. If you need something
+# this file does not do, ADD A TARGET rather than running Gradle by hand.
 #
-# `make verify` is the review entry point (Tech_Step13 §3).
+#   make build              both projects' jars, sources and javadoc
+#   make integration-test   the full suite and the coverage gate -- what CI runs
 #
 # Two artifacts, versioned INDEPENDENTLY (gradle.properties):
-#   massql-java       the SDK, the thin jar massql-app embeds  -> make publish-sdk
-#   massql-java-cli   the standalone CLI uber-jar              -> make publish-cli
+#   massql-java       the SDK, the thin jar consumers embed  -> make publish-sdk
+#   massql-java-cli   the standalone CLI uber-jar            -> make publish-cli
 
 GRADLE := ./gradlew --console=plain
 
 .DEFAULT_GOAL := help
-.PHONY: help all build test it verify lint lint-fix coverage cli audit spec-audit fixtures \
-        report clean test-one it-one set-version-sdk set-version-cli publish-sdk publish-cli \
-        feature-matrix
+.PHONY: help all build test integration-test lint lint-fix coverage cli deps fixtures \
+        clean test-one it-one set-version-sdk set-version-cli publish-sdk publish-cli
 
 ## help: list the targets (default)
 help:
@@ -27,31 +27,30 @@ help:
 	@echo
 	@echo "  Never run ./gradlew directly — add a target instead."
 
-## all: alias for verify
-all: verify
+## all: alias for integration-test
+all: integration-test
 
-## build: compile and package both jars
+## build: compile and package both projects -- jar, -sources.jar and -javadoc.jar each
+#
+# `assemble` produces all three per project: withJavadocJar()/withSourcesJar() in the build scripts
+# wire them in, so javadoc and sources are never a separate step. The javadoc task also writes the
+# browsable build/docs/javadoc/index.html on the way.
 build:
 	$(GRADLE) assemble
 	@ls -1 build/libs/*.jar cli/build/libs/*.jar 2>/dev/null | sed 's/^/  -> /'
+	@echo "  -> build/docs/javadoc/index.html"
 
 ## test: unit tests only (*Test.java in src/test). Seconds, for the edit loop.
 test:
 	$(GRADLE) test
 
-## it: integration tests only (*IT.java in src/integrationTest). Fast gate re-check.
+## integration-test: everything -- unit + integration suites, coverage gate, lint, banned deps
 #
-# Both projects. `integrationTest` alone resolves to the ROOT project's task, so the CLI contract
-# suite -- which forks the uber-jar -- would never run (C46).
-it:
-	$(GRADLE) integrationTest :cli:integrationTest
-
-## verify: unit + integration + coverage gate + lint + banned deps, audit, spec-audit, then the differential table. What the reviewer runs.
-verify:
+# `check` rather than the suites by name: it pulls in both projects' integrationTest suites, the 90%
+# jacocoTestCoverageVerification and checkBannedDependencies. Naming `integrationTest` alone would
+# resolve to the ROOT project's task and silently skip the CLI contract suite.
+integration-test:
 	$(GRADLE) check
-	@$(MAKE) --no-print-directory audit
-	@$(MAKE) --no-print-directory spec-audit
-	@bash scripts/differential-table.sh
 
 ## lint: report style violations (Spotless is the whole style specification)
 lint:
@@ -66,37 +65,18 @@ coverage:
 	$(GRADLE) jacocoTestReport
 	@echo "  -> build/reports/jacoco/test/html/index.html"
 
-## feature-matrix: regenerate docs/FEATURE_MATRIX.md from the code (run after changing the enums)
-feature-matrix:
-	$(GRADLE) :test --tests '*FeatureMatrixTest*' -Dmassql.regenerate.matrix=true --rerun-tasks
-	@echo "  -> docs/FEATURE_MATRIX.md"
-
 ## cli: build the standalone CLI uber-jar
 cli:
 	$(GRADLE) :cli:shadowJar
 	@ls -1 cli/build/libs/*.jar | sed 's/^/  -> /'
 
-## audit: regenerate dependency-audit.txt and check the SDK size budget
-audit:
-	@bash scripts/dependency-audit.sh
+## deps: print the SDK's runtime dependency tree (trace a transitive arrival before adding anything)
+deps:
+	$(GRADLE) -q dependencies --configuration runtimeClasspath
 
-## spec-audit: assert the harness specs still describe the code (fixtures, counts, fallout)
-spec-audit:
-	@bash scripts/spec-audit.sh
-
-## fixtures: download the two gitignored Ewing-lab fixtures (unstated licence, C26)
+## fixtures: download the two gitignored fixtures whose licence is unstated
 fixtures:
 	@bash scripts/fetch-fixtures.sh
-
-## report: print the review artifacts' headline results
-report:
-	@for f in docs/harness/PARITY_REPORT.md docs/harness/DIFFERENTIAL_REPORT.md; do \
-	  if [ -f "$$f" ]; then \
-	    echo "=== $$f ==="; sed -n '1,12p' "$$f"; echo; \
-	  else \
-	    echo "=== $$f === (not yet written)"; echo; \
-	  fi; \
-	done
 
 ## clean: remove build output
 clean:

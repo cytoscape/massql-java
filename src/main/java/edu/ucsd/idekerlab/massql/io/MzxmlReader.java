@@ -25,12 +25,12 @@ import javolution.xml.stream.XMLStreamConstants;
 import javolution.xml.stream.XMLStreamException;
 
 /**
- * Streaming mzXML reader — hand-written, vendoring nothing new (Correction C23).
+ * Streaming mzXML reader — hand-written, vendoring nothing new.
  *
  * <p><b>Hand-written because MSDK's `MzXMLFileParser` cannot be vendored:</b> it carries 13 msdk imports
  * including 7 `datamodel` types, and Guava arrives through `SimpleMsScan`, which imports `Preconditions`
  * and `Range`. Vendoring it would mean writing our own scan holder — the surgery that killed the same
- * plan for mzML one spec earlier (C21). mzXML is the simpler format anyway: zlib-or-none rather than zlib
+ * plan for mzML one spec earlier. mzXML is the simpler format anyway: zlib-or-none rather than zlib
  * plus six Numpress variants, one `precision` attribute rather than per-array cvParams, one interleaved
  * array rather than two.
  *
@@ -39,7 +39,7 @@ import javolution.xml.stream.XMLStreamException;
  * `DEPENDENCY_POLICY.md` constraint 1), capture each {@code <peaks>} element's base64 <b>text</b> and
  * decode it lazily in {@link ScanView#materialize()}.
  *
- * <p><b>Nothing is shared with the mzML decode path, deliberately</b> (Correction C21a). mzML is
+ * <p><b>Nothing is shared with the mzML decode path, deliberately</b>. mzML is
  * little-endian with separate arrays and Numpress; mzXML is <b>big-endian with interleaved pairs and no
  * Numpress</b>. A shared helper would need a flag for every one of those, and reusing a buffer configured
  * for mzML produces plausible-looking garbage rather than an error.
@@ -61,7 +61,7 @@ final class MzxmlReader extends AbstractSpectraStream {
     private int skippedNotASpectrum = 0;
     private boolean sawRootEnd = false;
 
-    /** Document-order tracking: the id of the most recent MS1 spectrum WITH PEAKS (C27b). */
+    /** Document-order tracking: the id of the most recent MS1 spectrum WITH PEAKS. */
     private int previousMs1Scan = 0;
 
     /** True once {@code <scan>} attributes are read, until its {@code <peaks>} is reached. */
@@ -98,7 +98,7 @@ final class MzxmlReader extends AbstractSpectraStream {
                             + " scans with ms level > 2 (out of scope for scaninfo)");
         }
         if (skippedNoMsLevel > 0) {
-            // C27a: MassQL drops these too -- pyteomics yields msLevel None and neither the ==1 nor
+            // MassQL drops these too -- pyteomics yields msLevel None and neither the ==1 nor
             // the ==2 branch fires. Reported rather than silent, because "48 scans became 40" needs
             // an explanation at the point of use.
             out.add(
@@ -168,7 +168,7 @@ final class MzxmlReader extends AbstractSpectraStream {
      * for a level-1 scan that survived it.
      */
     private boolean admit() {
-        if (scan.msLevel == 0) { // absent or empty msLevel -- C27a
+        if (scan.msLevel == 0) { // absent or empty msLevel
             skippedNoMsLevel++;
             return false;
         }
@@ -176,14 +176,14 @@ final class MzxmlReader extends AbstractSpectraStream {
             skippedHighMsLevel++;
             return false;
         }
-        // Correction C27(b): a ZERO-PEAK scan never becomes an ms1scan link. MassQL `continue`s on
+        // A ZERO-PEAK scan never becomes an ms1scan link. MassQL `continue`s on
         // len(intensity array)==0 (:421) BEFORE previous_ms1_scan is assigned, so an empty MS1 is
         // invisible to the chain and the next MS2 links to the MS1 *before* it. Verified against
         // MassQL's own loader: micro.mzXML gives {1:0, 3:2, 5:2} -- scan 5 links to 2, not to the
         // empty MS1 at 4 -- and the nested variant gives the identical map.
         //
         // The scan is still YIELDED; only the linkage skips it. Same split as MGF, where all 34,513
-        // blocks including the 12,571 empty ones are yielded and the engine filters (C24b).
+        // blocks including the 12,571 empty ones are yielded and the engine filters.
         if (scan.msLevel == 1) {
             if (scan.peakCount > 0) previousMs1Scan = scan.scanId;
         } else {
@@ -227,7 +227,7 @@ final class MzxmlReader extends AbstractSpectraStream {
     private void readPrecursorMz() throws XMLStreamException {
         // precursorCharge is optional; absent -> 0. NOTE this is mzXML's default, unlike MGF where
         // an
-        // absent CHARGE is 1 (Correction C6). Three formats, three charge defaults.
+        // absent CHARGE is 1. Three formats, three charge defaults.
         int charge = parseInt(attr("precursorCharge"), 0);
         // getElementText() consumes through </precursorMz>. The VALUE is element text, not an
         // attribute -- which is why a bare <precursorMz> with no attributes, the Step 2 finding
@@ -236,7 +236,7 @@ final class MzxmlReader extends AbstractSpectraStream {
         CharArray text = xml.getElementText();
         double mz = parseDouble(text == null ? null : text.toString(), 0.0);
 
-        // Correction C31: FIRST wins. MassQL hard-indexes spectrum["precursorMz"][0]
+        // FIRST wins. MassQL hard-indexes spectrum["precursorMz"][0]
         // (msql_fileloading.py:450), and a scan may legitimately carry several -- multiplexed (MSX)
         // acquisition co-fragments more than one precursor. This method used to overwrite on every
         // occurrence, i.e. last-wins, and no fixture was multi-precursor so nothing caught it.
@@ -276,7 +276,7 @@ final class MzxmlReader extends AbstractSpectraStream {
      * mzXML {@code num} attribute -> scan id.
      *
      * <p>pyteomics returns {@code spectrum["id"]} as a <b>{@code str}</b> ({@code '1'}), which is the
-     * root cause of Correction C12: {@code previous_ms1_scan} then propagates a string into
+     * root cause of a subtle bug: {@code previous_ms1_scan} then propagates a string into
      * {@code ms1scan} and every downstream {@code ms1_*} lookup misses. Parsing to int here is the fix.
      */
     static int scanNum(String num) {
@@ -293,7 +293,7 @@ final class MzxmlReader extends AbstractSpectraStream {
         // _determine_scan_polarity_mzXML (:517-523) initialises 0 and tests "+" then "-", so
         // present-but-other -> 0 IS parity. But it reads spec["polarity"] UNGUARDED, so an ABSENT
         // attribute raises KeyError -- MassQL produces nothing and no golden can exist. Our 0 there
-        // is our own contract (Correction C27c); micro_nopolarity.mzXML pins it and
+        // is our own contract; micro_nopolarity.mzXML pins it and
         // MzxmlPolarityTest
         // keeps the two cases apart so a pass cannot imply parity we do not have.
         if (polarity == null) return 0;
@@ -441,7 +441,7 @@ final class MzxmlReader extends AbstractSpectraStream {
         boolean bigEndian = true;
         boolean zlib = false;
         String base64 = "";
-        boolean precursorSeen; // C31: only the FIRST <precursorMz> counts
+        boolean precursorSeen; // only the FIRST <precursorMz> counts
 
         void reset() {
             scanId = 0;
@@ -449,9 +449,9 @@ final class MzxmlReader extends AbstractSpectraStream {
             rt = 0.0;
             polarity = 0;
             precmz = 0.0; // 0 sentinel -- Step 10 converts, not us. Also our non-parity value
-            // for an MS2 with no <precursorMz> at all (C27c).
+            // for an MS2 with no <precursorMz> at all.
             ms1scan = 0; // 0 = no preceding MS1; the origin of the sentinel
-            charge = 0; // mzXML default -- NOT MGF's 1 (C6)
+            charge = 0; // mzXML default -- NOT MGF's 1
             peakCount = 0;
             declaredPeaks = -1;
             precision = 32;
@@ -462,7 +462,7 @@ final class MzxmlReader extends AbstractSpectraStream {
         }
 
         /**
-         * Peak count without decoding, for the capacity hint and the C27b chain guard.
+         * Peak count without decoding, for the capacity hint and the zero-peak chain guard.
          *
          * <p>{@code peaksCount} is schema-required and is what we trust. When it is absent we derive
          * the count from the base64 length, which is exact for the uncompressed case — worth doing

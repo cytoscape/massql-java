@@ -33,7 +33,7 @@ final class ParityFixtures {
      * the delta is exactly the count of empty scans.
      *
      * <p><b>Deliberately absent</b>: {@code micro_nopolarity.mzXML} and {@code
-     * micro_noprecursor.mzXML} — MassQL raises {@code KeyError} on both (C27c), so no dump can exist
+     * micro_noprecursor.mzXML} — MassQL raises {@code KeyError} on both, so no dump can exist
      * and parity is not available. They pin our own contract in {@code MzxmlPolarityTest} / {@code
      * MzxmlEdgeCaseTest}. Also absent: {@code micro_multiprec.mzML}, whose peak parity the mzXML
      * twin already establishes.
@@ -46,7 +46,7 @@ final class ParityFixtures {
         FIXTURES_WITH_DUMPS.put("small.mzXML", 0);
         FIXTURES_WITH_DUMPS.put("DP00570_F02.mzxml", 0);
         FIXTURES_WITH_DUMPS.put("DP00570_F02.mgf", 0);
-        // 12,571 of PlusRise's 34,513 blocks carry no peak lines (C24b). MassQL loads 21,942.
+        // 12,571 of PlusRise's 34,513 blocks carry no peak lines. MassQL loads 21,942.
         FIXTURES_WITH_DUMPS.put("PlusRise.mgf", 12_571);
         // Micro fixtures: scan 4 is a zero-peak MS1, so each mzML/mzXML variant has exactly one
         // extra.
@@ -60,11 +60,11 @@ final class ParityFixtures {
         FIXTURES_WITH_DUMPS.put("micro_nested.mzXML", 1);
         FIXTURES_WITH_DUMPS.put("micro_multiprec.mzXML", 1);
         FIXTURES_WITH_DUMPS.put("micro.mgf", 0);
-        // Correction C36: MGF drops zero-intensity peaks. Block 2 of this fixture is ALL zeros, so
+        // MGF drops zero-intensity peaks. Block 2 of this fixture is ALL zeros, so
         // MassQL emits no rows for it and it vanishes from the dataframe -- our reader still yields
         // the block, now with zero peaks, hence exactly one reader-only scan.
         FIXTURES_WITH_DUMPS.put("micro_zeroint.mgf", 1);
-        // C37: two MS1 scans with DIFFERENT peaks -- the only fixture that can discriminate
+        // two MS1 scans with DIFFERENT peaks -- the only fixture that can discriminate
         // condition ORDER. Every scan has peaks, so nothing is reader-only.
         FIXTURES_WITH_DUMPS.put("micro_ms1var.mzML", 0);
     }

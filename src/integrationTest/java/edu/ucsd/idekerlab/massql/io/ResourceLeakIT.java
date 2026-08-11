@@ -155,7 +155,7 @@ class ResourceLeakIT {
      * ⚠ An <b>additional</b> assertion, never a test's only one.
      *
      * <p>Every test above also asserts a platform-independent property, because a conditional assertion
-     * that was the sole content of a test would be a skip wearing a disguise — which C26 rules out. On a
+     * that was the sole content of a test would be a skip wearing a disguise. On a
      * JVM that does not expose descriptor counts this check is inert and the rest still runs.
      */
     private static void assertNoDescriptorGrowth(String what, long before, int opens) {

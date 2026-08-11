@@ -10,7 +10,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * A zero-peak MS1 scan must <b>not</b> become an {@code ms1scan} link — Correction C27(b).
+ * A zero-peak MS1 scan must <b>not</b> become an {@code ms1scan} link.
  *
  * <p><b>The rule, and where it comes from.</b> Both MassQL loaders open with
  * {@code if len(spectrum["intensity array"]) == 0: continue} — {@code msql_fileloading.py:559} for mzML,
@@ -59,7 +59,7 @@ class ZeroPeakMs1ChainTest {
                 "scan 4 is an MS1 with zero peaks, so MassQL never assigns it to previous_ms1_scan; "
                         + "scan 5 must link back to scan 2. Got "
                         + links.get(5)
-                        + " -- the reader is updating the chain on empty scans (C27b).");
+                        + " -- the reader is updating the chain on empty scans.");
 
         // The other two links, so a reader that returned a constant 2 cannot pass vacuously.
         assertEquals(0, links.get(1), "scan 1 precedes any MS1 -- the raw 0 sentinel");
@@ -69,7 +69,7 @@ class ZeroPeakMs1ChainTest {
     @Test
     void theEmptyMs1IsStillYielded() {
         // The scan is not dropped, only excluded from the linkage. This mirrors MGF, where all
-        // 34,513 blocks including the 12,571 empty ones are yielded (C24b) and the engine filters.
+        // 34,513 blocks including the 12,571 empty ones are yielded and the engine filters.
         // A reader that skipped empty scans outright would also make the test above pass, so assert
         // the distinction explicitly.
         Path mzml = Fixtures.require("fixtures/micro/micro.mzML");

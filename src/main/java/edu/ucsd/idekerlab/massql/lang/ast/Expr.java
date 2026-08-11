@@ -4,9 +4,9 @@ package edu.ucsd.idekerlab.massql.lang.ast;
  * Arithmetic expression tree.
  *
  * <p><b>Deliberately unfolded.</b> {@code 157.0857+10} stays a {@link Binary} rather than
- * becoming {@code 167.0857}: constant folding is Tech_Step9's job, because that is where
+ * becoming {@code 167.0857}: constant folding is the engine's job, because that is where
  * the numeric semantics live and folding with the wrong rounding would silently change
- * query results. Tech_Step4 only has to represent the shape faithfully.
+ * query results. The parser only has to represent the shape faithfully.
  */
 public sealed interface Expr {
 

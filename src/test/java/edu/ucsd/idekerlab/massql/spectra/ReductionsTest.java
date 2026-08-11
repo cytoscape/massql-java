@@ -33,7 +33,7 @@ class ReductionsTest {
 
     @Test
     void argmaxReturnsARowIndexSoTheCallerCanReadAnotherColumn() {
-        // This is exactly what base_peak_mz needs (Tech_Step10 §3): argmax over intensity,
+        // This is exactly what base_peak_mz needs (the collation): argmax over intensity,
         // then read m/z at that row. A value-returning max() could not express it.
         SpectrumTable t = table();
         int row = Reductions.argmax(t, 0, Column.I);

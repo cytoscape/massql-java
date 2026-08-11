@@ -25,7 +25,7 @@ class QueryExecutorTest {
 
     // ---------------------------------------------------------------- helpers
 
-    /** Fixtures live in this repo (C26); a missing one FAILS rather than skipping. */
+    /** Fixtures live in this repo; a missing one FAILS rather than skipping. */
     private static Path resource(String relative) {
         var url = QueryExecutorTest.class.getClassLoader().getResource(relative);
         if (url == null)
@@ -62,7 +62,7 @@ class QueryExecutorTest {
 
     @Test
     void microEdgeQueryMatchesNothingBecauseBoundsAreStrict() {
-        // ⛔ Correction C37(a). micro.mzML scan 3 has a peak at EXACTLY 201.0; this query's window
+        // ⛔ micro.mzML scan 3 has a peak at EXACTLY 201.0; this query's window
         // is
         // [201.0, 202.0], so the peak sits precisely on the lower bound.
         //
@@ -105,11 +105,11 @@ class QueryExecutorTest {
         assertEquals(sorted, r.scans());
     }
 
-    // ---------------------------------------------------------------- C35(c): zero-peak scans
+    // ---------------------------------------------------------------- zero-peak scans
 
     @Test
     void aScanLevelOnlyQueryDoesNotReturnZeroPeakScans() {
-        // ⛔ Correction C35(c) -- THE case that needs an explicit guard.
+        // ⛔ -- THE case that needs an explicit guard.
         //
         // A peak-based condition fails an empty scan by itself. A SCAN-LEVEL condition never looks
         // at peaks,
@@ -137,9 +137,9 @@ class QueryExecutorTest {
 
     @Test
     void polarityOnAnMgfMatchesEveryLoadedScan() {
-        // Correction C34(b), asserted deliberately rather than discovered: MGF polarity is a
+        // asserted deliberately rather than discovered: MGF polarity is a
         // hardcoded 1
-        // (C33), so POLARITY=Positive matches everything and POLARITY=Negative nothing. This is
+        // , so POLARITY=Positive matches everything and POLARITY=Negative nothing. This is
         // CORRECT
         // behaviour, not a broken filter -- it is in the Step 13 known-deviations list for that
         // reason.
@@ -176,7 +176,7 @@ class QueryExecutorTest {
 
     @Test
     void conditionOrderDoesNotChangeTheAnswer() {
-        // Correction C37(g), proven from the source and pinned here. micro_ms1var.mzML is the ONLY
+        // proven from the source and pinned here. micro_ms1var.mzML is the ONLY
         // fixture
         // that can discriminate: MS1 scan 1 has 400.0, MS1 scan 3 does not, and both MS2 scans
         // carry 200.0.
@@ -247,12 +247,12 @@ class QueryExecutorTest {
     // PARSE
     // tests -- AstShapeTest, KeywordCaseMatrixTest, ParseRejectionTest -- plus the two .massql
     // fixtures
-    // that Step 12's differential will eventually run. So Tech_Step9's exit criterion "every 9a and
+    // that Step 12's differential will eventually run. So the exit criterion "every 9a and
     // 9b
     // condition has a positive and a negative test" was checked while 2 of the 10 conditions had
     // neither, and nothing could tell: the whole filter could have been inverted and the suite
     // stayed
-    // green. Same shape as C36 and C37 -- a rule with nothing able to falsify it.
+    // green. Same recurring shape -- a rule with nothing able to falsify it.
 
     @Test
     void chargeMatchesTheDeclaredChargeAndNothingElse() {
@@ -317,7 +317,8 @@ class QueryExecutorTest {
 
     @Test
     void ms2precBoundsAreStrictNotInclusive() {
-        // The C37 rule applied to a SCAN-level condition, where there is no SpectrumTable and so no
+        // The window rule applied to a SCAN-level condition, where there is no SpectrumTable and so
+        // no
         // mzWindowExclusive to carry it -- ConditionFilters:76 spells the > / < out by hand, which
         // means it can drift independently of the store. A tolerance placing the window edge
         // exactly
@@ -347,7 +348,8 @@ class QueryExecutorTest {
     // The third condition that had no execution test, and the one with the most to get wrong: it is
     // the only condition whose match target is DERIVED (precmz - loss) rather than given, so a
     // wrong
-    // sign or a peak-vs-precursor mix-up still produces plausible scan sets. Tech_Step9 named an
+    // sign or a peak-vs-precursor mix-up still produces plausible scan sets. the condition filters
+    // named an
     // `Ms2NlTest` for it; the class was never written.
     //
     // micro.mzML, from the parity dump:
@@ -411,13 +413,13 @@ class QueryExecutorTest {
 
     @Test
     void anMs2ScanWithNoRecordedPrecursorCannotSatisfyMs2nl() {
-        // C37(f). precmz == 0 is the "not recorded" sentinel, NOT a precursor at m/z zero. The
+        // precmz == 0 is the "not recorded" sentinel, NOT a precursor at m/z zero. The
         // reference excludes such a scan only incidentally -- (0 - mz) is negative while the window
         // is
         // positive -- and ConditionFilters makes it an explicit guard instead of trusting that
         // arithmetic. micro_noprecursor.mzXML is the fixture with a bare MS2 and no <precursorMz>.
         //
-        // Note MassQL cannot load this file at all (KeyError: 'precursorMz', C27c), so this pins
+        // Note MassQL cannot load this file at all (KeyError: 'precursorMz'), so this pins
         // OUR
         // contract rather than parity -- which is exactly why it needs stating in a test.
         assertEquals(

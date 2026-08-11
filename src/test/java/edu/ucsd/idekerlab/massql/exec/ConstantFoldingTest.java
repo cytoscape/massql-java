@@ -14,7 +14,7 @@ import edu.ucsd.idekerlab.massql.lang.ast.Op;
 /**
  * Arithmetic folding, with IEEE double semantics preserved exactly.
  *
- * <p>⚠ <b>{@code Expr.Unary} is covered here and Tech_Step9 §4 omitted it entirely</b> (Correction C35e). The
+ * <p>⚠ <b>{@code Expr.Unary} is covered here and the condition filters omitted it entirely</b> (e). The
  * spec said the folder reduces "{@code BinaryExpr} over {@code NumberLiteral}s" — neither type exists; the AST
  * is {@code Expr.Literal} / {@code Expr.Binary} / {@code Expr.Unary}. A folder written to that spec would
  * silently leave a negated literal such as {@code MS2NL=-18} unfolded.

@@ -16,7 +16,7 @@ import edu.ucsd.idekerlab.massql.lang.ast.Op;
  * which is the correct outcome for a degenerate query — an exception would turn a valid-but-useless query into
  * a crash.
  *
- * <p>⚠ <b>{@link Expr.Unary} is handled, and Tech_Step9 §4 originally omitted it</b> (Correction C35e). The
+ * <p>⚠ <b>{@link Expr.Unary} is handled</b>, which is easy to overlook. The
  * spec named "{@code BinaryExpr} over {@code NumberLiteral}s" — neither type exists — and never mentioned
  * unary negation, so a folder written to it would silently leave {@code MS2NL=-18} unfolded.
  */

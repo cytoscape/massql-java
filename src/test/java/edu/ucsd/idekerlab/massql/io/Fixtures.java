@@ -9,7 +9,7 @@ import java.nio.file.Paths;
 /**
  * Locates test fixtures, which live in this repository under {@code src/test/resources/}.
  *
- * <p><b>Correction C26 — this class used to make the whole verification story vacuous.</b> Fixtures
+ * <p><b> — this class used to make the whole verification story vacuous.</b> Fixtures
  * previously lived in a sibling {@code ../massql} oracle directory that is never shipped, and a missing
  * one was gated with {@code Assumptions.assumeTrue} — a <b>skip</b>. But {@code ci.yml} checks out only
  * {@code massql-java}, so {@code ../massql} never existed in CI: Step 6's oracle cross-check, Step 8's
@@ -40,7 +40,7 @@ final class Fixtures {
      * Resolves a fixture path, failing the test if it is absent.
      *
      * @param relative path under {@code src/test/resources}, e.g. {@code "data/small.mzML"}
-     * @throws AssertionError if the fixture is missing — never a skip (C26)
+     * @throws AssertionError if the fixture is missing — never a skip
      */
     static Path require(String relative) {
         URL url = Fixtures.class.getClassLoader().getResource(relative);
@@ -63,7 +63,7 @@ final class Fixtures {
      * True if a fixture is present, without failing.
      *
      * <p>For genuinely optional data only. Do <b>not</b> use it to make a required assertion
-     * conditional — that reintroduces the silent-skip failure C26 removed.
+     * conditional — that reintroduces the silent-skip failure this replaced.
      */
     static boolean has(String relative) {
         return Fixtures.class.getClassLoader().getResource(relative) != null;
@@ -75,7 +75,7 @@ final class Fixtures {
                     + relative
                     + "\n"
                     + "This is one of the two Ewing-lab files, gitignored because ewinglab.org\n"
-                    + "publishes no redistribution terms (Correction C26).\n"
+                    + "publishes no redistribution terms.\n"
                     + "Fetch them with:  bash scripts/fetch-fixtures.sh\n"
                     + "This test must NOT be skipped -- the Ewing mzXML is the only fixture that can\n"
                     + "distinguish document-order ms1scan from precursorScanNum resolution.";
@@ -83,7 +83,7 @@ final class Fixtures {
         return "fixture missing from src/test/resources: "
                 + relative
                 + "\n"
-                + "It is committed to this repository (Correction C26). If it has been deleted or\n"
+                + "It is committed to this repository. If it has been deleted or\n"
                 + "moved, restore it -- do not make the test conditional on its presence.";
     }
 }

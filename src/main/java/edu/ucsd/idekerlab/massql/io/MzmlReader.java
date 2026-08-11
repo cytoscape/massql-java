@@ -27,7 +27,7 @@ import javolution.xml.stream.XMLStreamException;
 /**
  * Streaming mzML reader: a hand-written XML walk over the vendored decode layer.
  *
- * <p><b>Hand-written because MSDK's parser cannot be vendored</b> (Correction C21):
+ * <p><b>Hand-written because MSDK's parser cannot be vendored</b>:
  * {@code MzMLMsScan}/{@code MzMLFileImportMethod}/{@code MzMLChromatogram} carry 9/17/11
  * {@code msdk-datamodel} imports plus Guava, slf4j and {@code msdk-spectra}. Only the decode layer was
  * clean, and it is what actually justified taking MSDK — {@code MSNumpress} is 44 KB of compression
@@ -106,14 +106,14 @@ final class MzmlReader extends AbstractSpectraStream {
                     skippedHighMsLevel++;
                     continue;
                 }
-                // Correction C27(b): a ZERO-PEAK scan never becomes an ms1scan link.
+                // A ZERO-PEAK scan never becomes an ms1scan link.
                 // msql_fileloading.py:559 does `if len(spectrum["intensity array"]) == 0: continue`
                 // BEFORE previous_ms1_scan is ever assigned, so an empty MS1 is invisible to the
                 // chain and the next MS2 links to the MS1 *before* it. Confirmed against MassQL's
                 // own loader on micro.mzML: scan 5 -> ms1scan 2, NOT the empty MS1 at scan 4.
                 //
                 // The scan is still YIELDED (consistent with MGF, where all 34,513 blocks including
-                // the 12,571 empty ones are yielded per C24b); only the linkage skips it.
+                // the 12,571 empty ones are still yielded); only the linkage skips it.
                 // peakCount is defaultArrayLength, so this costs no decode.
                 //
                 // ZeroPeakMs1ChainTest pins it, and it is not a hypothetical: with the guard
@@ -155,7 +155,7 @@ final class MzmlReader extends AbstractSpectraStream {
         boolean inBinaryArray = false;
         Binary bin = null;
 
-        // Correction C31: MassQL hard-indexes
+        // MassQL hard-indexes
         // precursorList.precursor[0].selectedIonList.selectedIon[0] (msql_fileloading.py:603), so
         // only
         // the FIRST selectedIon of the FIRST precursor counts. mzML legitimately carries more --
@@ -190,7 +190,7 @@ final class MzmlReader extends AbstractSpectraStream {
                 CharArray name = xml.getLocalName();
                 if (eq(name, "selectedIon")) {
                     inSelectedIon = false;
-                    // C31: the first selectedIon has now closed, so every later one -- whether a
+                    // The first selectedIon has now closed, so every later one -- whether a
                     // sibling in this precursor or the first of a subsequent <precursor> -- is
                     // ignored. This latch is the whole fix; without it the flag above never trips
                     // and the reader silently reverts to last-wins.

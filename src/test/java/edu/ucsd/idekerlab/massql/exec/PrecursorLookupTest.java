@@ -12,7 +12,7 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
 import edu.ucsd.idekerlab.massql.spectra.SpectrumTableBuilder;
 
 /**
- * The most important test in Tech_Step10.
+ * The most important test in the collation.
  *
  * <p>{@code SPIKE.md} §6a calls rule 1 <i>"the test that catches the most likely misreading of the whole
  * contract"</i>: the matched precursor peak is the one <b>closest in m/z</b> to {@code precmz}, not the
@@ -21,7 +21,7 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTableBuilder;
  */
 class PrecursorLookupTest {
 
-    /** A single-scan MS1 table, which is what the streaming executor retains (C22). */
+    /** A single-scan MS1 table, which is what the streaming executor retains. */
     private static SpectrumTable ms1(int scanId, double[] mz, double[] i) {
         SpectrumTableBuilder b = new SpectrumTableBuilder(1);
         b.startScan(scanId, 0.5, 1);
@@ -79,7 +79,7 @@ class PrecursorLookupTest {
                 9000.0,
                 r.ms1BasePeakI(),
                 "ms1_base_peak_i is the max over the WHOLE scan and does not depend on the match "
-                        + "(Tech_Step10 §3.2) -- note 9000.0 is the 600.0 peak, far outside any window");
+                        + "(the collation) -- note 9000.0 is the 600.0 peak, far outside any window");
     }
 
     @Test
@@ -103,7 +103,8 @@ class PrecursorLookupTest {
         // exactly
         // ON the window bounds and this test would also be exercising rule 4 -- it failed alongside
         // the
-        // C37 test during a sabotage run, which is how the overlap surfaced. At 40 ppm tol is 0.02
+        // on-bound test during a sabotage run, which is how the overlap surfaced. At 40 ppm tol is
+        // 0.02
         // and
         // both peaks are strictly interior, so this isolates the tie rule.
         SpectrumTable t = ms1(2, new double[] {499.99, 500.01}, new double[] {100.0, 9999.0});
@@ -125,12 +126,12 @@ class PrecursorLookupTest {
     }
 
     // ---------------------------------------------------------------- rule 4: INCLUSIVE bounds
-    // (C37)
+    //
 
     @Test
     void aPeakExactlyONTheBoundISAcandidate() {
-        // ⛔ Correction C37 at the unit layer; DifferentialIT's micro_onbound.mzML pair asserts the
-        // same property end to end. Tech_Step10 §3.4 records this as verified by EXECUTION: at
+        // ⛔ at the unit layer; DifferentialIT's micro_onbound.mzML pair asserts the
+        // same property end to end. the collation records this as verified by EXECUTION: at
         // --precursor-tol-ppm 7.8125 the reference returns ms1_i = 1000.0.
         //
         // Why 7.8125: 500.0 * 7.8125 / 1e6 = 0.00390625, and 500.0 - 0.00390625 = 499.99609375
@@ -147,16 +148,16 @@ class PrecursorLookupTest {
                 1000.0,
                 r.ms1I(),
                 "an on-bound peak IS a candidate: this step uses the INCLUSIVE mzWindow. If this fails, "
-                        + "someone switched to mzWindowExclusive -- which is correct for Tech_Step9's "
-                        + "conditions and wrong here (C37)");
+                        + "someone switched to mzWindowExclusive -- which is correct for the "
+                        + "conditions and wrong here");
         assertEquals(499.99609375, r.ms1Precmz());
     }
 
     @Test
     void theExclusiveVariantWouldHaveRejectedThatPeakWhichIsWhyTheChoiceMatters() {
-        // Demonstrates the divergence directly on the store, so the C37 distinction is visible here
+        // Demonstrates the divergence directly on the store, so the distinction is visible here
         // and
-        // not only in Tech_Step5's MzWindowTest.
+        // not only in the MzWindowTest.
         double tol = 500.0 * 7.8125 / 1e6;
         SpectrumTable t = microMs1();
         assertEquals(
@@ -181,7 +182,7 @@ class PrecursorLookupTest {
 
     @Test
     void theZeroSentinelOnMs1scanSuppressesTheLookupEvenIfATableIsPresent() {
-        // This is why Tech_Step10 §4 converts sentinels AFTER the lookup: ms1scan == 0 is the
+        // This is why the collation converts sentinels AFTER the lookup: ms1scan == 0 is the
         // signal.
         var r = PrecursorLookup.lookup(microMs1(), 0, 500.0, 20.0);
         assertNull(
@@ -205,11 +206,11 @@ class PrecursorLookupTest {
         assertEquals(9000.0, r.ms1BasePeakI());
     }
 
-    // ---------------------------------------------------------------- the C22 invariant
+    // ---------------------------------------------------------------- the invariant
 
     @Test
     void aRetainedScanThatIsNotTheLinkedScanIsAnErrorNotASilentWrongAnswer() {
-        // Tech_Step10 §3's C22 note: the document-order rule guarantees the retained MS1 IS
+        // the collation's invariant: the document-order rule guarantees the retained MS1 IS
         // ms1scan.
         // If that is ever broken upstream, reading the wrong scan's peaks would produce a plausible
         // number, so this fails loudly instead.

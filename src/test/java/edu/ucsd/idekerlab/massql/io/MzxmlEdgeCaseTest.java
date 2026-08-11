@@ -34,7 +34,7 @@ class MzxmlEdgeCaseTest {
 
     @Test
     void emptyMsLevelScansAreDropped() {
-        // Correction C27(a) -- the resolution of Tech_Step7's long-standing open item, derived from
+        // -- the resolution of the long-standing open item, derived from
         // source and then verified by execution rather than guessed at.
         //
         // pyteomics converts msLevel="" to None; MassQL tests `mslevel == 1` and `mslevel == 2`
@@ -92,7 +92,7 @@ class MzxmlEdgeCaseTest {
 
     @Test
     void anMs2WithNoPrecursorMzGivesZeroRatherThanThrowing() {
-        // Correction C27(c), and NOT parity: MassQL raises KeyError: 'precursorMz' here (verified
+        // and NOT parity: MassQL raises KeyError: 'precursorMz' here (verified
         // on
         // micro_noprecursor.mzXML), so no golden can exist. We give the 0 "not recorded" sentinel,
         // matching mzML's absent-MS:1000744 rule, which Step 10 converts to null. Throwing would

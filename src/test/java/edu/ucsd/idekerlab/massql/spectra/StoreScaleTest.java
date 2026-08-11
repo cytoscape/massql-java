@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 /**
- * Guards the Tech_Step12 §5 performance criterion at the level where the cause is obvious.
+ * Guards the differential performance criterion at the level where the cause is obvious.
  *
  * <p>SPIKE.md §7: <i>"if Java isn't at least as fast as pandas on the MGF, something is
  * quadratic (probably a linear scan where a binary search belongs)."</i> Finding that at
@@ -17,9 +17,9 @@ import org.junit.jupiter.api.Test;
  * 30,000 scans is compared against windowing one with 300, and if the window methods were doing
  * linear work the ratio would track the scan size rather than staying flat.
  *
- * <p><b>Both window methods are covered</b> (Correction C37). {@code mzWindowExclusive} is if
- * anything the hotter of the two — every Tech_Step9 condition calls it on every scan, whereas
- * {@code mzWindow} is called once per qualifying scan by the Tech_Step10 precursor lookup — so
+ * <p><b>Both window methods are covered</b>. {@code mzWindowExclusive} is if
+ * anything the hotter of the two — every the condition filters condition calls it on every scan, whereas
+ * {@code mzWindow} is called once per qualifying scan by the collation precursor lookup — so
  * leaving it untimed would have guarded the cooler path.
  */
 class StoreScaleTest {
@@ -73,7 +73,7 @@ class StoreScaleTest {
 
     @Test
     void exclusiveWindowCostAlsoDoesNotGrowWithScanCount() {
-        // The Step 9 path (C37). Same shape assertion as above -- the exclusive variant is a
+        // The Step 9 path. Same shape assertion as above -- the exclusive variant is a
         // separate pair of binary searches with the roles swapped, so it can regress into a
         // linear scan independently of its inclusive twin.
         SpectrumTable small = build(300, 33);

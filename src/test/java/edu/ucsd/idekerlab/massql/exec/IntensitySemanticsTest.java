@@ -20,7 +20,7 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTableBuilder;
  * (`msql_engine_filters.py:65-96`).
  *
  * <p>Every rule here is one line of code and a silent wrong answer if missed. Two of them were **wrong or
- * incomplete** in Tech_Step9 §3 until Correction C37 — the ÷100 on `INTENSITYTICPERCENT`, and the cap's scope.
+ * incomplete** in the condition filters until — the ÷100 on `INTENSITYTICPERCENT`, and the cap's scope.
  */
 class IntensitySemanticsTest {
 
@@ -70,7 +70,7 @@ class IntensitySemanticsTest {
     @Test
     void bothPercentQualifiersDivideByOneHundred() {
         SpectrumTable t = scan();
-        // C37(c): §3 stated the /100 rule for INTENSITYPERCENT only. Both have scale = 100.0.
+        // §3 stated the /100 rule for INTENSITYPERCENT only. Both have scale = 100.0.
         // Row 1: iNorm = 0.5. A qualifier of 50 means 50% = 0.50, so ">=" holds and ">" does not.
         assertTrue(
                 IntensityQualifiers.rowQualifies(
@@ -159,7 +159,7 @@ class IntensitySemanticsTest {
                         t, 2, List.of(q(QualifierType.INTENSITYPERCENT, Comparator.GT, 100))),
                 "INTENSITYPERCENT>100 must become > 0.99, so the base peak matches");
 
-        // C37(d): the guard is `if scale > 1.0`, so INTENSITYTICPERCENT is capped too -- Known
+        // the guard is `if scale > 1.0`, so INTENSITYTICPERCENT is capped too -- Known
         // traps used to
         // say "INTENSITYPERCENT only". iTicNorm = 0.6 > 0.99 is false, so use a row that exceeds
         // the cap...
@@ -208,7 +208,7 @@ class IntensitySemanticsTest {
 
     @Test
     void anAbsentQualifierMeansImplicitGreaterThanZeroPerColumn() {
-        // C37(e): the floor is applied to all THREE columns independently, not as one blanket
+        // the floor is applied to all THREE columns independently, not as one blanket
         // check.
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
         b.startScan(1, 0.5, 1);

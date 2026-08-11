@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
  * <p><b>This test must never skip.</b> The fixture is gitignored for licence reasons only;
  * {@code Fixtures.require} fails with the fetch command when it is absent, CI runs
  * {@code scripts/fetch-fixtures.sh} and caches the result, and CI asserts the skipped-test count is 0
- * (Correction C26 — previously this skipped silently in CI, which is how the gate came to prove nothing).
+ * ( — previously this skipped silently in CI, which is how the gate came to prove nothing).
  */
 class Ms1ScanDocumentOrderIT {
 
@@ -88,7 +88,7 @@ class Ms1ScanDocumentOrderIT {
             int peaks = Integer.parseInt(attrValue(attrs, "peaksCount"));
             if (level == 1) {
                 seenMs1++;
-                if (peaks > 0) previousMs1 = num; // C27b: an empty MS1 is not a link
+                if (peaks > 0) previousMs1 = num; // an empty MS1 is not a link
             } else if (level == 2) {
                 seenMs2++;
                 expected.put(num, previousMs1);

@@ -13,7 +13,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * The payload-shape half of stream hygiene: stdout carries the JSON array and nothing else.
  *
- * <p>⚠ <b>This is a complement to Tech_Step12 §3(b), not a delegation from it</b> (Correction C42).
+ * <p>⚠ <b>This is a complement to the differential, not a delegation from it</b>.
  * What is asserted here is the <i>shape</i> of what each stream receives, which an in-process
  * capture can establish perfectly. What it cannot establish is that real file descriptors keep the
  * two apart under a real fork — an in-process test would pass even if the CLI wrote both streams to
@@ -43,7 +43,7 @@ class MainStreamDisciplineTest {
         assertTrue(body.endsWith("]"), "and ends with it: " + preview(body));
 
         // Nothing before or after the array. A single stray progress line here would corrupt the
-        // payload for every consumer piping to jq -- the exact failure C24's JavolutionQuiet fix
+        // payload for every consumer piping to jq -- the exact failure the JavolutionQuiet fix
         // and
         // StdoutCleanlinessTest exist to prevent, now asserted at the CLI layer too.
         assertEquals(0, body.indexOf('['), "no preamble before the JSON");

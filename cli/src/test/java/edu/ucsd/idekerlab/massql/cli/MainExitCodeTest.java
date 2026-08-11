@@ -12,7 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * All four exit codes, each demonstrated rather than assumed.
  *
- * <p>This class exists because of the seam Correction <b>C42</b> added: {@code Main.run} returns the
+ * <p>This class exists because of the seam added: {@code Main.run} returns the
  * code and only {@code main} calls {@code System.exit}. Without that split none of these assertions
  * could be made at all — a test cannot observe an exit code from a method that terminates the JVM.
  *
@@ -34,9 +34,9 @@ class MainExitCodeTest {
 
     @Test
     void zeroWithAnEmptyArrayWhenNothingMatched() {
-        // micro.mzML + test_micro_edge.massql is the committed evidence for C37's strict window: a
+        // micro.mzML + test_micro_edge.massql is the committed evidence for the strict window: a
         // peak sits exactly on the bound and is therefore excluded. The golden for this pair is
-        // deliberately `[]`, and Tech_Step12 compares against it.
+        // deliberately `[]`, and the differential compares against it.
         CliFixtures.Invocation r =
                 invoke(
                         CliFixtures.microMzml().toString(),
@@ -48,7 +48,7 @@ class MainExitCodeTest {
     @Test
     void oneWhenTheContentWillNotParse() {
         // Readable, non-empty, and complete nonsense -- so it clears the usage gate and fails on
-        // CONTENT. This is the half of the C42 split that must not be reported as a usage error.
+        // CONTENT. This is the half of the split that must not be reported as a usage error.
         Path junk = CliFixtures.write(dir, "junk.mzML", "<notSpectra><at/></notSpectra>\n");
         CliFixtures.Invocation r = invoke(junk.toString(), CliFixtures.standardQuery().toString());
         assertEquals(1, r.exitCode(), "stderr: " + r.stderr());
@@ -57,7 +57,7 @@ class MainExitCodeTest {
 
     @Test
     void twoOnAnUnsupportedQueryWithTheConstructNamedOnStderr() {
-        // Tech_Step12 asserts the construct name appears, so a generic "syntax error" is not
+        // the differential asserts the construct name appears, so a generic "syntax error" is not
         // enough:
         // the whole reason the grammar admits out-of-scope constructs is to be able to say WHICH
         // one.

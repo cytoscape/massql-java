@@ -2,19 +2,16 @@
 
 Everything under `src/main/java/edu/ucsd/idekerlab/massql/io/vendor/`.
 
-> ⛔ **This file was missing until Correction C38.** It was a **Step 6** deliverable;
-> [Step 7](harness/Tech_Step7.md) recorded *"already written by Step 6 — no new entries"* and ticked
-> *"`docs/VENDORED.md` unchanged"* in its exit criteria; [Step 13](harness/Tech_Step13.md) lists it as a review
+> ⚠ **This file is a redistribution obligation, not a courtesy.** It is asserted to exist and to match the
 > artifact. **All twelve vendored files' headers point readers here** (*"See docs/VENDORED.md for the rationale
 > and the full modification list"*) and there was nothing to point at.
 >
-> Found by `VendoredProvenanceTest`, which Step 7 also required and which was also never written — surfaced by
-> `make spec-audit` check 4. The per-file headers were correct throughout, so no obligation was ever actually
-> unmet; what was missing was the central record they all deferred to, and anything that would notice.
+> per-file headers by `VendoredProvenanceTest`. Every vendored file's header points readers here, so this
+> record and those headers have to agree — the test is what keeps them agreeing.
 
 ## Why anything is vendored at all
 
-**MSDK cannot be a dependency** (Corrections **C16**, **C1**, **C21**, **C23**). The blocking problem is
+**MSDK cannot be a dependency.** The blocking problem is
 Guava, not size: `msdk-datamodel` drags it in unavoidably at **27.1**, which conflicts irreconcilably with the
 **9.0.0** a likely host already provides — and a library that forces its host's Guava version is not safely
 embeddable. So the
@@ -60,7 +57,7 @@ Three substitutions, each removing a dependency rather than changing behaviour:
 
 | Upstream | Here | Why |
 |---|---|---|
-| Guava `com.google.common.io.LittleEndianDataInputStream` | our `LittleEndianDataInput` | Guava cannot be a dependency (C16). See below |
+| Guava `com.google.common.io.LittleEndianDataInputStream` | our `LittleEndianDataInput` | Guava cannot be a dependency. See below |
 | commons-io `IOUtils.toByteArray(dis)` | `InputStream.readAllBytes()` | JDK 9+ has it; the dependency bought nothing |
 | `MSDKException` | `MassqlException` | MSDK types must not appear in our signatures |
 
@@ -77,7 +74,7 @@ than by a filename list, so a genuinely vendored file cannot be quietly exempted
 
 | File | What it is |
 |---|---|
-| `LittleEndianDataInput.java` | Written here as a drop-in replacement for the Guava class `MzMLPeaksDecoder` used (**C16**). Implements only the four methods the decoder calls — `readInt`, `readLong`, `readFloat`, `readDouble` — because anything else would be untested code. Extends `FilterInputStream` so `readAllBytes()` comes free, which is what replaces the commons-io call. Little-endian is load-bearing: mzML binary arrays are little-endian while mzXML's are big-endian, and getting it wrong yields plausible garbage rather than an error |
+| `LittleEndianDataInput.java` | Written here as a drop-in replacement for the Guava class `MzMLPeaksDecoder` used. Implements only the four methods the decoder calls — `readInt`, `readLong`, `readFloat`, `readDouble` — because anything else would be untested code. Extends `FilterInputStream` so `readAllBytes()` comes free, which is what replaces the commons-io call. Little-endian is load-bearing: mzML binary arrays are little-endian while mzXML's are big-endian, and getting it wrong yields plausible garbage rather than an error |
 | `package-info.java` | Package documentation, written here |
 
 It sits in `io/vendor/` because it exists solely to serve the vendored decoder; moving it out would separate it
@@ -90,14 +87,13 @@ from its only caller. That it is *not* vendored is the reason this section exist
 2. Re-apply the modifications in the tables above — they are exhaustive, which is the point of enumerating them.
 3. Update the `commit:` line in **every** header; `VendoredProvenanceTest` asserts a 40-character SHA is present
    but cannot tell a stale one from a current one, so this step is on you.
-4. `make verify`. The mzML decode path is pinned bit-for-bit against MassQL's own loader by the
-   [Step 8](harness/Tech_Step8.md) parity gate, so a behavioural regression in `MSNumpress` or
+4. `make integration-test`. The mzML decode path is pinned bit-for-bit against MassQL's own loader by the
+   reader-parity tests, so a behavioural regression in `MSNumpress` or
    `MzMLPeaksDecoder` shows up as a digest mismatch rather than as a silent numeric drift.
 
 ## References
 
 - `DEPENDENCY_POLICY.md` — constraint 5 (no split packages), the jsr305 and Guava bans, the size budget
-- [Step 6](harness/Tech_Step6.md) §5 — what was vendored and why; the `BinaryDecoder` that was dropped (C21a)
-- [Step 7](harness/Tech_Step7.md) §1–2 — why the mzXML parser was **hand-written** instead (C23): reusing
-  MSDK's would have dragged in 7 `datamodel` types and Guava via `SimpleMsScan`
-- `Tech_Step_INDEX.md` — Corrections **C1**, **C16**, **C21**, **C21a**, **C23**, **C38**
+- `docs/harness/` — the project's historical engineering record, including what was vendored and why, and
+  why the mzXML parser was **hand-written** instead: reusing MSDK's would have dragged in 7 `datamodel`
+  types and Guava via `SimpleMsScan`

@@ -55,7 +55,7 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
                         ? List.of()
                         : conditions(ctx.whereClause().whereConditionList().fullCondition());
 
-        // FILTER evaluates exactly like WHERE (Tech_Step9 §2); it is kept as a separate
+        // FILTER evaluates exactly like WHERE; it is kept as a separate
         // list only so the AST round-trips the source query.
         List<Condition> filter =
                 ctx.filterClause() == null

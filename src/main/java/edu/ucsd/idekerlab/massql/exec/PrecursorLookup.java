@@ -20,7 +20,7 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
  *   <li><b>{@code ms1_base_peak_i} does not depend on the match.</b> It is populated whenever the linked
  *       MS1 scan exists, so a tolerance miss nulls only the other two.</li>
  *   <li><b>Ties resolve to the LOWER m/z</b>, matching pandas {@code argmin}'s first-occurrence.</li>
- *   <li><b>The window is INCLUSIVE</b> — Correction C37. See {@link #candidates}.</li>
+ *   <li><b>The window is INCLUSIVE.</b> See {@link #candidates}.</li>
  * </ol>
  */
 public final class PrecursorLookup {
@@ -42,11 +42,11 @@ public final class PrecursorLookup {
      */
     public static Result lookup(
             SpectrumTable retainedMs1, int ms1scan, double precmz, double tolPpm) {
-        // The raw 0 sentinel is what tells us there is no linked scan, which is why Tech_Step10 §4
+        // The raw 0 sentinel is what tells us there is no linked scan, which is why the collation
         // converts sentinels to null only AFTER this runs. Converting earlier loses the signal.
         if (ms1scan == 0 || retainedMs1 == null || retainedMs1.isEmpty()) return Result.NONE;
 
-        // Tech_Step10 §3's C22 note: the stream retains exactly the linked MS1 scan, because the
+        // The stream retains exactly the linked MS1 scan, because the
         // document-order rule guarantees ms1scan is always the most recent PRECEDING MS1. If this
         // ever
         // disagrees, the rule has been broken upstream and the lookup would silently read a
@@ -59,7 +59,7 @@ public final class PrecursorLookup {
                             + retainedId
                             + " is not the linked ms1scan "
                             + ms1scan
-                            + "; the document-order rule has been broken upstream (Tech_Step10 §3, C22)");
+                            + "; the document-order rule has been broken upstream");
         }
 
         // Rule 2: computed across the WHOLE scan, before and independently of any window search, so
@@ -84,8 +84,8 @@ public final class PrecursorLookup {
     /**
      * The candidate peaks: MS1 m/z within {@code precmz ± precmz * tolPpm / 1e6}.
      *
-     * <p>⛔ <b>INCLUSIVE bounds — {@code mzWindow}, never {@code mzWindowExclusive}</b> (Correction C37).
-     * {@code massql_query.py:101-103} filters with {@code >=} / {@code <=}, whereas Tech_Step9's condition
+     * <p>⛔ <b>INCLUSIVE bounds — {@code mzWindow}, never {@code mzWindowExclusive}</b>.
+     * {@code massql_query.py:101-103} filters with {@code >=} / {@code <=}, whereas the condition
      * filters use {@code >} / {@code <} and therefore the exclusive variant. <b>The two genuinely differ
      * and must not be unified.</b>
      *

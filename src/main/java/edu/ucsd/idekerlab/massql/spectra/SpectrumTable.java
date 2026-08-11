@@ -13,7 +13,7 @@ import java.util.Arrays;
  *
  * <p><b>Two tables per file, not one.</b> MS1 and MS2 peaks live in separate instances,
  * mirroring MassQL's {@code ms1_df} / {@code ms2_df} split — {@code load_data()} returns
- * exactly that pair, and Tech_Step10's precursor lookup queries the MS1 table while
+ * exactly that pair, and the precursor lookup queries the MS1 table while
  * collating MS2 rows.
  *
  * <p><b>Filtering never prunes.</b> Conditions produce a {@link RowMask}; this class has no
@@ -55,7 +55,7 @@ public final class SpectrumTable {
         this.index = index;
     }
 
-    /** An empty table. Used for MGF's MS1 side, which keeps Tech_Step10 free of null checks. */
+    /** An empty table. Used for MGF's MS1 side, which keeps the collation free of null checks. */
     public static SpectrumTable empty(int msLevel) {
         return new SpectrumTableBuilder(msLevel).build();
     }
@@ -123,21 +123,20 @@ public final class SpectrumTable {
      * Rows within one scan whose m/z lies in {@code [lo, hi]} — <b>both bounds
      * inclusive</b>, exactly.
      *
-     * <p><b>Which of the two window methods you want depends on the caller</b> (Correction C37), and the
+     * <p><b>Which of the two window methods you want depends on the caller</b>, and the
      * distinction is not cosmetic — MassQL genuinely differs between them, both verified by execution:
      *
      * <table border="1">
      *   <caption>Bound semantics by caller</caption>
      *   <tr><th>Caller</th><th>Bound</th><th>Method</th></tr>
-     *   <tr><td>Tech_Step10 precursor lookup (`massql_query.py:101-103`, {@code >=}/{@code <=})</td>
+     *   <tr><td>precursor lookup (`massql_query.py:101-103`, {@code >=}/{@code <=})</td>
      *       <td><b>inclusive</b></td><td><b>this method</b></td></tr>
-     *   <tr><td>Tech_Step9 condition windows (`msql_engine_filters.py:253` etc., {@code >}/{@code <})</td>
+     *   <tr><td>condition windows (`msql_engine_filters.py:253` etc., {@code >}/{@code <})</td>
      *       <td><b>strict</b></td><td>{@link #mzWindowExclusive}</td></tr>
      * </table>
      *
      * <p>Two binary searches bounded to the scan's own slice, so this is O(log n) not O(n).
      * If the MGF fixture is ever slower than pandas, this method is the first place to look
-     * (Tech_Step12 §5).
      *
      * <p><b>No epsilon is applied here, ever.</b> The caller computes {@code lo}/{@code hi}
      * from a tolerance; a "helpful" epsilon at this level would silently widen every tolerance
@@ -161,16 +160,16 @@ public final class SpectrumTable {
      * Rows within one scan whose m/z lies in {@code (lo, hi)} — <b>both bounds STRICT</b>. A peak exactly
      * on either bound is <b>excluded</b>.
      *
-     * <p>This is what Tech_Step9's condition windows require. MassQL filters with
+     * <p>This is what the condition windows require. MassQL filters with
      * {@code (df["mz"] > mz_min) & (df["mz"] < mz_max)} in all four condition functions
      * (`msql_engine_filters.py:253`, `:410`, `:493`, `:607`), and it was confirmed by execution rather than
      * inferred: {@code micro.mzML} scan 3 has a peak at exactly {@code 201.0}, and
      * {@code MS2PROD=201.5:TOLERANCEMZ=0.5} — window {@code [201.0, 202.0]} — returns <b>0 rows</b>.
      * {@code test_micro_edge.massql} pins that with an empty golden.
      *
-     * <p><b>Do not "unify" this with {@link #mzWindow}.</b> Correction C37 exists because the spec assumed
-     * one rule served both callers; collapsing them would silently change Tech_Step10's {@code ms1_i} and
-     * {@code ms1_precmz}, which Tech_Step12 compares at 1e-9.
+     * <p><b>Do not "unify" this with {@link #mzWindow}.</b> It is tempting to assume one rule serves both
+     * callers; collapsing them silently changes {@code ms1_i} and {@code ms1_precmz}, which the
+     * differential compares at 1e-9.
      *
      * <p>Implemented by shifting the inclusive bounds off the exact values: {@code upperBound(lo)} skips
      * every row equal to {@code lo}, and {@code lowerBound(hi)} stops before every row equal to {@code hi}.

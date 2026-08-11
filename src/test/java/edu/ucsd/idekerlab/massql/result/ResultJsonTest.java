@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 /**
  * The published JSON contract: key set, key order, null rendering, and round-trip bit-exactness.
  *
- * <p><b>One shape</b> (Correction C40). Both {@code MS1DATA} and {@code MS2DATA} emit the same 12 keys in
+ * <p><b>One shape</b>. Both {@code MS1DATA} and {@code MS2DATA} emit the same 12 keys in
  * the same order — this class's predecessor spec required MS1DATA to emit 4 keys with the precursor keys
  * <i>absent</i>, and the assertions below deliberately check the <b>opposite</b>: present, with the value
  * {@code null}.
@@ -39,7 +39,7 @@ class ResultJsonTest {
                 183838.71875);
     }
 
-    /** An MS1 row: precursor fields null, base peaks REAL (C40). */
+    /** An MS1 row: precursor fields null, base peaks REAL. */
     private static ScanInfoResult ms1Row() {
         return new ScanInfoResult(
                 1,
@@ -88,13 +88,13 @@ class ResultJsonTest {
 
     @Test
     void anMs1RowEmitsTheSAMEtwelveKeysInTheSameOrder() {
-        // ⛔ The C40 assertion. This is what the old spec got backwards: it required MS1DATA to emit
+        // ⛔ The key assertion. This is what the old spec got backwards: it required MS1DATA to emit
         // 4
         // keys with precmz/ms1scan/charge ABSENT. There is one shape.
         assertEquals(
                 EXPECTED_12,
                 keysInOrder(ResultJson.write(List.of(ms1Row()))),
-                "MS1DATA and MS2DATA emit the same 12 keys, discriminated by mslevel (C40)");
+                "MS1DATA and MS2DATA emit the same 12 keys, discriminated by mslevel");
     }
 
     @Test
@@ -123,7 +123,7 @@ class ResultJsonTest {
 
     @Test
     void anMs1RowsBasePeaksAreRealValuesNotNull() {
-        // The other half of C40: the old golden's nulls here were an ms2_df join artifact.
+        // The other half: the old golden's nulls here were an ms2_df join artifact.
         String json = ResultJson.write(List.of(ms1Row()));
         assertTrue(json.contains("\"base_peak_i\":1471224.875"), json);
         assertTrue(json.contains("\"base_peak_mz\":810.4154747204038"), json);

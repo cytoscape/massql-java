@@ -271,7 +271,7 @@ class ScaninfoCollationTest {
     void anAllZeroIntensityScanCollatesWithoutNaNReachingTheRow() {
         // Reachable in mzML/mzXML via a scan-level-only query: only PEAK-level conditions apply the
         // implicit > 0 floor, so a POLARITY query passes such a scan straight through. mzML retains
-        // zero-intensity peaks (C36), so peakCount > 0 and the executor does not skip it.
+        // zero-intensity peaks, so peakCount > 0 and the executor does not skip it.
         SpectrumTable t =
                 oneScan(
                         4,
@@ -342,7 +342,8 @@ class ScaninfoCollationTest {
     @Test
     void scansArrivingOutOfOrderAreRejectedRatherThanSilentlyMisaligned() {
         // Scan-ascending order is a property of the fixtures, not a guarantee -- an MGF with
-        // non-monotonic SCANS= would break it, and Tech_Step12 compares row ORDER before fields, so
+        // non-monotonic SCANS= would break it, and the differential compares row ORDER before
+        // fields, so
         // a
         // silent violation would surface as a confusing field-level diff on misaligned rows.
         ScaninfoCollation c = new ScaninfoCollation(null);
@@ -394,7 +395,7 @@ class ScaninfoCollationTest {
 
     @Test
     void anMs1dataQueryProducesTheSameShapeWithRealBasePeaksAndNullPrecursorFields() {
-        // ⛔ The C40 shape, end to end. micro_ms1var.mzML has two MS1 scans with DIFFERENT peaks.
+        // ⛔ The union shape, end to end. micro_ms1var.mzML has two MS1 scans with DIFFERENT peaks.
         List<ScanInfoResult> rows =
                 run("QUERY scaninfo(MS1DATA)", "fixtures/micro/micro_ms1var.mzML", null);
         assertFalse(rows.isEmpty());
@@ -407,9 +408,9 @@ class ScaninfoCollationTest {
             assertNull(r.ms1I());
             assertNull(r.ms1Precmz());
             assertNull(r.ms1BasePeakI());
-            // NOT null: a survey scan plainly has a base peak. This is the half of C40 that was a
+            // NOT null: a survey scan plainly has a base peak. This is the half that was a
             // left-join artifact in the reference wrapper.
-            assertNotNull(r.basePeakI(), "an MS1 scan has a base peak (C40)");
+            assertNotNull(r.basePeakI(), "an MS1 scan has a base peak");
             assertNotNull(r.basePeakMz());
             assertTrue(r.basePeakI() > 0.0);
             assertNotNull(r.tic());
@@ -419,7 +420,7 @@ class ScaninfoCollationTest {
 
     @Test
     void anMgfPopulatesChargeAsOneAndLeavesEveryMs1ColumnNull() {
-        // Correction C6: MGF charge is never null -- CHARGE= if present, else 1. And MGF has no
+        // MGF charge is never null -- CHARGE= if present, else 1. And MGF has no
         // survey
         // scans at all, so ms1scan and all three ms1_* are null for every row.
         List<ScanInfoResult> rows =
@@ -432,7 +433,7 @@ class ScaninfoCollationTest {
         assertEquals(List.of(1, 2), rows.stream().map(ScanInfoResult::scan).toList());
 
         for (ScanInfoResult r : rows) {
-            assertNotNull(r.charge(), "MGF charge is never null (C6)");
+            assertNotNull(r.charge(), "MGF charge is never null");
             assertEquals(1, r.charge(), "absent CHARGE= defaults to 1, not 0-then-null");
             assertNull(r.ms1scan(), "MGF has no survey scans");
             assertNull(r.ms1I());
@@ -452,7 +453,7 @@ class ScaninfoCollationTest {
     @Test
     void thePrecursorToleranceIsHonouredAndIsSeparateFromTheQueryTolerance() {
         // Two runs differing ONLY in precursorTolPpm. At 1 ppm the nearest MS1 peak (3.9e-3 away,
-        // ~7.8 ppm) misses, so ms1_i nulls while ms1_base_peak_i survives -- Tech_Step10 §3.2 at
+        // ~7.8 ppm) misses, so ms1_i nulls while ms1_base_peak_i survives -- the collation at
         // the
         // collation level.
         String q = "QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.5:TOLERANCEMZ=0.5";

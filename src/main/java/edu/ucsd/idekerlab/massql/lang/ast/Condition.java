@@ -17,8 +17,8 @@ public sealed interface Condition {
      * A field compared against one or more values.
      *
      * <p>{@code values} has more than one element only for an {@code OR} list —
-     * {@code MS2PROD=(58.06 OR 60.04)} — which the engine treats as "any of these"
-     * (Tech_Step9). A plain {@code MS2PROD=226.18} yields a single-element list, so the
+     * {@code MS2PROD=(58.06 OR 60.04)} — which the engine treats as "any of these". A plain
+     * {@code MS2PROD=226.18} yields a single-element list, so the
      * engine has one code path rather than two.
      */
     record Value(ConditionType type, List<Expr> values, List<Qualifier> qualifiers)

@@ -23,7 +23,7 @@ import edu.ucsd.idekerlab.massql.MassqlParseException;
 import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
 
 /**
- * Every documented error path, per format — Tech_Step12 §4.
+ * Every documented error path, per format — the differential
  *
  * <h2>What "fails cleanly" has to mean</h2>
  *
@@ -36,7 +36,7 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  *       broken feature rather than as a bad input file.
  *   <li><b>No partial results.</b> A reader that returns the rows it managed to parse before hitting
  *       damage is worse than one that throws: the caller gets a plausible short answer with no
- *       indication anything was lost. That is the same failure shape as C44, where a parser stopped
+ *       indication anything was lost. That is the failure shape where a parser stopped
  *       early and stayed quiet.
  * </ul>
  */
@@ -232,7 +232,7 @@ class ErrorPathIT {
     /**
      * An empty {@code msLevel} tag drops the scan silently — the reference's behaviour, not a failure.
      *
-     * <p>Correction C27(a), verified against MassQL: pyteomics converts {@code msLevel=""} to
+     * <p>verified against MassQL: pyteomics converts {@code msLevel=""} to
      * {@code None}, and MassQL tests {@code mslevel == 1} / {@code == 2}, so {@code None} matches
      * neither branch and the scan contributes nothing. Of this file's 10 scans, 8 are {@code msLevel=""}
      * and only scans 4 (MS2) and 8 (MS1) survive.
@@ -249,7 +249,7 @@ class ErrorPathIT {
                 1,
                 rows.size(),
                 "only scan 4 has a usable msLevel of 2; the 8 empty-msLevel scans contribute zero rows"
-                        + " (C27a)");
+                        + "");
 
         List<ScanInfoResult> ms1 = Massql.run("QUERY scaninfo(MS1DATA)", p, null);
         assertEquals(1, ms1.size(), "and only scan 8 survives as MS1");
@@ -279,7 +279,7 @@ class ErrorPathIT {
                 "50 failed reads must leave the reader able to read a good file");
     }
 
-    /** No error path may write to a stream — the SDK is silent, and the CLI owns all output (C25). */
+    /** No error path may write to a stream — the SDK is silent, and the CLI owns all output. */
     @Test
     void theSdkPrintsNothingOnAnyErrorPath(@TempDir Path dir) {
         java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();

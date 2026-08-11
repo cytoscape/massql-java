@@ -38,7 +38,7 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  * <h2>The second rule, and why it exists</h2>
  *
  * <p>"One of ours" is not sufficient on its own. {@code Format} lives in {@code massql.io} and is
- * therefore ours, but Correction <b>C42</b> narrowed it to <b>package-private</b> precisely so it
+ * therefore ours, but narrowed it to <b>package-private</b> precisely so it
  * appears in no public signature — a consumer cannot name a type they cannot see, so exposing one is
  * a compile error waiting to happen for them and an unusable API for everyone. Asserting that every
  * type in a public signature is itself {@code public} catches that, and catches the next one.
@@ -96,7 +96,7 @@ class ApiEncapsulationTest {
 
     @Test
     void formatStaysInvisible() {
-        // The specific case C42 created, asserted by name so the reason survives: SpectraStream
+        // The specific case, asserted by name so the reason survives: SpectraStream
         // used
         // to carry a format() accessor whose ONLY caller was a test. Removing it let Format become
         // package-private, so it now appears in no public signature at all. This fails loudly if
@@ -109,7 +109,7 @@ class ApiEncapsulationTest {
         }
         assertTrue(
                 !Modifier.isPublic(format.getModifiers()),
-                "Format must stay package-private (C42) -- it is an implementation detail of which "
+                "Format must stay package-private -- it is an implementation detail of which "
                         + "reader was chosen, and a public API cannot mention a type callers cannot see");
     }
 

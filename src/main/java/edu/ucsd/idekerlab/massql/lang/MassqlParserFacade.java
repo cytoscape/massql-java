@@ -97,7 +97,7 @@ public final class MassqlParserFacade {
             throw e;
         } catch (RuntimeException e) {
             // Never let an ANTLR internal failure surface as something other than our type;
-            // "never a crash" is a Tech_Step4 requirement even on garbage input.
+            // "never a crash" is a requirement even on garbage input.
             throw new MassqlParseException(
                     "<syntax>", "could not parse query: " + e.getMessage(), -1, e);
         }

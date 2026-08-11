@@ -61,7 +61,7 @@ class UsageDocSyncTest {
                 "docs/CLI.md not found walking up from "
                         + Paths.get("").toAbsolutePath()
                         + " -- it is committed to this repository, so this is a real failure rather"
-                        + " than a reason to skip (C26).");
+                        + " than a reason to skip.");
     }
 
     private static String read(Path p) {

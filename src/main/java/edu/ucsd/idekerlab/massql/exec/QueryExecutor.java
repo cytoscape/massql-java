@@ -17,13 +17,13 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
  *
  * <h2>Why per-scan rather than whole-file</h2>
  *
- * <p>Correction C22: there is no whole-file table. A 500 MB input projects to 1.0–1.9 GB of heap if
+ * <p>There is no whole-file table. A 500 MB input projects to 1.0–1.9 GB of heap if
  * materialised, which OOMs the host. The executor advances a {@link SpectraStream} cursor and retains
  * exactly <b>one</b> MS1 scan — which the document-order {@code ms1scan} rule makes sufficient, since the
  * linked MS1 is always the most recent preceding one.
  *
- * <p>Tech_Step9 §1 originally declared {@code execute(MassqlQuery, SpectrumTable ms1, SpectrumTable ms2)}
- * returning "ordinals", eight lines below the note saying those tables do not exist (Correction C35b). Under
+ * <p>An earlier design declared {@code execute(MassqlQuery, SpectrumTable ms1, SpectrumTable ms2)}
+ * returning "ordinals", eight lines below the note saying those tables do not exist. Under
  * streaming there is no whole-file ordinal space at all: a single-scan table's only ordinal is {@code 0}.
  *
  * <h2>Evaluation order, and why it is not arbitrary</h2>
@@ -32,10 +32,9 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
  *   <li><b>Zero-peak scans are skipped first.</b> MassQL's loaders {@code continue} on an empty intensity
  *       array, so its dataframes hold no rows for them. Without this guard a <i>scan-level-only</i> query
  *       would return 34,513 scans on {@code PlusRise.mgf} where MassQL returns <b>21,942</b> — peak-based
- *       conditions fail an empty scan by themselves, but a scan-level condition never looks at peaks
- *       (Correction C35c).</li>
+ *       conditions fail an empty scan by themselves, but a scan-level condition never looks at peaks.</li>
  *   <li><b>The MS1 retention comes after that guard</b>, because an empty MS1 must not become an
- *       {@code ms1scan} link either (C27b) — the same rule one layer up.</li>
+ *       {@code ms1scan} link either — the same rule one layer up.</li>
  *   <li><b>Scan-level conditions before {@code materialize()}.</b> A scan rejected on {@code RTMIN},
  *       {@code SCANMIN}, {@code POLARITY}, {@code CHARGE} or {@code MS2PREC} never pays base64-decode,
  *       inflate or the {@code double[]} allocation. That is the entire payoff of deferred decoding.</li>
@@ -143,7 +142,7 @@ public final class QueryExecutor {
                     "skipped "
                             + skippedEmpty
                             + " zero-peak scan(s); MassQL's loaders drop these, "
-                            + "so they cannot qualify (Correction C35c)");
+                            + "so they cannot qualify");
         }
         if (missingMs1 > 0) {
             diagnostics.add(

@@ -81,7 +81,7 @@ class ParseRejectionTest {
             delimiter = '|',
             value = {
                 "QUERY scaninfo(MS2DATA) WHERE MS2PROD=X                                            | X",
-                "QUERY scaninfo(MS2DATA) WHERE MS2PROD=formula(C10)                                 | formula()",
+                "QUERY scaninfo(MS2DATA) WHERE MS2PROD=formula(C10)                            | formula()",
                 "QUERY scaninfo(MS2DATA) WHERE MOBILITY=range(min=100, max=500)                     | MOBILITY",
                 "QUERY scaninfo(MS2DATA) WHERE MS2PROD=226.18:TOLERANCEPPM=5:EXCLUDED               | EXCLUDED",
                 "QUERY scaninfo(MS2DATA) WHERE MS2PROD=100:INTENSITYMATCHREFERENCE                  | INTENSITYMATCHREFERENCE",

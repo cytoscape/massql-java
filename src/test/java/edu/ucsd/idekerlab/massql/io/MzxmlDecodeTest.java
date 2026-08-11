@@ -18,7 +18,7 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
  * The mzXML binary decode path: big-endian, <b>interleaved pairs</b>, one {@code precision} attribute,
  * zlib or nothing — every one of them different from mzML.
  *
- * <p><b>Correction C27 exists partly because this test was unsatisfiable as specified.</b> Tech_Step7
+ * <p><b> exists partly because this test was unsatisfiable as specified.</b> the mzXML reader
  * required assertions on {@code precision="64"} and zlib, but {@code micro.mzXML}, {@code small.mzXML}
  * and the Ewing file are <i>all</i> {@code precision="32"} / uncompressed / {@code network} — the same
  * configuration — while the spec claimed the fixtures "cover every decode path". The variants used here

@@ -168,7 +168,7 @@ class MzxmlReaderTest {
         assertEquals(
                 Map.of(1, 0, 3, 2, 5, 2),
                 links,
-                "scan 5 must link to 2 -- scan 4 is a zero-peak MS1 and is invisible to the chain (C27b)");
+                "scan 5 must link to 2 -- scan 4 is a zero-peak MS1 and is invisible to the chain");
     }
 
     @Test
@@ -211,7 +211,7 @@ class MzxmlReaderTest {
     void chargeAbsentIsZeroNotOne() {
         // The cross-format trap: mzXML's absent precursorCharge is 0 (msql_fileloading.py:451),
         // while
-        // MGF's absent CHARGE is 1 (Correction C6). micro scans 1 and 3 omit it; scan 5 has charge
+        // MGF's absent CHARGE is 1. micro scans 1 and 3 omit it; scan 5 has charge
         // 2.
         Map<Integer, Integer> charges = new LinkedHashMap<>();
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mzXML"))) {
@@ -233,12 +233,12 @@ class MzxmlReaderTest {
                 mgfCharges.put(v.scanId(), v.charge());
             }
         }
-        assertEquals(1, mgfCharges.get(1), "MGF's absent CHARGE is 1 (C6) -- deliberately NOT 0");
+        assertEquals(1, mgfCharges.get(1), "MGF's absent CHARGE is 1 -- deliberately NOT 0");
     }
 
     @Test
     void zeroPeakScanIsYieldedAndMaterialisesEmpty() {
-        // peaksCount="0" must not throw, and must not be dropped (Tech_Step7 §4). Scan 4 of the
+        // peaksCount="0" must not throw, and must not be dropped (the mzXML reader). Scan 4 of the
         // micro
         // table is the empty MS1.
         boolean saw = false;

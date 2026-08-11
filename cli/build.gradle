@@ -4,8 +4,8 @@
 //
 //   1. It is versioned and released independently (cliVersion in gradle.properties). A CLI fix
 //      does not force consumers to resolve a new SDK coordinate, and vice versa.
-//   2. It can only compile against the SDK's PUBLIC API. The encapsulation boundary Tech_Step11
-//      cares about is therefore a compile error, not something a test has to catch.
+//   2. It can only compile against the SDK's PUBLIC API, so the encapsulation boundary is a compile
+//      error rather than something a test has to catch.
 //
 // Shadow lives HERE and only here. Applied at the root it could make a fat jar the SDK's published
 // artifact, which would hand every SDK consumer a jar with javolution baked inside.
@@ -64,7 +64,7 @@ tasks.named('test') {
 // ⚠ The thing under test is the ASSEMBLED UBER-JAR, not Main.run. Step 11 already exercises
 // Main.run(String[], PrintStream, PrintStream) in-process and owns the payload-shape assertions;
 // what an in-process test cannot establish is that real file descriptors keep stdout and stderr
-// apart, which is the whole reason this suite exists (Tech_Step12 §3(b), C25c).
+// apart, which is the whole reason this suite exists.
 testing {
     suites {
         integrationTest(JvmTestSuite) {
@@ -80,7 +80,7 @@ testing {
                     //
                     // ⛔ Do NOT reconstruct this path from a version string. `cliVersion` is a Gradle
                     // property, not a JVM system property, so System.getProperty("cliVersion") is
-                    // null and the path becomes massql-java-cli-null.jar (C46). Passing the resolved
+                    // null and the path becomes massql-java-cli-null.jar. Passing the resolved
                     // file also means a version bump cannot break the test.
                     dependsOn tasks.named('shadowJar')
                     systemProperty 'cliJar',
@@ -108,7 +108,7 @@ dependencies {
     integrationTestImplementation sourceSets.test.output
 
     // The contract test must inspect the CLI's JSON payload -- row count and which columns are null.
-    // Hand-rolling that parse is the C44 failure mode (a regex that stops early and silently drops
+    // Hand-rolling that parse invites the classic failure (a regex that stops early and silently drops
     // columns) applied to the artifact that proves the CLI contract. Test-only: checkBannedDependencies
     // inspects runtimeClasspath, which this cannot reach, and the uber-jar is built from `implementation`.
     integrationTestImplementation "com.google.code.gson:gson:${rootProject.ext.gsonVersion}"
@@ -125,7 +125,7 @@ tasks.named('check') {
 
 // Same bar as the SDK. The root gate excluded this project only while it held a single
 // package-info.java; once Main.java exists that exemption would just be an unenforced floor, which
-// is exactly what `make skipcheck` was before C43 replaced it.
+// would just be an unenforced floor.
 jacocoTestReport {
     reports {
         xml.required = true

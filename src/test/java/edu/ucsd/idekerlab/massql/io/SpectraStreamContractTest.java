@@ -25,7 +25,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  * written out three times — which means it can be got wrong three times. Everything here is
  * parameterized over one fixture per format rather than testing whichever reader came to hand.
  *
- * <p>Added with the {@code hasNext()}/{@code next()} refactor (Correction C42). The old shape was
+ * <p>Added with the {@code hasNext()}/{@code next()} refactor. The old shape was
  * {@code next()} returning a boolean plus {@code current()}; the guarantees below either did not exist
  * or could not be stated:
  *

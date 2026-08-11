@@ -35,7 +35,7 @@ class MzmlReaderTest {
     void scanIdTakesTheLastScanEqualsSegment() {
         // int(id.replace("scanId=","").split("scan=")[-1])  -- msql_fileloading.py:575.
         // This determines every row's identity; the LAST segment matters, and the rule was
-        // missing from the spec entirely until Correction C21's rewrite.
+        // missing from the spec entirely until Correction the rewrite.
         assertEquals(1, MzmlReader.scanIdFrom("controllerType=0 controllerNumber=1 scan=1"));
         assertEquals(48, MzmlReader.scanIdFrom("controllerType=0 controllerNumber=1 scan=48"));
         assertEquals(7, MzmlReader.scanIdFrom("scanId=7"));

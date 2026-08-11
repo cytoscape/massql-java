@@ -55,7 +55,7 @@ class CrossFormatEquivalenceIT {
      * exercised on a third of the data. At 60 ppm all six populate. The 20 ppm case runs below as
      * well, because the tolerance-miss pattern must itself agree across formats.
      *
-     * <p>⚠ The sole permitted difference is {@code ms1_precmz} at <b>1e-7</b> (C11): it is a
+     * <p>⚠ The sole permitted difference is {@code ms1_precmz} at <b>1e-7</b>: it is a
      * <i>measured</i> m/z read from the MS1 binary array, and the mzXML stores that array at
      * {@code precision="32"}. Measured worst case across this pair is <b>2.929e-8</b>. Every other
      * column — including {@code base_peak_mz} and all intensities — is bit-identical, because those are
@@ -115,7 +115,7 @@ class CrossFormatEquivalenceIT {
     /**
      * {@code ms1scan} is populated on both sides — the conversion did not drop {@code precursorScanNum}.
      *
-     * <p>Tech_Step12 §2 requires that a degraded comparison <b>say so</b> rather than quietly compare
+     * <p>the differential requires that a degraded comparison <b>say so</b> rather than quietly compare
      * fewer columns. This asserts the undegraded state positively, so if a future conversion does drop
      * the attribute the failure names the cause instead of surfacing as a puzzling null mismatch.
      * {@code CONVERSION_NOTES.md} records 34 {@code precursorScanNum} attributes in {@code small.mzXML},
@@ -144,7 +144,7 @@ class CrossFormatEquivalenceIT {
      * {@code DP00570_F02.mzxml} vs {@code DP00570_F02.mgf}: same experiment, two formats that carry
      * genuinely different metadata.
      *
-     * <p>⚠ <b>Not a row-identity join.</b> The scan ids are <b>disjoint</b> (C13) — the MGF has no
+     * <p>⚠ <b>Not a row-identity join.</b> The scan ids are <b>disjoint</b> — the MGF has no
      * {@code SCANS=}, so MassQL numbers its blocks by index. Joining on {@code scan} would silently
      * compare unrelated spectra. The assertion is the <b>population pattern per file</b>.
      */
@@ -153,8 +153,8 @@ class CrossFormatEquivalenceIT {
         Set<Integer> mzxml = scanIds(run("data/DP00570_F02.mzxml", "test_dp00570", 20.0));
         Set<Integer> mgf = scanIds(run("data/DP00570_F02.mgf", "test_dp00570", 20.0));
 
-        assertEquals(Set.of(2, 556, 871), mzxml, "mzXML scan ids (C13)");
-        assertEquals(Set.of(370, 598), mgf, "MGF scan ids -- block index, not a scan number (C13)");
+        assertEquals(Set.of(2, 556, 871), mzxml, "mzXML scan ids");
+        assertEquals(Set.of(370, 598), mgf, "MGF scan ids -- block index, not a scan number");
 
         Set<Integer> intersection = new TreeSet<>(mzxml);
         intersection.retainAll(mgf);
@@ -216,14 +216,14 @@ class CrossFormatEquivalenceIT {
     }
 
     /**
-     * ⛔ {@code charge} is a <b>predicted difference</b>, not a shared column (Correction C29).
+     * ⛔ {@code charge} is a <b>predicted difference</b>, not a shared column.
      *
      * <p>The mzXML has zero {@code precursorCharge} attributes, so every raw charge is {@code 0}, which
-     * Step 10 maps to <b>null</b>. The MGF carries real charge data, and by C6 an absent {@code CHARGE=}
+     * the collation maps to <b>null</b>. The MGF carries real charge data, and an absent {@code CHARGE=}
      * becomes <b>1</b> rather than 0 — so MGF charge is <b>never</b> null.
      *
      * <p>A test that listed {@code charge} among the columns expected to agree would fail for an
-     * entirely correct reason. That is the same trap as C6 (three formats, three charge defaults),
+     * entirely correct reason. Three formats have three different charge defaults,
      * surfacing where it is easiest to mistake for a bug.
      */
     @Test
@@ -234,7 +234,7 @@ class CrossFormatEquivalenceIT {
                     "mzXML scan "
                             + r.scan()
                             + ": charge must be null -- this file has zero"
-                            + " precursorCharge attributes, and raw 0 maps to null (C29)");
+                            + " precursorCharge attributes, and raw 0 maps to null");
         }
         for (ScanInfoResult r : run("data/DP00570_F02.mgf", "test_dp00570", 20.0)) {
             assertNotNull(
@@ -242,7 +242,7 @@ class CrossFormatEquivalenceIT {
                     "MGF scan "
                             + r.scan()
                             + ": charge is never null in MGF -- an absent CHARGE= is 1,"
-                            + " not 0 (C6/C29)");
+                            + " not 0");
             assertTrue(
                     r.charge() == 1 || r.charge() == 2,
                     "MGF scan " + r.scan() + ": charge was " + r.charge() + ", expected 1 or 2");

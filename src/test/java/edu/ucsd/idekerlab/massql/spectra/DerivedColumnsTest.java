@@ -40,7 +40,7 @@ class DerivedColumnsTest {
 
     @Test
     void allZeroIntensityScanYieldsNaNRatherThanZero() {
-        // Division by zero. NaN is the correct in-band "undefined" and Tech_Step10 maps it to
+        // Division by zero. NaN is the correct in-band "undefined" and the collation maps it to
         // JSON null; substituting 0 would report a real value where there is none, and
         // substituting 1 would claim every peak is the base peak.
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
@@ -69,7 +69,7 @@ class DerivedColumnsTest {
     @Test
     void anEmptyScanContributesNoRowsButStillExists() {
         // scaninfo(MS1DATA) can report a scan with no peaks, so it must keep its index entry
-        // with rowStart == rowEnd -- Tech_Step10 still needs its rt and tic.
+        // with rowStart == rowEnd -- the collation still needs its rt and tic.
         SpectrumTableBuilder b = new SpectrumTableBuilder(1);
         b.startScan(7, 1.25, 2);
         SpectrumTable t = b.build();

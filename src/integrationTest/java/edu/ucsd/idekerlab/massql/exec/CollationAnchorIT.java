@@ -25,18 +25,18 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  * tolerances.
  *
  * <p>An IT rather than a unit test because it reads the real {@code data/small.mzML} and its committed
- * goldens. A missing fixture <b>fails</b> — there is no skip path (Correction C26).
+ * goldens. A missing fixture <b>fails</b> — there is no skip path.
  *
  * <p><b>Why both tolerances.</b> Scan 3 is itself the tolerance-miss case: its nearest MS1 peak is
  * <b>34.8 ppm</b> away, so at the documented 20 ppm default {@code ms1_i}/{@code ms1_precmz} are null
  * while {@code ms1_base_peak_i} survives — and at 60 ppm all three populate. The pair is the cleanest
- * available proof of Tech_Step10 §3.2, because the *only* thing that differs between the two runs is one
+ * available proof of the collation, because the *only* thing that differs between the two runs is one
  * flag.
  */
 class CollationAnchorIT {
 
     /**
-     * A missing fixture FAILS — there is no skip path (Correction C26). {@code io.Fixtures} is
+     * A missing fixture FAILS — there is no skip path. {@code io.Fixtures} is
      * package-private to that package, so this mirrors the helper the sibling {@code exec} tests use.
      */
     private static Path resource(String relative) {
@@ -45,7 +45,7 @@ class CollationAnchorIT {
             throw new AssertionError(
                     "fixture missing from src/test/resources: "
                             + relative
-                            + " -- fixtures are committed in-repo (C26); restore it rather than skipping");
+                            + " -- fixtures are committed in-repo; restore it rather than skipping");
         }
         try {
             return Paths.get(url.toURI());
@@ -70,7 +70,7 @@ class CollationAnchorIT {
     }
 
     /**
-     * {@code tic} is compared at RELATIVE 1e-6, not bit-identically — Correction C34.
+     * {@code tic} is compared at RELATIVE 1e-6, not bit-identically.
      *
      * <p>MassQL's intensity column is {@code float32} and {@code tic} is a pandas {@code groupby.sum()}
      * over it, so the golden carries float32 accumulation error while our float64 sum is <b>exact</b>. The
@@ -86,7 +86,7 @@ class CollationAnchorIT {
                 expected,
                 actual,
                 Math.abs(expected) * 1e-6,
-                "tic is a float32 accumulation on the reference side (C34); relative 1e-6");
+                "tic is a float32 accumulation on the reference side; relative 1e-6");
     }
 
     @Test
@@ -120,7 +120,7 @@ class CollationAnchorIT {
         assertEquals(
                 183838.71875,
                 r.ms1BasePeakI(),
-                "ms1_base_peak_i SURVIVES the tolerance miss (Tech_Step10 §3.2) -- if this is null, the "
+                "ms1_base_peak_i SURVIVES the tolerance miss (the collation) -- if this is null, the "
                         + "lookup is nulling it along with the match");
     }
 
@@ -164,7 +164,7 @@ class CollationAnchorIT {
     void fourOfTheSixRowsAreToleranceMissesAtTwentyPpmAndNoneAreAtSixty() {
         // The distribution the golden records, asserted as a shape rather than row by row -- and
         // the
-        // reason the 20 ppm golden exists at all (C10): it supplies the only golden coverage of the
+        // reason the 20 ppm golden exists at all: it supplies the only golden coverage of the
         // "a miss nulls ms1_i but not ms1_base_peak_i" rule.
         long missesAt20 = run(20.0).stream().filter(r -> r.ms1I() == null).count();
         assertEquals(4, missesAt20, "4 of 6 rows miss at 20 ppm");

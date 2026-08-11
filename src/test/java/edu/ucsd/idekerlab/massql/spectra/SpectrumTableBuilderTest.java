@@ -56,7 +56,7 @@ class SpectrumTableBuilderTest {
 
     @Test
     void anEmptyTableIsValidAndUsable() {
-        // MGF's MS1 side is an empty table rather than null, which keeps Tech_Step10 free of
+        // MGF's MS1 side is an empty table rather than null, which keeps the collation free of
         // null checks.
         SpectrumTable t = SpectrumTable.empty(1);
         assertTrue(t.isEmpty());

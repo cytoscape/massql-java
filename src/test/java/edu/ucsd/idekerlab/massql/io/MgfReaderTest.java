@@ -64,7 +64,7 @@ class MgfReaderTest {
     @Test
     void chargeFallsBackToOneOnlyWhenTheFileDeclaresNoneEither(@TempDir Path dir)
             throws IOException {
-        // ⚠ Corrections C6 and C44. SPIKE.md §3 says MGF charge is "null if absent"; the live
+        // ⚠ SPIKE.md §3 says MGF charge is "null if absent"; the live
         // pyteomics loader uses params.get('charge', [1]) with `except: charge = 1`. Since only 0
         // is
         // null-converted (Step 10 §4), MGF charge is NEVER null -- a genuine 1+ and an absent
@@ -87,7 +87,7 @@ class MgfReaderTest {
     @Test
     void theFileLevelChargeHeaderIsTheDefaultForBlocksWithoutTheirOwn(@TempDir Path dir)
             throws IOException {
-        // ⛔ Correction C44 -- and it is a real file's behaviour, not a hypothetical:
+        // ⛔ -- and it is a real file's behaviour, not a hypothetical:
         // DP00570_F02.mgf declares `CHARGE=2+ and 3+` once, then omits CHARGE= from 583 of its 625
         // blocks. pyteomics copies the file header into EVERY spectrum's params, so MassQL sees
         // [2, 3] on all of them and takes element 0. Reading only per-block CHARGE= lines gave 1
@@ -169,7 +169,7 @@ class MgfReaderTest {
         // The whole-file distribution, taken from the oracle itself:
         //     pyteomics + msql_fileloading -> {2: 583, 1: 42}
         // The 42 are the blocks carrying their own `CHARGE=1+`; the 583 inherit the header. Before
-        // C44 this read {1: 625} and nothing noticed, because the loader-parity dumps did not
+        // This once read {1: 625} and nothing noticed, because the loader-parity dumps did not
         // record
         // charge at all.
         Map<Integer, Long> byCharge =
@@ -257,7 +257,7 @@ class MgfReaderTest {
 
     @Test
     void scanIdIsScansWhenPresentElseTheOneBasedBlockIndex(@TempDir Path dir) throws IOException {
-        // Correction C7. Getting this wrong shifts every row's identity and makes the Step 12
+        // Getting this wrong shifts every row's identity and makes the Step 12
         // differential fail in a way that looks like a filtering bug.
         Path withScans =
                 write(
@@ -312,9 +312,9 @@ class MgfReaderTest {
         assertEquals(2, r.msLevel(), "MGF is an MS2-only peak list");
         assertEquals(0, r.ms1scan(), "hardcoded 0 (msql_fileloading.py:394) -> null downstream");
 
-        // ⚠ Correction C33 -- this assertion used to require 0, citing C8 ("polarity is not read on
+        // ⚠ -- this assertion used to require 0, reasoning that "polarity is not read on
         // the
-        // live path"). C8's premise is right (no MGF header carries polarity) but its conclusion
+        // live path"). the premise is right (no MGF header carries polarity) but its conclusion
         // was
         // wrong: both MGF loaders write `"polarity": 1  # Default` into every peak dict
         // (msql_fileloading.py:67 and :86), so MassQL reports POSITIVE for every MGF row. Measured
@@ -325,10 +325,7 @@ class MgfReaderTest {
         // Caught by ReaderParityIT, the Step 8 gate. Returning 0 would have failed the Step 12
         // differential on the polarity column for EVERY MGF row, where it would have looked like a
         // collation bug rather than a reader default.
-        assertEquals(
-                1,
-                r.polarity(),
-                "MGF polarity is a hardcoded 1 (positive), not 0 -- C33 corrects C8");
+        assertEquals(1, r.polarity(), "MGF polarity is a hardcoded 1 (positive), not 0");
     }
 
     @Test

@@ -24,7 +24,8 @@ class MainTest {
 
     @Test
     void argumentOrderMatchesThePythonReference() {
-        // spectra file first, query file second. Swapped, the differential in Tech_Step12 would
+        // spectra file first, query file second. Swapped, the differential in the differential
+        // would
         // compare two programs that were never given the same input.
         CliFixtures.Invocation ok =
                 invoke(CliFixtures.smallMzml().toString(), CliFixtures.standardQuery().toString());
@@ -102,7 +103,7 @@ class MainTest {
 
     @Test
     void aMissingOrEmptyFileExitsTwoNotOne() {
-        // The C42 split: these are knowable from the command line, so they are USAGE errors -- even
+        // These are knowable from the command line, so they are USAGE errors -- even
         // though SpectraFile.open throws the same exception type for them as for unreadable
         // content.
         Path missing = dir.resolve("nope.mzML");

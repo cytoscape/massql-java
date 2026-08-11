@@ -10,7 +10,7 @@ class MassqlParseExceptionTest {
 
     @Test
     void constructIsMandatory() {
-        // Tech_Step4's rejection tests and Tech_Step12's CLI contract both assert on
+        // the rejection tests and the CLI contract both assert on
         // construct(), so an instance without one is useless and must not be constructible.
         assertThrows(IllegalArgumentException.class, () -> new MassqlParseException(null, "m"));
         assertThrows(IllegalArgumentException.class, () -> new MassqlParseException("  ", "m"));

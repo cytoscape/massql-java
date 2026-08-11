@@ -6,7 +6,7 @@ import java.util.List;
 import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
 
 /**
- * The per-column comparison policy of Tech_Step12 §1, in one place.
+ * The per-column comparison policy of the differential, in one place.
  *
  * <p>One class rather than assertions scattered across four ITs, because the policy <b>is</b> the
  * gate: every tolerance here is a claim about where the two implementations may legitimately differ,
@@ -24,19 +24,19 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  *       <td>m/z read from the same bytes on both sides</td></tr>
  *   <tr><td>{@code ms1_precmz}</td><td>relative 1e-9, or <b>1e-7</b> on a 32-bit mzXML</td>
  *       <td>a <i>measured</i> centroid from the MS1 array; mzXML's {@code precision="32"} truncates
- *           it, so the same peak reads 4.9e-9 to 2.9e-8 apart from its 64-bit mzML twin (C11)</td></tr>
+ *           it, so the same peak reads 4.9e-9 to 2.9e-8 apart from its 64-bit mzML twin</td></tr>
  *   <tr><td>{@code tic}</td><td>relative <b>1e-6</b></td>
  *       <td>⛔ NOT bit-identical. MassQL's intensity column is {@code float32} and {@code tic} is a
  *           pandas sum over it, so the <i>reference</i> carries accumulation error our float64 sum
- *           does not — measured worst case 3.69e-8 (C34)</td></tr>
+ *           does not — measured worst case 3.69e-8</td></tr>
  *   <tr><td>{@code base_peak_i}, {@code ms1_i}, {@code ms1_base_peak_i}</td><td><b>bit-identical</b></td>
- *       <td>maxima and lookups — <i>selected</i> values with no accumulation, so C34 does not reach
+ *       <td>maxima and lookups — <i>selected</i> values with no accumulation, so that error does not reach
  *           them. This is a split, not a blanket loosening</td></tr>
  *   <tr><td>{@code rt}</td><td><b>bit-identical</b></td>
  *       <td>requires the double-precision {@code scanRt}; a float would pass Step 8 and fail here</td></tr>
  *   <tr><td><i>every</i> column</td><td><b>exact null-vs-value</b></td>
  *       <td>a null where the golden has a value is a failure regardless of any tolerance — it is how
- *           a wrong m/z-window choice surfaces (C37)</td></tr>
+ *           a wrong m/z-window choice surfaces</td></tr>
  * </table>
  *
  * <p><b>Row count and order are compared first</b>, so a missing row reports "expected 664, got 663"
@@ -53,10 +53,10 @@ public final class ResultComparator {
     /** Relative tolerance for m/z columns read identically on both sides. */
     private static final double MZ_TOL = 1e-9;
 
-    /** {@code ms1_precmz} against a 32-bit mzXML fixture — C11. */
+    /** {@code ms1_precmz} against a 32-bit mzXML fixture. */
     private static final double MZ_TOL_FLOAT32 = 1e-7;
 
-    /** {@code tic} only — the reference's float32 accumulation, C34. */
+    /** {@code tic} only — the reference's float32 accumulation. */
     private static final double TIC_TOL = 1e-6;
 
     private ResultComparator() {}
@@ -65,7 +65,7 @@ public final class ResultComparator {
      * Compares actual rows against a golden.
      *
      * @param float32Mz true when the fixture stores m/z at {@code precision="32"} (any mzXML), which
-     *     relaxes {@code ms1_precmz} alone — see C11
+     *     relaxes {@code ms1_precmz} alone
      * @return every difference found; empty means identical under the policy
      */
     public static List<String> compare(
@@ -143,7 +143,7 @@ public final class ResultComparator {
      *
      * <p>The null check runs before the tolerance: a null where the golden has a number is a
      * <b>failure</b>, not a difference of zero. That is the assertion that catches a wrong
-     * m/z-window choice in the precursor lookup (C37), which no tolerance would ever see.
+     * m/z-window choice in the precursor lookup, which no tolerance would ever see.
      */
     private static void relative(
             List<String> out, String at, String col, Double g, Double a, double tol) {
@@ -195,7 +195,7 @@ public final class ResultComparator {
                             + ", got "
                             + (a == null ? "null" : a)
                             + " (null-vs-value is exact; check the m/z window method before the"
-                            + " decoder -- C37)");
+                            + " decoder)");
             return true;
         }
         return false;

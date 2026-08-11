@@ -8,7 +8,7 @@ import edu.ucsd.idekerlab.massql.MassqlException;
  * An immutable set of selected rows.
  *
  * <p><b>Immutable on purpose.</b> {@link #and}, {@link #or} and {@link #not} return new
- * instances rather than mutating in place. Tech_Step9 composes several conditions, and a mask
+ * instances rather than mutating in place. Several conditions compose, and a mask
  * mutated under one condition while another still holds a reference is a subtle
  * wrong-answer bug with no exception to point at it.
  *
@@ -86,7 +86,7 @@ public final class RowMask {
      * Ordinals of scans retaining at least one selected row.
      *
      * <p>This is the shape most MassQL conditions actually need: they mean "this scan contains
-     * a peak matching X", not "this row matches X". Tech_Step9 §1 combines conditions by
+     * a peak matching X", not "this row matches X". Conditions are combined by
      * intersecting these scan sets, because two conditions may be satisfied by <i>different</i>
      * peaks in the same scan and a row-level AND would wrongly reject it.
      */

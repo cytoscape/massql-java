@@ -6,7 +6,7 @@ package edu.ucsd.idekerlab.massql.result;
  * <p><b>The contract is defined in {@code docs/RESULT_SCHEMA.md}, not here.</b> That file carries the
  * key order, the per-field nullability, the population-by-format table and the float policy, and
  * {@code ResultSchemaContractTest} asserts this class's serialized key order against it. Do not
- * restate the contract in javadoc — four documents restating it is what caused Correction C40.
+ * restate the contract in javadoc — four documents restating it is how they came to disagree.
  *
  * <p><b>Boxed {@code Integer}/{@code Double} throughout, deliberately.</b> Null is a real, testable
  * value rather than a sentinel, which is the whole point: MassQL's raw output uses {@code 0} to mean
@@ -14,9 +14,9 @@ package edu.ucsd.idekerlab.massql.result;
  * "genuinely zero" indistinguishable. {@code rt} is the case that proves it — {@code 0.0} is a
  * genuine retention time and appears on all 664 rows of the PlusRise golden.
  *
- * <p><b>There is exactly ONE shape</b> (Correction C40). {@code scaninfo(MS1DATA)} and
+ * <p><b>There is exactly ONE shape</b>. {@code scaninfo(MS1DATA)} and
  * {@code scaninfo(MS2DATA)} emit the same 12 keys, discriminated by the {@link #mslevel} value; no key
- * is ever omitted. This record therefore has <b>no</b> {@code ms1DataShape} flag — Tech_Step10 §1
+ * is ever omitted. This record therefore has <b>no</b> {@code ms1DataShape} flag — an earlier design
  * originally specified one, but it was a per-<i>query</i> property stored per-<i>row</i> (664 identical
  * copies in a PlusRise result, and part of {@code equals}) and with one shape it selects nothing.
  *
@@ -33,8 +33,8 @@ public record ScanInfoResult(
         Integer charge, // null: not recorded, or an MS1 row
         Double tic, // never null
         Integer mslevel, // never null: 1 or 2. THE discriminator.
-        Double basePeakI, // never null -- including on an MS1 row (C40)
-        Double basePeakMz, // never null -- including on an MS1 row (C40)
+        Double basePeakI, // never null -- including on an MS1 row
+        Double basePeakMz, // never null -- including on an MS1 row
         Double ms1I, // null: no MS1 data, tolerance miss, or an MS1 row
         Double ms1Precmz, // null: same conditions as ms1I
         Double ms1BasePeakI // null: no linked MS1 scan, or an MS1 row

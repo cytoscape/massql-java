@@ -1,6 +1,6 @@
 package edu.ucsd.idekerlab.massql.lang.ast;
 
-/** Arithmetic operator. Folding happens in Tech_Step9, not here. */
+/** Arithmetic operator. Folding happens in the engine, not here. */
 public enum Op {
     ADD("+"),
     SUB("-"),

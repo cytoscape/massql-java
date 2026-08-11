@@ -97,6 +97,31 @@ rejected **by name** — the exception says which construct was the problem, not
 
 ---
 
+## Known deviations from the Python reference
+
+Six deliberate differences. Each is a decision rather than an oversight, and each is the kind of thing
+that looks like a bug if you compare our output against `massql_query.py` without knowing about it.
+
+1. **`ms1scan` is inferred by document order, not read from the file.** The reference ignores
+   `spectrumRef` (mzML) and `precursorScanNum` (mzXML), and we reproduce that to match its answers. On
+   interleaved acquisition, or where a precursor reference points further back than the immediately
+   preceding MS1 scan, our `ms1scan` will disagree with the file's declared linkage. For simple DDA
+   they coincide.
+2. **`=` means `>=` for intensity comparisons.** The reference's historical semantics, reproduced.
+3. **`i_norm` and `i_norm_ms1` are not emitted.** Both are structurally constant, so they carry no
+   information; the row is 12 keys, not 14.
+4. **`tic` is not bit-identical — and ours is the more accurate value.** The reference's intensity
+   column is `float32` and `tic` is a pandas sum over it, while we accumulate in float64. Worst
+   measured divergence is **4.7e-8** relative. ⚠ The error is in the reference, not here. Every other
+   intensity column *is* bit-identical, because those are selections rather than sums.
+5. **`POLARITY` on an MGF filters a constant, not the data.** The reference hardcodes MGF polarity to
+   `1`, so `POLARITY=Positive` matches every MGF scan and `POLARITY=Negative` matches none, whatever
+   the spectra actually contain. Nothing in the output reveals this, which is why it is listed.
+6. **The JSON is compact; the reference emits `indent=2`.** Values are identical and round-trip
+   exactly, but the two outputs are **not byte-comparable** — compare parsed values, not `diff`.
+
+---
+
 ## Building from source
 
 The `Makefile` is the only entry point; do not invoke `./gradlew` directly.
@@ -104,11 +129,11 @@ The `Makefile` is the only entry point; do not invoke `./gradlew` directly.
 ```sh
 make build          # both jars -> build/libs/ and cli/build/libs/
 make test           # unit tests, seconds
-make verify         # the full gate: unit + integration + coverage + lint + dependency audit
+make integration-test  # unit + integration tests, coverage gate, lint, banned deps
 make publish-sdk    # publish to the nexus (needs REPO_USER / REPO_PWD)
 ```
 
 `make` with no argument lists every target. JDK 17 is required, and the build enforces it.
 
-`make build` produces all three artifacts. To read the javadoc locally without publishing, open
-`build/docs/javadoc/index.html` after `./gradlew javadoc`.
+`make build` produces all three artifacts, and writes the browsable javadoc on the way — open
+`build/docs/javadoc/index.html` to read it locally without publishing.

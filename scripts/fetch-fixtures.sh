@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Fetch the only two test fixtures that are NOT committed to this repository.
 #
-# Everything else under src/test/resources/ is committed (Correction C26) -- fixtures used to live in
+# Everything else under src/test/resources/ is committed -- fixtures used to live in
 # a sibling oracle directory that CI could not see, which made every parity assertion skip silently.
 #
 # These two are the exception: ewinglab.org publishes no redistribution terms, so we reference them by
 # URL instead of republishing them. Their GOLDENS are committed, which is not an inconsistency -- those
 # hold per-scan counts, hex sums and SHA-256 digests, never a peak array.
 #
-# NOTE (C26): a test that needs these must FAIL when they are absent, not skip. Fixtures.require()
-# does exactly that, and prints this script's name in the failure message. The previous
-# skip-when-absent behaviour is the regression C26 removed -- do not reintroduce it here by making a
-# failed fetch exit 0.
+# NOTE: a test that needs these must FAIL when they are absent, not skip. Fixtures.require() does
+# exactly that, and prints this script's name in the failure message. A suite that skips when its
+# inputs are missing reports success while proving nothing -- do not reintroduce that here by making
+# a failed fetch exit 0.
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
@@ -75,6 +75,6 @@ if [ "$STATUS" -eq 0 ]; then
   echo "Both fixtures present. Ms1ScanDocumentOrderIT can now run -- it is the only test that can"
   echo "distinguish document-order ms1scan from precursorScanNum resolution."
 else
-  echo "One or more fetches failed. Tests needing these fixtures will FAIL, not skip (C26)." >&2
+  echo "One or more fetches failed. Tests needing these fixtures will FAIL, not skip." >&2
 fi
 exit "$STATUS"

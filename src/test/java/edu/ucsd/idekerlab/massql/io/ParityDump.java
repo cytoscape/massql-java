@@ -34,12 +34,12 @@ import java.util.zip.GZIPInputStream;
  *
  * <h2>Two properties of these dumps that are easy to get wrong</h2>
  *
- * <p><b>1. Keys are {@code (mslevel, scan)}, never {@code scan} alone</b> (Correction C32a). MassQL
+ * <p><b>1. Keys are {@code (mslevel, scan)}, never {@code scan} alone</b>. MassQL
  * synthesises an all-zero MS1 placeholder for MGF, and its scan id <b>collides with a real MS2 id</b> in
  * {@code micro.mgf} (id 3) and {@code DP00570_F02.mgf} (id 625). Keying by scan id silently compares a real
  * spectrum against a row of zeros.
  *
- * <p><b>2. Entries are grouped by ms level, NOT document order</b> (Correction C28).
+ * <p><b>2. Entries are grouped by ms level, NOT document order</b>.
  * {@code dump_loader_parity.py} builds its list from {@code ms1_df} then {@code ms2_df} — 229 MS1 entries
  * then 687 MS2 on the Ewing file. Never infer sequence from a dump; re-derive order from the file.
  */
@@ -128,7 +128,7 @@ final class ParityDump {
         return scans;
     }
 
-    /** Loads the dump for a fixture name, e.g. {@code "small.mzML"}. Fails if absent (C26). */
+    /** Loads the dump for a fixture name, e.g. {@code "small.mzML"}. Fails if absent. */
     static ParityDump of(String fixtureName) {
         Path gz = Fixtures.require("goldens/loader-parity/" + fixtureName + ".json.gz");
         String json;
@@ -159,13 +159,13 @@ final class ParityDump {
             Scan clash = byKey.put(s.key(), s);
             // A duplicate key would mean the dump itself is malformed, or that our key is too weak
             // --
-            // the failure mode C32a is about. Better to know here than to silently drop half the
+            // that failure mode. Better to know here than to silently drop half the
             // file.
             assertNull(clash, "duplicate key " + s.key() + " in dump " + fixtureName);
         }
 
         // A dump that failed to parse must FAIL, not yield an empty map that every later assertion
-        // vacuously satisfies. This is the "vacuous pass" trap in Tech_Step8's Known traps.
+        // vacuously satisfies. This is the "vacuous pass" trap in the Known traps.
         assertFalse(
                 byKey.isEmpty(),
                 "no scans parsed from "

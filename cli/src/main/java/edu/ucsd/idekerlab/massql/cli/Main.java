@@ -23,7 +23,7 @@ import edu.ucsd.idekerlab.massql.result.ResultJson;
  * The standalone MassQL command-line tool — a batch filter mirroring {@code massql_query.py}.
  *
  * <p>Argument order and the {@code --precursor-tol-ppm} default match the Python reference exactly,
- * because Tech_Step12's differential invokes both with the same argv shape and compares the results.
+ * because the differential invokes both with the same argv shape and compares the results.
  * {@code --output} and the two extra query sources below are deliberate additions.
  *
  * <h2>Where the query comes from</h2>
@@ -55,7 +55,7 @@ import edu.ucsd.idekerlab.massql.result.ResultJson;
  *
  * <p>⚠ This is the <b>CLI's</b> contract, not the SDK's. The SDK writes to no stream at all
  * ({@code DEPENDENCY_POLICY.md} constraint 2); it returns diagnostics and lets its caller decide.
- * Conflating the two is what Correction C25 exists to stop.
+ * Conflating the two is how a library ends up printing into someone else's application.
  *
  * <h2>Exit codes</h2>
  *
@@ -69,7 +69,7 @@ import edu.ucsd.idekerlab.massql.result.ResultJson;
  *       {@code --output}</td></tr>
  * </table>
  *
- * <p><b>1 and 2 are not mechanically distinguishable from the exception type</b> (Correction C42):
+ * <p><b>1 and 2 are not mechanically distinguishable from the exception type</b>:
  * {@code SpectraFile.open} throws a plain {@code MassqlException} for <i>both</i> "no such file"
  * (which belongs at 2) and "cannot determine format" (which belongs at 1), and matching on message
  * text would be worse than the problem. So this class separates them itself, with
@@ -169,7 +169,7 @@ public final class Main {
         try {
             // ⚠ MassqlParseException extends MassqlException, so it MUST be caught first. Reversed,
             // an unsupported query would report as exit 1 and lose the construct name that
-            // Tech_Step12 asserts on.
+            // the differential asserts on.
             var q = Massql.parse(queryText);
             try (SpectraStream s = SpectraFile.open(parsed.spectra)) {
                 result = Massql.executeWithDiagnostics(q, s, opts);

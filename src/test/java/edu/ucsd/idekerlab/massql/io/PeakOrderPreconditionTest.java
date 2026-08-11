@@ -13,7 +13,7 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
  * The precondition that makes {@code ReaderParityIT}'s digest comparison valid.
  *
  * <p><b>Why this exists.</b> The parity gate compares SHA-256 over each peak array, which is
- * <b>order-sensitive</b> — strictly stronger than a multiset, and the reason Correction C32(d) replaced the
+ * <b>order-sensitive</b> — strictly stronger than a multiset, and the reason replaced the
  * spec's multiset language. But order-sensitivity is only *correct* if our array order equals MassQL's file
  * order, and {@code SpectrumTableBuilder} <b>sorts a scan by m/z when it is not already ascending</b>
  * ({@code SpectrumTableBuilder:174-176}). If a fixture ever contained descending peaks, that sort would

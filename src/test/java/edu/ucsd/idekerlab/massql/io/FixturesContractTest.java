@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.opentest4j.TestAbortedException;
 
 /**
- * Guards Correction C26: a missing fixture must <b>fail</b>, never skip.
+ * Guards: a missing fixture must <b>fail</b>, never skip.
  *
  * <p><b>Why this test exists at all.</b> {@code Fixtures} previously resolved to a sibling
  * {@code ../massql} directory and gated on {@code Assumptions.assumeTrue}. CI checks out only
@@ -31,7 +31,7 @@ class FixturesContractTest {
                 AssertionError.class,
                 () -> Fixtures.require("data/no_such_fixture_exists.mzML"),
                 "a missing fixture must raise AssertionError; if this threw TestAbortedException "
-                        + "instead, someone reintroduced assumeTrue and C26's silent-skip hole is back");
+                        + "instead, someone reintroduced assumeTrue and the silent-skip hole is back");
     }
 
     @Test

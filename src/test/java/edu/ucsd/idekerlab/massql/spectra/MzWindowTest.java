@@ -9,20 +9,20 @@ import org.junit.jupiter.api.Test;
  * The m/z window is the performance-critical primitive and the one whose edge behaviour the
  * tolerance semantics rest on. No epsilon, ever.
  *
- * <p><b>There are TWO windows, deliberately</b> (Correction C37), because MassQL genuinely differs by caller
+ * <p><b>There are TWO windows, deliberately</b>, because MassQL genuinely differs by caller
  * — both verified by execution, not inference:
  *
  * <ul>
- *   <li>{@code mzWindow} — <b>inclusive</b>. Tech_Step10's precursor lookup (`massql_query.py:101-103`,
+ *   <li>{@code mzWindow} — <b>inclusive</b>. the precursor lookup (`massql_query.py:101-103`,
  *       {@code >=}/{@code <=}): at {@code --precursor-tol-ppm 7.8125} a peak exactly on the bound
  *       <b>does</b> populate {@code ms1_i}.</li>
- *   <li>{@code mzWindowExclusive} — <b>strict</b>. Tech_Step9's condition windows
+ *   <li>{@code mzWindowExclusive} — <b>strict</b>. the condition windows
  *       (`msql_engine_filters.py:253` and three siblings, {@code >}/{@code <}): {@code micro.mzML} scan 3 has
  *       a peak at exactly {@code 201.0}, and {@code MS2PROD=201.5:TOLERANCEMZ=0.5} returns <b>0 rows</b>.</li>
  * </ul>
  *
  * <p>The spec originally assumed one rule served both. Collapsing them again would silently change
- * {@code ms1_i}/{@code ms1_precmz}, which Tech_Step12 compares at 1e-9.
+ * {@code ms1_i}/{@code ms1_precmz}, which the differential compares at 1e-9.
  */
 class MzWindowTest {
 
@@ -34,7 +34,7 @@ class MzWindowTest {
         return b.build();
     }
 
-    // ---------------------------------------------------------------- the EXCLUSIVE variant (C37)
+    // ---------------------------------------------------------------- the EXCLUSIVE variant
 
     @Test
     void exclusiveWindowRejectsPeaksExactlyOnEitherBound() {
@@ -103,13 +103,13 @@ class MzWindowTest {
         SpectrumTable t = simple();
         // A peak exactly ON either bound is IN the window.
         //
-        // ⚠ Correction C37: the justification here USED to read "Tech_Step9 computes the bounds
+        // ⚠ the justification here USED to read "the condition filters computes the bounds
         // from a
         // tolerance, so an exclusive bound here would silently narrow every tolerance." That
         // reasoning is
-        // backwards -- Tech_Step9's condition windows are STRICT in MassQL, verified by execution.
+        // backwards -- the condition windows are STRICT in MassQL, verified by execution.
         // This
-        // inclusive method exists for Tech_Step10's PRECURSOR LOOKUP, which really is inclusive
+        // inclusive method exists for the PRECURSOR LOOKUP, which really is inclusive
         // (massql_query.py:101-103 uses >=/<=, also verified). Step 9 uses mzWindowExclusive.
         assertEquals(new IntRange(1, 3), t.mzWindow(0, 200.0, 300.0));
         assertEquals(new IntRange(0, 4), t.mzWindow(0, 100.0, 400.0));

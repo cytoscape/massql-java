@@ -16,10 +16,10 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
  * must compute itself.
  *
  * <p>Implements {@link QualifyingScanConsumer}, which is the intended shape: the executor streams and
- * this collects, so retained memory stays at one scan plus one MS1 (Correction C22).
+ * this collects, so retained memory stays at one scan plus one MS1.
  *
  * <p><b>The contract is {@code docs/RESULT_SCHEMA.md}.</b> One uniform 12-key shape for both MS1DATA and
- * MS2DATA, discriminated by {@code mslevel} (Correction C40) — so there is no shape branch here.
+ * MS2DATA, discriminated by {@code mslevel} — so there is no shape branch here.
  *
  * <h2>Order of operations, which is load-bearing</h2>
  *
@@ -30,7 +30,7 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
  * <h2>Why options arrive in the constructor</h2>
  *
  * {@link QualifyingScanConsumer#accept} takes {@code (view, scan, retainedMs1)} and no options — widening
- * that interface to carry {@code precursorTolPpm} would push a Tech_Step10 concern into Tech_Step9's API,
+ * that interface to carry {@code precursorTolPpm} would push a collation concern into the filters' API,
  * so the tolerance is injected here instead.
  */
 public final class ScaninfoCollation implements QualifyingScanConsumer {
@@ -52,7 +52,7 @@ public final class ScaninfoCollation implements QualifyingScanConsumer {
     public void accept(ScanView view, SpectrumTable scan, SpectrumTable retainedMs1) {
         // ---- metadata comes from ScanView, deliberately.
         //
-        // Correction C20 stores precmz/ms1scan/charge on ScanIndex, and a single-scan table's index
+        // precmz/ms1scan/charge live on ScanIndex, and a single-scan table's index
         // agrees with the view. But reading them off a TABLE invites reading them off the WRONG
         // table:
         // retainedMs1.index().precmzOf(0) is the MS1 scan's precmz (0), not this scan's. ScanView
@@ -72,14 +72,14 @@ public final class ScaninfoCollation implements QualifyingScanConsumer {
         // fixtures
         // ascend -- PlusRise's 34,513 SCANS= are monotonic -- so assert it rather than discover
         // later
-        // that Tech_Step12's row-order comparison was silently comparing misaligned rows.
+        // that the differential's row-order comparison was silently comparing misaligned rows.
         if (scanId < lastScanId) {
             throw new MassqlException(
                     "scans arrived out of order: "
                             + scanId
                             + " after "
                             + lastScanId
-                            + ". Results must be scan-id ascending (Tech_Step10, Tech_Step12 §1). An MGF "
+                            + ". Results must be scan-id ascending. An MGF "
                             + "with non-monotonic SCANS= would cause this.");
         }
         lastScanId = scanId;
@@ -93,7 +93,7 @@ public final class ScaninfoCollation implements QualifyingScanConsumer {
 
         // ---- base peaks, from THIS scan's own table, whatever its MS level.
         //
-        // Correction C40: the reference computed these from ms2_df and left-joined on scan, so
+        // The reference computed these from ms2_df and left-joined on scan, so
         // MS1DATA
         // rows missed the join and came back null. The rule is: MS1 ids join only to MS1 data. Here
         // that
@@ -101,7 +101,7 @@ public final class ScaninfoCollation implements QualifyingScanConsumer {
         // had
         // the bug and only the golden needed regenerating.
         int topRow = Reductions.argmax(scan, 0, Column.I);
-        // argmax returns -1 on an empty scan. The executor skips zero-peak scans (C35c) so this
+        // argmax returns -1 on an empty scan. The executor skips zero-peak scans so this
         // cannot
         // fire today, but Reductions' contract allows it and a NaN reaching the JSON would be a
         // null for

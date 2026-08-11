@@ -13,7 +13,7 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
  * or {@code MS2PREC} rejects most scans on metadata alone and never touches their binary arrays.
  *
  * <p>{@code precmz}, {@code ms1scan} and {@code charge} carry MassQL's raw <b>0 sentinel</b> when the
- * file recorded nothing. Converting 0 to null is Tech_Step10's job — doing it here would destroy the
+ * file recorded nothing. Converting 0 to null is the collation's job — doing it here would destroy the
  * distinction between "absent" and "already converted", and {@code ms1scan == 0} is specifically what
  * the precursor lookup tests for.
  */
@@ -23,7 +23,7 @@ public interface ScanView {
      * The scan's identifier, as MassQL derives it — which is <b>not</b> always its position in the file.
      *
      * <p>mzML parses the last {@code scan=N} segment of the spectrum id; mzXML uses {@code num}; MGF uses
-     * {@code SCANS=} when present and otherwise the 1-based block index (Correction C7). This is the value
+     * {@code SCANS=} when present and otherwise the 1-based block index. This is the value
      * that reaches the result JSON's {@code scan} key, so the goldens are keyed on it.
      */
     int scanId();
@@ -51,7 +51,7 @@ public interface ScanView {
      *
      * <p>Read from metadata — mzML's {@code defaultArrayLength}, mzXML's {@code peaksCount}, MGF's line
      * count — so it costs no base64 decode, inflate or array allocation. That is what lets the executor
-     * skip zero-peak scans before paying for them (Correction C35c), and why this is a separate accessor
+     * skip zero-peak scans before paying for them, and why this is a separate accessor
      * rather than {@code materialize().rowCount()}.
      *
      * <p>{@code 0} is a real, expected value: PlusRise.mgf has 12,571 peak-less blocks, and mzML files

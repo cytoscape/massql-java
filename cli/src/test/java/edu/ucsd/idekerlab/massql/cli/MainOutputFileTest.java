@@ -18,9 +18,9 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * {@code --output FILE}: byte-identity with stdout mode, and atomicity.
  *
- * <p><b>Byte-identity is the load-bearing assertion here</b>, and it is what Tech_Step12's
+ * <p><b>Byte-identity is the load-bearing assertion here</b>, and it is what the differential's
  * differential rests on: that comparison reads the {@code --output} file rather than the pipe
- * (Correction C34(c)), so if the two modes could differ, the gate would be measuring something other
+ * (), so if the two modes could differ, the gate would be measuring something other
  * than what a user piping to {@code jq} gets. The property is guaranteed structurally —
  * {@code ResultJson.write} returns one {@code String} and both sinks receive it — but the guarantee
  * is only as good as the thing checking it, and the trailing newline is exactly where two render

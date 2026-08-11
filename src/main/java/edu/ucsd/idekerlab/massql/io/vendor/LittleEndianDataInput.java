@@ -11,7 +11,7 @@ import java.io.InputStream;
  *
  * <p><b>Not vendored — written for this project</b> as a drop-in replacement for Guava's
  * {@code com.google.common.io.LittleEndianDataInputStream}, which {@code MzMLPeaksDecoder}
- * used. Guava cannot be a dependency here (Correction C16: it is unavoidable via
+ * used. Guava cannot be a dependency here (it is unavoidable via
  * {@code msdk-datamodel}, costs 2.85 MB, and its major version conflicts irreconcilably with the
  * 9.0.0 a likely host already provides).
  *
@@ -24,7 +24,7 @@ import java.io.InputStream;
  *
  * <p><b>Little-endian is not a detail here.</b> mzML binary arrays are little-endian while
  * mzXML's are big-endian ("network"), which is why the two readers must never share a
- * configured buffer (Tech_Step6 §5).
+ * configured buffer.
  */
 public final class LittleEndianDataInput extends FilterInputStream {
 

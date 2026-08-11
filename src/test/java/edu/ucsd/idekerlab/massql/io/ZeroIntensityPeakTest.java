@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
 
 /**
- * <b>MGF drops zero-intensity peaks; mzML and mzXML keep them</b> — Correction C36.
+ * <b>MGF drops zero-intensity peaks; mzML and mzXML keep them</b>.
  *
  * <p>{@code _load_data_mgf_pyteomics} opens its peak loop with {@code if intensity == 0: continue}, so a
  * zero-intensity peak never becomes a row: MassQL cannot match it, count it or sum it. The mzML and mzXML
@@ -25,7 +25,7 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTable;
  *
  * <p><b>Why this was latent.</b> Our {@code MgfReader} kept zero-intensity peaks, and not one of the three MGF
  * fixtures contained a single one — measured. So the Step 8 parity gate passed while being structurally unable
- * to detect the divergence. Exactly the shape of C27b, C31 and C33: a rule with no fixture that can
+ * to detect the divergence. Exactly the recurring shape: a rule with no fixture that can
  * discriminate. {@code micro_zeroint.mgf} exists to close it.
  *
  * <p>Both directions are asserted <b>in the same class</b> so the asymmetry is visible rather than folklore. A
@@ -84,10 +84,11 @@ class ZeroIntensityPeakTest {
         // from its
         // dataframe entirely (verified: its ms2_df holds scans 1 and 3 only).
         //
-        // Our reader still YIELDS the block, now with zero peaks -- consistent with C24b/C27b,
+        // Our reader still YIELDS the block, now with zero peaks -- consistent with the reader
+        // rules,
         // where the
-        // reader stays faithful to the file and the engine filters. Tech_Step9's zero-peak guard
-        // (C35c) is
+        // reader stays faithful to the file and the engine filters. the zero-peak guard
+        // is
         // what then makes the two agree.
         Map<Integer, double[][]> got = peaksByScan("fixtures/micro/micro_zeroint.mgf");
 
@@ -115,7 +116,7 @@ class ZeroIntensityPeakTest {
         assertEquals(
                 4L,
                 peaks,
-                "6 peak lines minus 2 zero-intensity ones. Before C36 this was 6 and the parity gate "
+                "6 peak lines minus 2 zero-intensity ones. Before the fix this was 6 and the parity gate "
                         + "could not tell, because no MGF fixture had a zero-intensity peak");
     }
 
@@ -183,7 +184,7 @@ class ZeroIntensityPeakTest {
                             "mzML must RETAIN zero-intensity peaks; row "
                                     + i
                                     + " should be 0.0. The MGF "
-                                    + "skip (C36) is MGF-only -- generalising it breaks the Step 8 gate");
+                                    + "skip is MGF-only -- generalising it breaks the Step 8 gate");
                 }
                 assertEquals(want.peakCount(), t.rowCount(), "peak count includes the zeros");
                 return;

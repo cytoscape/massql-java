@@ -7,7 +7,7 @@ import java.util.List;
  * A parsed, validated MassQL query. Immutable.
  *
  * <p>Everything here is in scope for v1 by construction: {@code AstBuilder} rejects every
- * unsupported construct before an instance can be built, so the engine (Tech_Step9) never
+ * unsupported construct before an instance can be built, so the engine never
  * needs defensive handling for {@code MOBILITY}, variables, {@code formula()} and the rest.
  */
 public record MassqlQuery(

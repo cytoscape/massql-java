@@ -9,7 +9,7 @@ import edu.ucsd.idekerlab.massql.lang.ast.QualifierType;
  * The m/z tolerance window, computed in exactly one place.
  *
  * <p>Mirrors {@code _get_mz_tolerance} (`msql_engine_filters.py:5-17`) — which is the real authority for this
- * rule, not `msql_engine.py` as Tech_Step9 §3 used to say (Correction C37).
+ * rule, not `msql_engine.py`.
  *
  * <p><b>The three rules, in the source's own order:</b>
  * <ol>
@@ -23,8 +23,8 @@ import edu.ucsd.idekerlab.massql.lang.ast.QualifierType;
  *
  * <p>⛔ <b>The window is STRICT at both ends</b> — {@code (target - tol, target + tol)}. Callers must use
  * {@link edu.ucsd.idekerlab.massql.spectra.SpectrumTable#mzWindowExclusive}, never {@code mzWindow}. See
- * Correction C37(a): verified by execution, a peak exactly on the bound does not match. The inclusive
- * {@code mzWindow} exists for Tech_Step10's precursor lookup, which genuinely differs.
+ * Verified by execution: a peak exactly on the bound does not match. The inclusive
+ * {@code mzWindow} exists for the precursor lookup, which genuinely differs.
  *
  * <p><b>Computed from the TARGET value, never from the observed peak.</b> Deriving the width from each peak
  * would make the window vary across a scan.

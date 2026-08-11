@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 /**
- * Proves the build wiring works before Tech_Step4 depends on it: {@code generateGrammarSource} ran,
+ * Proves the build wiring works before the parser depends on it: {@code generateGrammarSource} ran,
  * its output compiled under Java 17, and {@code antlr4-runtime} is on the classpath.
  */
 class ScaffoldTest {
