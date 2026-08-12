@@ -14,7 +14,7 @@
 GRADLE := ./gradlew --console=plain
 
 .DEFAULT_GOAL := help
-.PHONY: help all build test integration-test lint lint-fix coverage fixtures \
+.PHONY: help all build test integration-test lint lint-fix coverage \
         clean set-version-sdk set-version-cli publish-local publish-sdk publish-cli
 
 ## help: list the targets (default)
@@ -67,10 +67,6 @@ lint-fix:
 coverage:
 	$(GRADLE) jacocoTestReport
 	@echo "  -> build/reports/jacoco/test/html/index.html"
-
-## fixtures: download the two gitignored fixtures whose licence is unstated
-fixtures:
-	@bash scripts/fetch-fixtures.sh
 
 ## clean: remove build output
 clean:

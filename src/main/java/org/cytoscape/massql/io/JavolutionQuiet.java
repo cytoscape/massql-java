@@ -43,7 +43,7 @@ final class JavolutionQuiet {
             // Never let log configuration break a read. If a future javolution refuses the
             // reconfigure, the worst case is stray INFO lines -- which StdoutCleanlinessTest
             // catches
-            // at the SDK layer (constraint 2), before the Java CLI's payload is ever involved.
+            // at the SDK layer, before the CLI's payload is ever involved.
         }
     }
 }

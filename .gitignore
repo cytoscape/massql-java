@@ -30,22 +30,8 @@ target/
 *~
 
 # ---------------------------------------------------------------------------------------
-# The two Ewing-lab fixtures are the ONLY test data not committed.
-#
-# They are downloaded from ewinglab.org, which publishes no redistribution terms, so this
-# project does not republish them.
-# Everything else under src/test/resources/ IS committed, deliberately: CI checks out only this
+# Everything under src/test/resources/ IS committed, deliberately: CI checks out only this
 # repository, and a fixture it cannot see would make every parity assertion skip silently.
-#
-# Their GOLDENS are committed, and that is not an inconsistency: loader-parity dumps hold
-# per-scan counts, hex sums and SHA-256 digests; query-result goldens hold matched-scan metadata.
-# Neither contains a peak array, so no spectra are redistributed.
-#
-# `scripts/fetch-fixtures.sh` downloads both into this directory, and CI runs it and caches the
-# result. Fixtures.require() FAILS with that instruction when they are missing -- it must never
-# skip, which is the regression C26 exists to prevent.
-src/test/resources/data/DP00570_F02.mzxml
-src/test/resources/data/DP00570_F02.mgf
 
 # ---------------------------------------------------------------------------------------
 # DO NOT ignore src/test/resources/reference_parses/*.json

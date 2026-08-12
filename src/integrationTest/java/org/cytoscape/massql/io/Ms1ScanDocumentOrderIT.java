@@ -34,10 +34,8 @@ import org.junit.jupiter.api.Test;
  * <b>97</b>, not 99, because 98 and 99 are themselves MS2 scans. A reader that guessed "scan id minus
  * one" would pass on a naive fixture and fail on this one.
  *
- * <p><b>This test must never skip.</b> The fixture is gitignored for licence reasons only;
- * {@code Fixtures.require} fails with the fetch command when it is absent, CI runs
- * {@code scripts/fetch-fixtures.sh} and caches the result, and CI asserts the skipped-test count is 0.
- * A silent skip here would leave the gate proving nothing.
+ * <p><b>This test must never skip.</b> {@code Fixtures.require} throws when the fixture is absent, and
+ * CI asserts the skipped-test count is 0. A silent skip here would leave the gate proving nothing.
  */
 class Ms1ScanDocumentOrderIT {
 

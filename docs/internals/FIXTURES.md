@@ -84,21 +84,27 @@ a failure. CI separately asserts the skipped-test count is **0**.
 If a fixture is missing, restore it. Do not make the assertion conditional — that is the hole a hard
 failure exists to close.
 
-## The exception: two fixtures are fetched, not committed
+## Attribution — the Ewing pair is CC BY 4.0
 
-`data/DP00570_F02.mzxml` and `data/DP00570_F02.mgf` are **gitignored**. They come from
-ewinglab.org, which publishes no redistribution terms, so this project does not republish them.
+`data/DP00570_F02.mzxml` and `data/DP00570_F02.mgf` are two views of one experiment, redistributed here
+under the **Creative Commons Attribution 4.0 International** licence their source declares. They are
+committed like every other fixture, so the test suite needs no network access.
 
-```bash
-make fixtures     # downloads both into src/test/resources/data/
-```
+> **Omics Analysis Tutorial** — developed by **Professor Rob Ewing**, with financial support from The
+> University Center for Innovation in Teaching and Education (UCITE), Case Western Reserve University,
+> Cleveland, Ohio.
+>
+> Source: <https://www.ewinglab.org/omicsanalysistutorial>  
+> Licence: [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/)  
+> **Both files are redistributed unmodified.**
 
-CI runs that script and caches the result, so the flaky upstream is contacted once rather than per run.
-When they are absent, `Fixtures.require` fails with that command in the message.
+The licence permits redistribution, including commercially, so long as that attribution travels with the
+files — which is what this section is for. It also carries a disclaimer of warranties; see the licence
+text at the link above.
 
-**Their goldens ARE committed, and that is not an inconsistency.** `goldens/loader-parity/DP00570_*`
-holds per-scan counts, hex intensity sums and SHA-256 digests; `goldens/query-results/dp00570_*` holds
-metadata for matched scans only. Neither contains a peak array, so no spectra are redistributed.
+⚠ The declaration is made for the tutorial resource as a whole, at the page that serves these files from
+its own `/data/` path, rather than per file. If a stricter record is ever wanted, ask the lab to confirm
+it covers the data files specifically.
 
 ## Why the Ewing mzXML matters more than its size suggests
 

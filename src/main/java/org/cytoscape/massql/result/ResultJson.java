@@ -20,7 +20,7 @@ import java.util.List;
  * The output is 12 fixed keys. Jackson discovers modules through {@code ServiceLoader}, which
  * this project forbids outright (provider lookup is unreliable whenever the
  * thread-context classloader cannot see the caller's classes, which is any non-flat classpath), and
- * constraint 6 caps the dependency budget that a JSON library would consume for no benefit here.
+ * and the closure-size budget leaves no room for a JSON library that buys nothing here.
  *
  * <h2>Number formatting</h2>
  *

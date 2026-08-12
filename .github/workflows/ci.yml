@@ -34,25 +34,6 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      # The two Ewing-lab fixtures are the only test data not committed: ewinglab.org states no
-      # redistribution terms. Everything else lives in src/test/resources.
-      # Cached so the flaky upstream is contacted once rather than on every run: flaky CI destroys the
-      # credibility of a conformance number.
-      - name: Cache the fetched Ewing fixtures
-        uses: actions/cache@v4
-        with:
-          path: |
-            src/test/resources/data/DP00570_F02.mzxml
-            src/test/resources/data/DP00570_F02.mgf
-          key: ewing-fixtures-3761778-2196881   # sizes are the identity; a changed upstream = a new key
-
-      # Required, not best-effort: Ms1ScanDocumentOrderIT is the only test that can distinguish
-      # document-order ms1scan from precursorScanNum resolution, and it FAILS rather than
-      # skipping when the fixture is absent. Letting this step pass on error would only move the
-      # failure later and make it look like a reader bug.
-      - name: Fetch uncommitted fixtures
-        run: make fixtures
-
       # Unit + integration tests, Spotless, the banned-dependency rule and the 90% coverage gate --
       # everything, in one target.
       #

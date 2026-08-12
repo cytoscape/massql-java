@@ -44,19 +44,6 @@ class FixturesContractTest {
     }
 
     @Test
-    void theEwingFixturesGetFetchInstructionsNotJustAnAbsenceReport() {
-        // The two Ewing files are gitignored (unstated licence), so "missing" is an expected state
-        // with a specific remedy. A bare "file not found" would send the next engineer hunting.
-        AssertionError e =
-                assertThrows(
-                        AssertionError.class,
-                        () -> Fixtures.require("data/DP00570_F02.does_not_exist"));
-        assertTrue(
-                e.getMessage().contains("fetch-fixtures.sh"),
-                "an absent Ewing fixture must name the fetch script. Got: " + e.getMessage());
-    }
-
-    @Test
     void committedFixturesResolveOnTheClasspath() {
         // The complement: the happy path genuinely finds the committed fixtures, so the assertions
         // above cannot pass merely because resolution is broken for everything.

@@ -226,8 +226,7 @@ class DifferentialIT {
                 url,
                 "fixture missing from src/test/resources: "
                         + relative
-                        + " -- fixtures are committed in-repo. Restore it, or run"
-                        + " `make fixtures` for the two Ewing files. Never skip.");
+                        + " -- every fixture is committed in-repo. Restore it; never skip.");
         try {
             return Paths.get(url.toURI());
         } catch (URISyntaxException e) {

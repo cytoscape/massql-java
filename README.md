@@ -104,3 +104,9 @@ licence matches it: only MSDK's *decode layer* is vendored — its parser could 
 readers are hand-written. Those files keep their own upstream copyright headers. Per-file provenance a
 redistributor needs: [`docs/VENDORED.md`](docs/VENDORED.md), asserted on disk by
 `VendoredProvenanceTest`.
+
+**Two test fixtures are third-party data under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/)**
+— `src/test/resources/data/DP00570_F02.*`, from Professor Rob Ewing's Omics Analysis Tutorial. They are
+test inputs only and appear in no published artifact, but redistributing this repository redistributes
+them, so the attribution the licence requires is recorded in
+[`docs/internals/FIXTURES.md`](docs/internals/FIXTURES.md).

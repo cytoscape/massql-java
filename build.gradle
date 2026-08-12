@@ -76,11 +76,11 @@ allprojects {
     }
 }
 
-// Shell scripts and the Makefile get no formatter otherwise. Markdown is deliberately EXCLUDED:
-// two trailing spaces is a semantic line break there, so reformatting docs would change how they render.
+// The Makefile gets no formatter otherwise. Markdown is deliberately EXCLUDED: two trailing spaces is
+// a semantic line break there, so reformatting docs would change how they render.
 spotless {
-    format 'scripts', {
-        target 'scripts/**/*.sh', 'Makefile'
+    format 'makefile', {
+        target 'Makefile'
         trimTrailingWhitespace()
         endWithNewline()
     }
@@ -367,11 +367,11 @@ ext.bannedDependencies = [
     'org.checkerframework:checker-qual',
     'com.google.errorprone:error_prone_annotations',
     'com.google.j2objc:j2objc-annotations',
-    // Constraint 5: the SDK logs nothing at all, so no slf4j in any form, and no logging
-    // framework beyond it. (slf4j 2.x would also breach constraint 1 via ServiceLoader.)
+    // The SDK logs nothing at all, so no slf4j in any form and no logging framework beyond it.
+    // (slf4j 2.x also discovers its binding via ServiceLoader, which is separately not allowed.)
     'ch.qos.logback:*',
     'org.slf4j:*',
-    // Constraint 3: no JAXB.
+    // No JAXB.
     'javax.xml.bind:*',
     'com.sun.xml.bind:*',
     'jakarta.xml.bind:*',

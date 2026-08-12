@@ -74,7 +74,7 @@ class StdoutCleanlinessTest {
 
     @Test
     void readingAnMzmlWritesNothingToStderrEither() {
-        // Constraint 2 is "the SDK logs nothing", not "logs only to stderr". Diagnostics are
+        // The rule is "the SDK logs nothing", not "logs only to stderr". Diagnostics are
         // RETURNED via SpectraStream.diagnostics() so the caller decides where they go.
         Path mzml = Fixtures.require("data/small.mzML");
         Captured c =

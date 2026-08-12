@@ -152,7 +152,8 @@ file-level `COM=`/`CHARGE=` preamble before the first `BEGIN IONS` (both real fi
 ## mzML
 
 Hand-written XML walk over the vendored decode layer. `XMLStreamReaderImpl` is
-instantiated **directly** — the JDK's `XMLInputFactory` uses `ServiceLoader`, banned by constraint 1.
+instantiated **directly** — the JDK's `XMLInputFactory` uses `ServiceLoader`, which this project does
+not permit.
 
 | Field | Accession / rule |
 |---|---|

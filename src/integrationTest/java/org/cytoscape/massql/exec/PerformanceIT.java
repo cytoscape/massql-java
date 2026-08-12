@@ -208,8 +208,7 @@ class PerformanceIT {
             throw new AssertionError(
                     "fixture missing from src/test/resources: "
                             + relative
-                            + " -- fixtures are committed"
-                            + " in-repo. Run `make fixtures` for the two Ewing files. Never skip.");
+                            + " -- every fixture is committed in-repo. Restore it; never skip.");
         }
         try {
             return Paths.get(url.toURI());

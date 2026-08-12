@@ -12,7 +12,7 @@
 #
 # Modelled on ../cy-ndex-2/.github/workflows/release.yml. Deliberate differences:
 #
-#   1. JDK 17, not 11 (constraint 7).
+#   1. JDK 17.
 #   2. No `xvfb-run` — nothing here touches AWT.
 #   3. Runs the FULL suite instead of skipping tests. cy-ndex-2 skips tests on release; for an SDK
 #      whose whole value is bug-for-bug agreement with a pinned MassQL commit, publishing an
@@ -67,19 +67,6 @@ jobs:
       - name: Stamp the version
         run: make set-version-${{ steps.rel.outputs.artifact }} V=${{ steps.rel.outputs.version }}
 
-      # REQUIRED, the suite cannot pass without the temporary Ewing files --
-      # Ms1ScanDocumentOrderIT and ReaderParityIT both need them. 
-      - name: Cache the fetched Ewing fixtures
-        uses: actions/cache@v4
-        with:
-          path: |
-            src/test/resources/data/DP00570_F02.mzxml
-            src/test/resources/data/DP00570_F02.mgf
-          key: ewing-fixtures-3761778-2196881
-
-      - name: Fetch uncommitted fixtures
-        run: make fixtures
-
       # Full suite: unit + integration + Spotless + banned deps + the coverage gate, in one target.
       - name: Test
         run: make integration-test
@@ -112,8 +99,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Gradle has no settings.xml, so there is no <server> id to match: the repository block in
-      # build.gradle / cli/build.gradle reads REPO_USER and REPO_PWD straight from the environment.
+      # Gradle does not read ~/.m2/settings.xml. The repository block in build.gradle /
+      # cli/build.gradle prefers ~/.gradle/gradle.properties and falls back to REPO_USER / REPO_PWD,
+      # which is what these secrets supply.
       - name: Publish to Nexus
         run: make publish-${{ steps.rel.outputs.artifact }}
         env:

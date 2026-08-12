@@ -21,17 +21,10 @@ import java.nio.file.Paths;
  * files in the build output, so the returned {@link Path} can be memory-mapped — which the mzML and
  * mzXML readers require and a jar-embedded resource could not satisfy.
  *
- * <p><b>The one exception</b> is the two Ewing-lab files ({@code data/DP00570_F02.*}), gitignored because
- * ewinglab.org states no redistribution terms. {@code scripts/fetch-fixtures.sh} downloads them and CI
- * caches the result; when they are absent the failure message says exactly that, rather than letting the
- * test report success.
  */
 final class Fixtures {
 
     private Fixtures() {}
-
-    /** Fixtures that are fetched rather than committed — drives the failure message only. */
-    private static final String FETCHED_PREFIX = "data/DP00570_F02.";
 
     /**
      * Resolves a fixture path, failing the test if it is absent.
@@ -67,16 +60,6 @@ final class Fixtures {
     }
 
     private static String explainMissing(String relative) {
-        if (relative.startsWith(FETCHED_PREFIX)) {
-            return "fixture missing: "
-                    + relative
-                    + "\n"
-                    + "This is one of the two Ewing-lab files, gitignored because ewinglab.org\n"
-                    + "publishes no redistribution terms.\n"
-                    + "Fetch them with:  bash scripts/fetch-fixtures.sh\n"
-                    + "This test must NOT be skipped -- the Ewing mzXML is the only fixture that can\n"
-                    + "distinguish document-order ms1scan from precursorScanNum resolution.";
-        }
         return "fixture missing from src/test/resources: "
                 + relative
                 + "\n"
