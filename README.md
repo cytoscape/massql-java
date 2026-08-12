@@ -14,12 +14,13 @@ QUERY scaninfo(MS2DATA) WHERE MS2PREC=810.79:TOLERANCEMZ=1.0
 per matching scan, with its scan number, precursor m/z, retention time, charge and intensity columns
 — 12 in all, listed in [`docs/RESULT_SCHEMA.md`](docs/RESULT_SCHEMA.md).
 
-Reads `.mgf`, `.mzML` and `.mzXML`. No Python, no network, no logging framework — an ordinary jar
-that runs anywhere a JVM does.
+Reads `.mgf`, `.mzML` and `.mzXML`. 
 
 ---
 
-## Try it in 30 seconds
+## Try it 
+
+The library requires JDK 17+.
 
 The command-line tool needs no data of your own — this runs against a fixture in the repository:
 
@@ -35,23 +36,17 @@ That prints a JSON array — one object per matching scan, six of them here.
 
 ## Two artifacts
 
-They are **versioned and released independently**, and kept deliberately separate.
-
 ### 📚 [`massql-java`](docs/SDK.md) — the SDK
 
 The library. Embed it in any JVM application: add one coordinate, call `Massql.run(...)`, get a
 `List<ScanInfoResult>` back.
 
-A thin jar with a **0.749 MB** dependency closure, enforced by the build. Writes to no stream, logs
-nothing, and returns diagnostics as values so the host decides what to do with them.
-
-→ **[docs/SDK.md](docs/SDK.md)** — a complete copy-paste project to start from. **Class-level
-documentation is the published `-javadoc.jar`**, not prose in this repository.
+→ **[docs/SDK.md](docs/SDK.md)** — a complete copy-paste project to start from. Standard javadocs
+documentation is the published `-javadoc.jar`.
 
 ### 🖥 [`massql-java-cli`](docs/CLI.md) — the command-line tool
 
-A standalone uber-jar. Spectra file in, JSON on stdout, an exit code that means something. The query
-comes from a file, from stdin, or inline as `--query`.
+A standalone uber-jar that can be run as cli tool. Accepts spectra file and massql query as inputs and json for output results.
 
 → **[docs/CLI.md](docs/CLI.md)** — arguments, streams, output modes and exit codes, plus **runnable
 examples** against fixtures committed here; paste them as written.
@@ -62,7 +57,7 @@ examples** against fixtures committed here; paste them as written.
 
 | | |
 |---|---|
-| [`docs/RESULT_SCHEMA.md`](docs/RESULT_SCHEMA.md) | the frozen 12-key result contract, shared by both artifacts and machine-checked |
+| [`docs/RESULT_SCHEMA.md`](docs/RESULT_SCHEMA.md) | the frozen 12-key result structure |
 | [`docs/internals/`](docs/internals/READER_RULES.md) | engineering notes for maintainers: reader rules, query semantics, the column store, grammar and fixture provenance |
 | [`docs/VENDORED.md`](docs/VENDORED.md) | vendored MSDK provenance and the EPL-1.0 election a redistributor needs |
 
@@ -70,8 +65,7 @@ examples** against fixtures committed here; paste them as written.
 
 ## Building
 
-The `Makefile` is the only entry point, so what you run locally and what CI runs cannot drift.
-Never invoke `./gradlew` directly — if you need something the Makefile does not do, add a target.
+The `Makefile` is preferred entry point.
 
 ```sh
 make                   # list every target
@@ -80,33 +74,16 @@ make test              # unit tests, seconds
 make integration-test  # everything: unit + integration suites and the coverage gate
 ```
 
-JDK 17.
-
 ## Implementation basis
 
-This SDK was **initiated from** MassQL's Python implementation as a precedent — tag **`2026.03.14`**,
-commit `dad2a28c01e6e5132240270fc6700fbae29f1652` — and implements its **`scaninfo`** subset. Results
-are verified against goldens generated from that commit across all three input formats.
+This SDK was **initiated from** MassQL's Python implementation as a precedent — tag **`2026.03.14`**. 
 
-⛔ **It makes no effort to track or follow Python MassQL going forward.** This code is the authority for
-its own behaviour; the goldens are frozen test data, not a moving upstream.
-
-Anything outside the subset parses and is then rejected **by name**, so an unsupported construct
-produces a message saying which one — see [`docs/SDK.md`](docs/SDK.md).
+⛔ **This SDK does not continue to track the Python MassQL going forward.** This SDK maintains its own behavior in relation to MassQL specs going forward.
 
 ## Licensing and vendored code
 
-**This project is licensed under the Eclipse Public License 1.0** — see [`LICENSE`](LICENSE). Both
-published coordinates declare it in their POM, so a consumer resolving either one sees the terms.
+**This project is licensed under the Eclipse Public License 1.0** — see [`LICENSE`](LICENSE). 
 
-**EPL-1.0 is also the election** where MSDK's dual LGPL-2.1 / EPL-1.0 applies, which is why the project
-licence matches it: only MSDK's *decode layer* is vendored — its parser could not be, so the three
-readers are hand-written. Those files keep their own upstream copyright headers. Per-file provenance a
-redistributor needs: [`docs/VENDORED.md`](docs/VENDORED.md), asserted on disk by
-`VendoredProvenanceTest`.
 
 **Two test fixtures are third-party data under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/)**
-— `src/test/resources/data/DP00570_F02.*`, from Professor Rob Ewing's Omics Analysis Tutorial. They are
-test inputs only and appear in no published artifact, but redistributing this repository redistributes
-them, so the attribution the licence requires is recorded in
-[`docs/internals/FIXTURES.md`](docs/internals/FIXTURES.md).
+— `src/test/resources/data/DP00570_F02.*`, from Professor Rob Ewing's Omics Analysis Tutorial. 
