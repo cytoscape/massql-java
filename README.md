@@ -41,7 +41,7 @@ come from a file, from stdin, or inline as `--query`.
 | | |
 |---|---|
 | [`docs/RESULT_SCHEMA.md`](docs/RESULT_SCHEMA.md) | the frozen 12-key result contract, shared by both artifacts and machine-checked |
-| [`DEPENDENCY_POLICY.md`](DEPENDENCY_POLICY.md) | what may be depended on and why — every rule states its failure mechanism |
+| [`docs/DEPENDENCY_POLICY.md`](docs/DEPENDENCY_POLICY.md) | what may be depended on and why — every rule states its failure mechanism |
 | [`docs/VENDORED.md`](docs/VENDORED.md) | vendored MSDK provenance and the EPL-1.0 election a redistributor needs |
 | [`docs/harness/`](docs/harness/README.md) | the engineering record: step specs, the corrections ledger, verification reports. Not needed to *use* either artifact |
 
@@ -73,7 +73,11 @@ produces a message saying which one — see [`docs/SDK.md`](docs/SDK.md).
 
 ## Licensing and vendored code
 
-**EPL-1.0 is elected** where MSDK's dual LGPL-2.1 / EPL-1.0 applies. Only MSDK's *decode layer* is
-vendored — its parser could not be, so the three readers are hand-written. Per-file provenance a
+**This project is licensed under the Eclipse Public License 1.0** — see [`LICENSE`](LICENSE). Both
+published coordinates declare it in their POM, so a consumer resolving either one sees the terms.
+
+**EPL-1.0 is also the election** where MSDK's dual LGPL-2.1 / EPL-1.0 applies, which is why the project
+licence matches it: only MSDK's *decode layer* is vendored — its parser could not be, so the three
+readers are hand-written. Those files keep their own upstream copyright headers. Per-file provenance a
 redistributor needs: [`docs/VENDORED.md`](docs/VENDORED.md), asserted on disk by
 `VendoredProvenanceTest`.

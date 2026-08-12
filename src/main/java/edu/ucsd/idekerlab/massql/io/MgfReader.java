@@ -19,7 +19,7 @@ import edu.ucsd.idekerlab.massql.spectra.SpectrumTableBuilder;
  * Streaming MGF reader — hand-written, one {@code BEGIN IONS}…{@code END IONS} block at a time.
  *
  * <p>Hand-written because the alternative, {@code uk.ac.ebi.pride.tools:mgf-parser} (28 KB), drags
- * fastutil (23 MB), logback and both JAXB stacks — every one forbidden by `DEPENDENCY_POLICY.md`.
+ * fastutil (23 MB), logback and both JAXB stacks — every one of which this project refuses.
  *
  * <p><b>The specification is {@code _load_data_mgf_pyteomics}</b> (`msql_fileloading.py:155-244`), not
  * the MGF format documentation. Where the two differ, MassQL wins, because Step 8 asserts bit-identity

@@ -47,8 +47,9 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  *
  * <h2>The SDK writes to no stream</h2>
  *
- * <p>Nothing here prints, logs, or touches {@code System.out} — {@code DEPENDENCY_POLICY.md}
- * constraint 2. Notes about a valid-but-degenerate query come back through
+ * <p>Nothing here prints, logs, or touches {@code System.out}: an embedded library that writes to a
+ * stream fights whatever its host already uses, and the host wins. Notes about a
+ * valid-but-degenerate query come back through
  * {@link #executeWithDiagnostics}. Treating stdout as a data pipe is the <b>CLI's</b> contract, never
  * the SDK's.
  */

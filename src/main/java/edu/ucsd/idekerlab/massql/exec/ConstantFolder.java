@@ -28,8 +28,8 @@ public final class ConstantFolder {
      * Folds {@code e} to its double value.
      *
      * <p>Uses {@code instanceof} binding patterns rather than a pattern {@code switch}: pattern switches are
-     * a <b>preview</b> feature under {@code <release>17</release>} (`DEPENDENCY_POLICY.md` constraint 7, which
-     * pins 17), and enabling preview features in a shipping library is not on the
+     * a <b>preview</b> feature under {@code <release>17</release>}, which this project targets, and
+     * enabling preview features in a shipping library is not on the
      * table. This matches the idiom already used in `AstBuilder`.
      */
     public static double fold(Expr e) {

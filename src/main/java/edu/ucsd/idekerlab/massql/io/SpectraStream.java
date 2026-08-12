@@ -79,7 +79,7 @@ public interface SpectraStream extends AutoCloseable {
     /**
      * Non-fatal notes accumulated so far, e.g. "skipped 3 spectra with ms level > 2".
      *
-     * <p>The SDK logs nothing ({@code DEPENDENCY_POLICY.md} constraint 2), so diagnostics are returned
+     * <p>The SDK logs nothing, so diagnostics are returned
      * and the caller decides: the CLI prints them to stderr, a GUI could surface them in a
      * dialog. Accumulates as the stream advances, so read it <b>after</b> iterating.
      */

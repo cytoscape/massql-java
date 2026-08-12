@@ -153,7 +153,7 @@ allprojects {
     dependencies {
         // 2.39.0 is the NEWEST release still compiled for Java 17. From 2.40 onward ErrorProne
         // targets Java 21 (class file 65) and fails here with UnsupportedClassVersionError, because
-        // this project is pinned to JDK 17 by DEPENDENCY_POLICY.md constraint 7.
+        // this project is pinned to JDK 17 by docs/DEPENDENCY_POLICY.md constraint 7.
         // Do not bump this without changing that constraint first.
         errorprone 'com.google.errorprone:error_prone_core:2.39.0'
     }
@@ -169,7 +169,7 @@ allprojects {
 }
 
 dependencies {
-    // DEPENDENCY_POLICY.md: these two are the entire shipping closure.
+    // docs/DEPENDENCY_POLICY.md: these two are the entire shipping closure.
     implementation "com.github.chhh:javolution-core-java-msftbx:6.11.8"
     implementation "org.antlr:antlr4-runtime:${antlrVersion}"
 
@@ -210,7 +210,7 @@ dependencies {
 //
 // against a shipping closure of 0.75 MB and a ~1.5 MB budget -- so ~21x over, not a rounding error.
 // antlr-runtime 3.x sitting beside antlr4-runtime is also exactly the duplicate-artifact situation
-// DEPENDENCY_POLICY.md exists to prevent.
+// docs/DEPENDENCY_POLICY.md exists to prevent.
 //
 // generateGrammarSource takes its tool classpath from the `antlr` configuration directly, so
 // severing the inheritance costs nothing.
@@ -334,7 +334,7 @@ tasks.named('check') {
 // Dependency policy
 // ---------------------------------------------------------------------------------------------
 
-// Turns DEPENDENCY_POLICY.md from prose into a failing build.
+// Turns docs/DEPENDENCY_POLICY.md from prose into a failing build.
 //
 // Implemented directly rather than with a Maven-enforcer port: the only such plugin
 // (org.kordamp.gradle.project-enforcer) last released 0.14.0 in August 2024, predating Gradle 9,
@@ -388,9 +388,9 @@ allprojects {
             }
             if (offenders) {
                 throw new GradleException(
-                        "DEPENDENCY_POLICY.md violation in ${project.path}:\n  "
+                        "docs/DEPENDENCY_POLICY.md violation in ${project.path}:\n  "
                                 + offenders.unique().join('\n  ')
-                                + "\n\nSee DEPENDENCY_POLICY.md before relaxing this.")
+                                + "\n\nSee docs/DEPENDENCY_POLICY.md before relaxing this.")
             }
         }
     }
@@ -412,6 +412,16 @@ publishing {
             pom {
                 name = 'massql-java'
                 description = 'Pure-Java MassQL SDK (scaninfo subset).'
+                // Declared HERE and not only in the LICENSE file: a consumer resolving this
+                // coordinate reads the POM, never the repository, so a licence stated only at the
+                // repo root leaves the published artifact silent about its terms.
+                licenses {
+                    license {
+                        name = 'Eclipse Public License - v 1.0'
+                        url = 'https://www.eclipse.org/legal/epl-v10.html'
+                        distribution = 'repo'
+                    }
+                }
             }
         }
     }

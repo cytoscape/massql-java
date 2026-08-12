@@ -177,6 +177,15 @@ publishing {
             pom {
                 name = 'massql-java-cli'
                 description = 'Standalone MassQL command-line tool (uber-jar).'
+                // Same reasoning as the SDK's POM. ⚠ This jar is an UBER-jar: it also bundles
+                // javolution and antlr4-runtime, whose own licences travel inside it.
+                licenses {
+                    license {
+                        name = 'Eclipse Public License - v 1.0'
+                        url = 'https://www.eclipse.org/legal/epl-v10.html'
+                        distribution = 'repo'
+                    }
+                }
             }
         }
     }

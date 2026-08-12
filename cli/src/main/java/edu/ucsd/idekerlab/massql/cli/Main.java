@@ -53,9 +53,9 @@ import edu.ucsd.idekerlab.massql.result.ResultJson;
  * warnings, errors, usage — goes to stderr, on every output mode. That is the Unix convention for a
  * batch filter, it is what makes {@code | jq} work, and it is what the reference deliberately does.
  *
- * <p>⚠ This is the <b>CLI's</b> contract, not the SDK's. The SDK writes to no stream at all
- * ({@code DEPENDENCY_POLICY.md} constraint 2); it returns diagnostics and lets its caller decide.
- * Conflating the two is how a library ends up printing into someone else's application.
+ * <p>⚠ This is the <b>CLI's</b> contract, not the SDK's. The SDK writes to no stream at all; it
+ * returns diagnostics and lets its caller decide. Conflating the two is how a library ends up
+ * printing into someone else's application.
  *
  * <h2>Exit codes</h2>
  *

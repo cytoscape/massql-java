@@ -28,7 +28,7 @@ import java.util.zip.GZIPInputStream;
  * ad-hoc regex in {@code MzmlReaderTest} / {@code Ms1ScanDocumentOrderIT} only extracted three fields.
  *
  * <p><b>Regex rather than a JSON library, deliberately.</b> Jackson discovers modules via
- * {@code ServiceLoader}, banned by `DEPENDENCY_POLICY.md` constraint 1 — and a test-scoped dependency
+ * {@code ServiceLoader}, banned by `docs/DEPENDENCY_POLICY.md` constraint 1 — and a test-scoped dependency
  * would still be one more thing that can drift from the shipping closure. The dumps are machine-generated
  * with a fixed field order, so a regex is sufficient and adds nothing to the build.
  *

@@ -7,9 +7,9 @@ import java.util.Arrays;
  *
  * <p>This is the replacement for MassQL's pandas dataframe, and it is written rather than
  * imported because no Java dataframe library is usable here: Tablesaw pulls ~44 MB and finds
- * its I/O registry by classpath scanning (breaking {@code DEPENDENCY_POLICY.md} constraint
- * 1), and Arrow has split packages and needs {@code sun.misc.Unsafe} plus JVM flags we do not
- * control.
+ * its I/O registry by classpath scanning, which is unreliable wherever the thread-context classloader
+ * cannot see the caller's classes; and Arrow has split packages and needs {@code sun.misc.Unsafe} plus
+ * JVM flags we do not control.
  *
  * <p><b>Two tables per file, not one.</b> MS1 and MS2 peaks live in separate instances,
  * mirroring MassQL's {@code ms1_df} / {@code ms2_df} split — {@code load_data()} returns

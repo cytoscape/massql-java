@@ -29,7 +29,7 @@ class ScaffoldTest {
 
     @Test
     void compiledForJava17() {
-        // Guards DEPENDENCY_POLICY.md constraint 7: class file major version <= 61.
+        // Guards docs/DEPENDENCY_POLICY.md constraint 7: class file major version <= 61.
         assertTrue(Runtime.version().feature() >= 17, "tests must run on JDK 17+");
     }
 }

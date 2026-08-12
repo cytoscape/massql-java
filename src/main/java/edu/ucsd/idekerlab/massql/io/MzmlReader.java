@@ -35,7 +35,7 @@ import javolution.xml.stream.XMLStreamException;
  *
  * <p><b>{@link XMLStreamReaderImpl} is instantiated DIRECTLY</b>, exactly as upstream does. That is the
  * entire reason javolution is a dependency: the JDK's {@code XMLInputFactory} discovers implementations
- * via {@code ServiceLoader}, banned by `DEPENDENCY_POLICY.md` constraint 1 because provider lookup fails
+ * via {@code ServiceLoader}, which this project does not use because provider lookup fails
  * wherever the thread-context classloader cannot see the caller's classes, and naming the JDK's internal
  * impl would need {@code Class.forName}, also banned.
  *

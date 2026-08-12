@@ -64,7 +64,7 @@ Two artifacts, **0.749 MB total** — `javolution-core-java-msftbx` and `antlr4-
 
 That number is enforced, not aspirational: the build fails if the closure exceeds ~1.5 MB or if any
 of a list of banned coordinates appears. No logging framework, no `ServiceLoader`, no JAXB, no native
-code — see [`DEPENDENCY_POLICY.md`](../DEPENDENCY_POLICY.md) for the constraints and why each exists.
+code — see [`DEPENDENCY_POLICY.md`](DEPENDENCY_POLICY.md) for the constraints and why each exists.
 The point of all of it is that embedding this SDK should be uneventful: it brings no logger to conflict
 with yours, no provider lookup that depends on classloader layout, and little enough weight that you
 need not think about it.

@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * What a run produced, plus its diagnostics.
  *
- * <p>The SDK <b>logs nothing</b> — `DEPENDENCY_POLICY.md` constraint 2.
+ * <p>The SDK <b>logs nothing</b>.
  * So a valid-but-degenerate query returns its explanation here rather than printing it: the CLI
  * writes these to stderr; a GUI could show them in a dialog.
  *

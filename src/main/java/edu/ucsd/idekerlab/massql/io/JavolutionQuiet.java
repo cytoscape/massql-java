@@ -11,7 +11,7 @@ import javolution.context.LogContext;
  * every real file. Measured on {@code small.mzML}: 6 lines, and they land on <b>stdout</b>.
  *
  * <p><b>Why that is a defect, stated at the right layer.</b> This class sits in the <b>SDK</b>, and the
- * rule governing the SDK is {@code DEPENDENCY_POLICY.md} constraint 2: <b>the SDK logs nothing at all</b>,
+ * rule governing the SDK is simple: <b>it logs nothing at all</b>,
  * to stdout or stderr. Diagnostics are <i>returned</i> to the caller via
  * {@link SpectraStream#diagnostics()}, so the caller decides where they go. A library printing uninvited
  * is the whole defect; which stream it chose is incidental — which is why {@code StdoutCleanlinessTest}

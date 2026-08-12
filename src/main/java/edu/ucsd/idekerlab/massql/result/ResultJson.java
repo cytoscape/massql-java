@@ -18,7 +18,7 @@ import java.util.List;
  * <h2>Written by hand — no Jackson, no Gson</h2>
  *
  * The output is 12 fixed keys. Jackson discovers modules through {@code ServiceLoader}, which
- * {@code DEPENDENCY_POLICY.md} constraint 1 forbids outright (provider lookup is unreliable whenever the
+ * this project forbids outright (provider lookup is unreliable whenever the
  * thread-context classloader cannot see the caller's classes, which is any non-flat classpath), and
  * constraint 6 caps the dependency budget that a JSON library would consume for no benefit here.
  *

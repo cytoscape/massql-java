@@ -8,7 +8,7 @@ import edu.ucsd.idekerlab.massql.result.ScanInfoResult;
  * What {@link Massql#executeWithDiagnostics} returns: the rows, and anything the engine wants the
  * caller to know about how it got them.
  *
- * <p><b>The SDK logs nothing</b> — {@code DEPENDENCY_POLICY.md} constraint 2. A valid-but-degenerate
+ * <p><b>The SDK logs nothing.</b> A valid-but-degenerate
  * query therefore returns its explanation here rather than printing it, and the caller decides what
  * to do with it: the CLI writes these to stderr, a GUI could show them in a dialog. An
  * empty result set is a legitimate answer; a <i>silent</i> empty result set is a poor one.

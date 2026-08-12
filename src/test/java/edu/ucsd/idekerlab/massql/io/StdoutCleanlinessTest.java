@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
  * <b>stdout</b>.
  *
  * <p><b>The rule this enforces is an SDK rule</b>, so it is stated at that layer:
- * {@code DEPENDENCY_POLICY.md} constraint 2 — <b>the SDK logs nothing at all</b>, to stdout or stderr.
+ * {@code docs/DEPENDENCY_POLICY.md} constraint 2 — <b>the SDK logs nothing at all</b>, to stdout or stderr.
  * That is why there are two tests below rather than one: "logs only to stderr" would not be compliance.
  * Diagnostics are returned via {@link SpectraStream#diagnostics()} for the caller to route.
  *

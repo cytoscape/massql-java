@@ -36,7 +36,7 @@ import javolution.xml.stream.XMLStreamException;
  *
  * <p>Shape mirrors {@link MzmlReader}: memory-map, walk with {@link XMLStreamReaderImpl} instantiated
  * directly (the JDK's {@code XMLInputFactory} uses {@code ServiceLoader}, banned by
- * `DEPENDENCY_POLICY.md` constraint 1), capture each {@code <peaks>} element's base64 <b>text</b> and
+ * which this project does not use), capture each {@code <peaks>} element's base64 <b>text</b> and
  * decode it lazily in {@link ScanView#materialize()}.
  *
  * <p><b>Nothing is shared with the mzML decode path, deliberately</b>. mzML is
