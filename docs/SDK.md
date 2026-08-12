@@ -136,7 +136,7 @@ Two details in that snippet are worth carrying into your own code:
 To point it at your own data, change the path: `.mgf`, `.mzML` and `.mzXML` all work, and the format
 is detected from content rather than the extension.
 
-### The three artifacts
+### The three SDK  artifacts
 
 | Classifier | What it is |
 |---|---|
@@ -144,74 +144,47 @@ is detected from content rather than the extension.
 | `-javadoc` | **the API reference** — IDEs attach it automatically and show it inline |
 | `-sources` | sources for stepping through in a debugger |
 
-Snapshots live in `cytoscape_snapshots` on the same host, releases in `cytoscape_releases`.
-
-### What it drags in
-
-Two artifacts, **0.749 MB total** — `javolution-core-java-msftbx` and `antlr4-runtime`. Both are
-`runtime` scope, so neither appears on your compile classpath.
-
-That number is enforced, not aspirational: the build fails if the closure exceeds ~1.5 MB or if any
-of a list of banned coordinates appears. No logging framework, no `ServiceLoader`, no JAXB, no native
-code — see [`DEPENDENCY_POLICY.md`](DEPENDENCY_POLICY.md) for the constraints and why each exists.
-The point of all of it is that embedding this SDK should be uneventful: it brings no logger to conflict
-with yours, no provider lookup that depends on classloader layout, and little enough weight that you
-need not think about it.
+Snapshots live in `cytoscape_snapshots` on the https://nrnb-nexus.ucsd.edu/repository host, releases in `cytoscape_releases`.
 
 ---
 
 ## Beyond the one-shot form
 
-`Massql.run(query, path, null)` above is the one-shot form. When you want to own the resource, or
-need the diagnostics a valid-but-degenerate query produces, use the explicit form — **see the javadoc
+`Massql.run(query, path, null)` — **see the javadoc
 on `Massql`**, which documents all four entry points and the resource rules in full.
 
-Two behaviours are worth knowing before you start, because they are easy to assume wrongly:
+Results follow the contract in [`RESULT_SCHEMA.md`](RESULT_SCHEMA.md).
 
-- **A stream is single-pass.** Several queries over one file means reopening the file, once per
-  query. A spent stream throws rather than quietly returning an empty result.
-- **The SDK writes to no stream.** It never prints or logs; diagnostics come back as return values
-  for you to surface however you like.
+### Supported massql query subset
 
-Results follow the frozen 12-key contract in [`RESULT_SCHEMA.md`](RESULT_SCHEMA.md).
-
-### Supported query subset
-
-`QUERY scaninfo(MS1DATA|MS2DATA) WHERE … [FILTER …]`. Anything outside that subset parses and is then
-rejected **by name** — the exception says which construct was the problem, not "syntax error".
+`QUERY scaninfo(MS1DATA|MS2DATA) WHERE … [FILTER …]`. Anything outside that subset is rejected.
 
 ---
 
-## Known deviations from the Python reference
+## Some deviations from the Python reference
 
-Six deliberate differences. Each is a decision rather than an oversight, and each is the kind of thing
-that looks like a bug if you compare our output against `massql_query.py` without knowing about it.
+Six differences. 
 
-1. **`ms1scan` is inferred by document order, not read from the file.** The reference ignores
-   `spectrumRef` (mzML) and `precursorScanNum` (mzXML), and we reproduce that to match its answers. On
+1. **`ms1scan` is inferred by document order, not read from the file.** The py ignores
+   `spectrumRef` (mzML) and `precursorScanNum` (mzXML), and this sdk reproduces that to match its answers. On
    interleaved acquisition, or where a precursor reference points further back than the immediately
-   preceding MS1 scan, our `ms1scan` will disagree with the file's declared linkage. For simple DDA
+   preceding MS1 scan, the java `ms1scan` will disagree with the file's declared linkage. For simple DDA
    they coincide.
-2. **`=` means `>=` for intensity comparisons.** The reference's historical semantics, reproduced.
+2. **`=` means `>=` for intensity comparisons.** 
 3. **`i_norm` and `i_norm_ms1` are not emitted.** Both are structurally constant, so they carry no
-   information; the row is 12 keys, not 14.
-4. **`tic` is not bit-identical — and ours is the more accurate value.** The reference's intensity
-   column is `float32` and `tic` is a pandas sum over it, while we accumulate in float64. Worst
-   measured divergence is **4.7e-8** relative. ⚠ The error is in the reference, not here. Every other
-   intensity column *is* bit-identical, because those are selections rather than sums.
-5. **`POLARITY` on an MGF filters a constant, not the data.** The reference hardcodes MGF polarity to
-   `1`, so `POLARITY=Positive` matches every MGF scan and `POLARITY=Negative` matches none, whatever
-   the spectra actually contain. Nothing in the output reveals this, which is why it is listed.
-6. **The JSON is compact; the reference emits `indent=2`.** Values are identical and round-trip
-   exactly, but the two outputs are **not byte-comparable** — compare parsed values, not `diff`.
+   information.
+4. **`tic` is not bit-identical** The py intensity
+   column is `float32` and `tic` is a pandas sum over it, while java sdk accumulate in float64. 
+
+
 
 ---
 
 ## Working on the SDK itself
 
-Nothing above requires a clone — this section is for changing the library, not using it.
+This section is for changing the library, not using it.
 
-The `Makefile` is the only entry point; do not invoke `./gradlew` directly.
+The `Makefile` is the entry point.
 
 ```sh
 make build             # jar, -sources.jar and -javadoc.jar -> build/libs/
@@ -226,6 +199,4 @@ make publish-sdk       # publish to the nexus
 `make build` produces all three artifacts and writes the browsable javadoc on the way — open
 `build/docs/javadoc/index.html` to read it locally without publishing.
 
-Publishing reads credentials from `~/.gradle/gradle.properties` as `<repo-id>User` / `<repo-id>Pwd`
-(e.g. `cytoscape_snapshotsUser`), falling back to `REPO_USER` / `REPO_PWD` in the environment, which
-is how CI supplies them. ⚠ Gradle does **not** read `~/.m2/settings.xml`.
+
