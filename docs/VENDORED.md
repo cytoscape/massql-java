@@ -1,6 +1,6 @@
 # Vendored sources — provenance, licence election, and every modification
 
-Everything under `src/main/java/edu/ucsd/idekerlab/massql/io/vendor/`.
+Everything under `src/main/java/org/cytoscape/massql/io/vendor/`.
 
 > ⚠ **This file is a redistribution obligation, not a courtesy.** It is asserted to exist and to match the
 > artifact. **All twelve vendored files' headers point readers here** (*"See docs/VENDORED.md for the rationale

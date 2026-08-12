@@ -95,15 +95,23 @@ jobs:
 
       # Attach only the artifact this tag is for. Publishing the other one here would attach a jar
       # whose version was never stamped by this run.
+      #
+      # ⚠ BUILT and ASSET differ on purpose. Build outputs carry no version (archiveVersion = '' in
+      # both build scripts), so the path on disk is fixed -- but a release attachment named
+      # massql-java-cli.jar tells a downloader nothing about what they just got. Copy to a versioned
+      # name first, and upload that.
       - name: Upload artifact to release
         run: |
           if [ "${{ steps.rel.outputs.artifact }}" = "cli" ]; then
-            JAR="cli/build/libs/massql-java-cli-${{ steps.rel.outputs.version }}.jar"
+            BUILT="cli/build/libs/massql-java-cli.jar"
+            ASSET="massql-java-cli-${{ steps.rel.outputs.version }}.jar"
           else
-            JAR="build/libs/massql-java-${{ steps.rel.outputs.version }}.jar"
+            BUILT="build/libs/massql-java.jar"
+            ASSET="massql-java-${{ steps.rel.outputs.version }}.jar"
           fi
-          test -f "$JAR" || { echo "expected $JAR to exist"; ls -R build/libs cli/build/libs; exit 1; }
-          gh release upload "${{ github.event.release.tag_name }}" "$JAR" --clobber
+          test -f "$BUILT" || { echo "expected $BUILT to exist"; ls -R build/libs cli/build/libs; exit 1; }
+          cp "$BUILT" "$ASSET"
+          gh release upload "${{ github.event.release.tag_name }}" "$ASSET" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

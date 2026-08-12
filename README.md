@@ -3,12 +3,33 @@
 A pure-Java implementation of [MassQL](https://github.com/mwang87/MassQueryLanguage)'s `scaninfo`
 queries, verified against the reference Python implementation at a pinned commit.
 
-Reads `.mgf`, `.mzML` and `.mzXML`. No Python, no network, no logging framework — an ordinary jar
-that runs anywhere a JVM does.
+**MassQL is a query language for mass spectrometry data.** You describe the scans you want — by
+precursor or product ion, retention time, charge, intensity — and get back the ones that match:
 
 ```
 QUERY scaninfo(MS2DATA) WHERE MS2PREC=810.79:TOLERANCEMZ=1.0
 ```
+
+*Every MS2 scan whose precursor is within 1.0 Da of m/z 810.79.* A `scaninfo` query returns one row
+per matching scan, with its scan number, precursor m/z, retention time, charge and intensity columns
+— 12 in all, listed in [`docs/RESULT_SCHEMA.md`](docs/RESULT_SCHEMA.md).
+
+Reads `.mgf`, `.mzML` and `.mzXML`. No Python, no network, no logging framework — an ordinary jar
+that runs anywhere a JVM does.
+
+---
+
+## Try it in 30 seconds
+
+The command-line tool needs no data of your own — this runs against a fixture in the repository:
+
+```sh
+make build
+java -jar cli/build/libs/massql-java-cli.jar src/test/resources/data/small.mzML \
+  -q 'QUERY scaninfo(MS2DATA) WHERE MS2PREC=810.79:TOLERANCEMZ=1.0'
+```
+
+That prints a JSON array — one object per matching scan, six of them here.
 
 ---
 
@@ -18,21 +39,22 @@ They are **versioned and released independently**, and kept deliberately separat
 
 ### 📚 [`massql-java`](docs/SDK.md) — the SDK
 
-The library. Embed it in any JVM application.
+The library. Embed it in any JVM application: add one coordinate, call `Massql.run(...)`, get a
+`List<ScanInfoResult>` back.
 
 A thin jar with a **0.749 MB** dependency closure, enforced by the build. Writes to no stream, logs
 nothing, and returns diagnostics as values so the host decides what to do with them.
 
-→ **[docs/SDK.md](docs/SDK.md)** for coordinates and building. **Class-level documentation is the
-published `-javadoc.jar`**, not prose in this repository.
+→ **[docs/SDK.md](docs/SDK.md)** — a complete copy-paste project to start from. **Class-level
+documentation is the published `-javadoc.jar`**, not prose in this repository.
 
 ### 🖥 [`massql-java-cli`](docs/CLI.md) — the command-line tool
 
-A standalone uber-jar. Spectra file inputs, query results as JSON on stdout, exit code that means something. The query can
-come from a file, from stdin, or inline as `--query`.
+A standalone uber-jar. Spectra file in, JSON on stdout, an exit code that means something. The query
+comes from a file, from stdin, or inline as `--query`.
 
-→ **[docs/CLI.md](docs/CLI.md)** for arguments, streams, output modes and exit codes, plus
-**runnable examples** against fixtures committed to this repository — paste them as written.
+→ **[docs/CLI.md](docs/CLI.md)** — arguments, streams, output modes and exit codes, plus **runnable
+examples** against fixtures committed here; paste them as written.
 
 ---
 

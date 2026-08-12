@@ -37,7 +37,12 @@ all: integration-test
 # browsable build/docs/javadoc/index.html on the way.
 build:
 	$(GRADLE) assemble
-	@ls -1 build/libs/*.jar cli/build/libs/*.jar 2>/dev/null | sed 's/^/  -> /'
+	@echo "  -> build/libs/massql-java.jar"
+	@echo "  -> build/libs/massql-java-sources.jar"
+	@echo "  -> build/libs/massql-java-javadoc.jar"
+	@echo "  -> cli/build/libs/massql-java-cli.jar"
+	@echo "  -> cli/build/libs/massql-java-cli-sources.jar"
+	@echo "  -> cli/build/libs/massql-java-cli-javadoc.jar"
 	@echo "  -> build/docs/javadoc/index.html"
 
 ## test: unit tests only (*Test.java in src/test). Seconds, for the edit loop.
@@ -68,7 +73,7 @@ coverage:
 ## cli: build the standalone CLI uber-jar
 cli:
 	$(GRADLE) :cli:shadowJar
-	@ls -1 cli/build/libs/*.jar | sed 's/^/  -> /'
+	@echo "  -> cli/build/libs/massql-java-cli.jar"
 
 ## deps: print the SDK's runtime dependency tree (trace a transitive arrival before adding anything)
 deps:
@@ -101,7 +106,21 @@ stamp:
 	@sed -i.bak "s|^$(KEY)=.*|$(KEY)=$(V)|" gradle.properties && rm -f gradle.properties.bak
 	@grep "^$(KEY)=" gradle.properties | sed 's/^/  /'
 
-## publish-sdk: publish the SDK jar to the Nexus repository. Needs REPO_USER / REPO_PWD.
+## publish-local: install both artifacts into ~/.m2 -- a dry run for the Nexus publishes below
+#
+# The POM is what a consumer actually resolves: get its groupId, version or dependency list wrong and
+# their build compiles, then throws NoClassDefFoundError at runtime. This produces that POM and the
+# jars beside it without touching the shared Nexus, so they can be inspected first. It also lets a
+# local project resolve the coordinate before it is released.
+publish-local:
+	$(GRADLE) publishToMavenLocal
+	@echo "  -> ~/.m2/repository/org/cytoscape/"
+
+## publish-sdk: publish the SDK jar to the Nexus repository.
+#
+# Credentials: ~/.gradle/gradle.properties (<repo-id>User / <repo-id>Pwd), or REPO_USER / REPO_PWD
+# in the environment. The version decides the destination -- a -SNAPSHOT goes to cytoscape_snapshots,
+# anything else to cytoscape_releases.
 publish-sdk:
 	$(GRADLE) :publish
 

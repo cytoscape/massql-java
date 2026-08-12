@@ -19,7 +19,7 @@ plugins {
     id 'net.ltgt.errorprone' version '5.1.0' apply false
 }
 
-group = 'edu.ucsd.idekerlab'
+group = 'org.cytoscape'
 version = sdkVersion          // gradle.properties; independent of cliVersion
 
 ext.antlrVersion = '4.13.2'
@@ -43,7 +43,7 @@ allprojects {
             // Vendored MSDK sources are held byte-identical to upstream by policy. NOTE this is
             // src/MAIN only: src/test/.../io/vendor/ holds OUR tests OF the vendored decoder, which
             // are formatted like everything else.
-            targetExclude 'src/main/java/edu/ucsd/idekerlab/massql/io/vendor/**',
+            targetExclude 'src/main/java/org/cytoscape/massql/io/vendor/**',
             // ANTLR's generated lexer/parser. The antlr plugin adds build/generated-src as a java
             // source directory, so Spotless picks it up unless told otherwise -- and it is full of
             // wildcard imports that forbidWildcardImports cannot auto-fix and nobody should hand-fix.
@@ -114,7 +114,7 @@ tasks.named('javadoc') {
     // bury a real one. Removing `-missing` is a tag-completeness project, not a correctness fix.
     options.addStringOption('Xdoclint:all,-missing', '-quiet')
 
-    exclude 'edu/ucsd/idekerlab/massql/io/vendor/**'
+    exclude 'org/cytoscape/massql/io/vendor/**'
     // Same reasoning for the generated lexer/parser: machine-written, not our API, and the source of
     // ~100 "no comment" warnings that bury anything real.
     exclude '**/MassqlLexer.java', '**/MassqlParser.java', '**/MassqlVisitor.java',
@@ -127,6 +127,18 @@ tasks.withType(JavaCompile).configureEach {
     // measured at zero, rather than assumed.
     options.compilerArgs << '-Xlint:all'
 }
+
+// Build outputs carry no version: build/libs/massql-java.jar, not massql-java-0.0.1-SNAPSHOT.jar.
+//
+// WHY. A version in the filename forces every consumer of that path to glob for it -- the Makefile
+// ran `ls *.jar | sed`, and docs/CLI.md told readers to paste a version-stamped path that went stale
+// on the next bump. A fixed name lets both state the path literally.
+//
+// This does NOT affect what is PUBLISHED. maven-publish names artifacts from
+// artifactId/version/classifier, so the Nexus still receives massql-java-<version>.jar; only the
+// local build output loses the stamp. release.yml copies the built jar to a versioned name before
+// attaching it to a GitHub release, where a bare massql-java.jar would tell a downloader nothing.
+tasks.withType(Jar).configureEach { archiveVersion = '' }
 
 // ---------------------------------------------------------------------------------------------
 // ErrorProne -- dead code fails the build
@@ -229,7 +241,7 @@ tasks.named('generateGrammarSource') {
     // no `package` declaration unless told to, so the generated classes land in the correct
     // directory as members of the DEFAULT package -- and every reference to them fails to compile.
     // antlr4-maven-plugin derived this from the path automatically; Gradle's does not.
-    arguments += ['-visitor', '-no-listener', '-package', 'edu.ucsd.idekerlab.massql.lang']
+    arguments += ['-visitor', '-no-listener', '-package', 'org.cytoscape.massql.lang']
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -285,15 +297,15 @@ tasks.named('check') {
 // rule would fail on arrival and mean something different from "90% coverage".
 def coverageExclusions = [
     // Upstream MSDK, held byte-identical by policy -- not ours to test.
-    'edu/ucsd/idekerlab/massql/io/vendor/**',
+    'org/cytoscape/massql/io/vendor/**',
     // Machine-generated from Massql.g4. NOTE: MassqlParserFacade and its ThrowingErrorListener are
     // HAND-WRITTEN and must stay counted, so these are named exactly rather than globbed as
     // `Massql*`.
-    'edu/ucsd/idekerlab/massql/lang/MassqlParser.class',
-    'edu/ucsd/idekerlab/massql/lang/MassqlParser$*.class',
-    'edu/ucsd/idekerlab/massql/lang/MassqlLexer.class',
-    'edu/ucsd/idekerlab/massql/lang/MassqlBaseVisitor.class',
-    'edu/ucsd/idekerlab/massql/lang/MassqlVisitor.class',
+    'org/cytoscape/massql/lang/MassqlParser.class',
+    'org/cytoscape/massql/lang/MassqlParser$*.class',
+    'org/cytoscape/massql/lang/MassqlLexer.class',
+    'org/cytoscape/massql/lang/MassqlBaseVisitor.class',
+    'org/cytoscape/massql/lang/MassqlVisitor.class',
 ]
 
 tasks.withType(JacocoReportBase).configureEach {
@@ -427,15 +439,24 @@ publishing {
     }
     repositories {
         maven {
-            // The NRNB-hosted Nexus this project publishes to. Credentials come from the
-            // environment: Gradle has no settings.xml, so there is no <server> id to match.
+            // The NRNB-hosted Nexus this project publishes to.
+            //
+            // Credentials are looked up under the SAME repository id the URL below selects, so the
+            // two can never disagree -- publishing a snapshot cannot pick up release credentials.
+            //
+            // ⚠ Gradle does NOT read ~/.m2/settings.xml; that is Maven's. Put the values in
+            // ~/.gradle/gradle.properties (chmod 600) as `<id>User` / `<id>Pwd`, e.g.
+            // cytoscape_snapshotsUser=... -- copied from the matching <server> in settings.xml.
+            //
+            // The environment fallback is what keeps CI working: release.yml has no
+            // gradle.properties and supplies REPO_USER / REPO_PWD as GitHub secrets.
             name = 'nexus'
-            url = version.toString().endsWith('SNAPSHOT')
-                    ? 'https://nrnb-nexus.ucsd.edu/repository/cytoscape_snapshots/'
-                    : 'https://nrnb-nexus.ucsd.edu/repository/cytoscape_releases/'
+            def snapshot = version.toString().endsWith('SNAPSHOT')
+            def repoId = snapshot ? 'cytoscape_snapshots' : 'cytoscape_releases'
+            url = "https://nrnb-nexus.ucsd.edu/repository/${repoId}/"
             credentials {
-                username = System.getenv('REPO_USER')
-                password = System.getenv('REPO_PWD')
+                username = findProperty("${repoId}User") ?: System.getenv('REPO_USER')
+                password = findProperty("${repoId}Pwd") ?: System.getenv('REPO_PWD')
             }
         }
     }

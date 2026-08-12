@@ -17,7 +17,7 @@ plugins {
     id 'com.gradleup.shadow' version '9.0.0-rc3'
 }
 
-group = 'edu.ucsd.idekerlab'
+group = 'org.cytoscape'
 version = cliVersion          // independent of sdkVersion
 
 java {
@@ -35,6 +35,24 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.compilerArgs << '-Xlint:all'
 }
+
+// Same reasoning as the SDK's: build outputs carry no version, so the Makefile and docs/CLI.md can
+// name cli/build/libs/massql-java-cli.jar literally instead of globbing for a version they cannot
+// predict. shadowJar is a Jar subtype, so this covers the uber-jar too. Publication is unaffected --
+// maven-publish derives the published filename from artifactId/version/classifier.
+tasks.withType(Jar).configureEach { archiveVersion = '' }
+
+// archiveBaseName defaults to the PROJECT name, which is `cli` -- so these two shipped beside the
+// uber-jar as cli-sources.jar and cli-javadoc.jar, matching neither the artifactId they publish
+// under nor the jar they accompany. The old `ls *.jar` in the Makefile printed whatever it found, so
+// nothing ever pointed it out.
+//
+// ⛔ Named individually, NOT via tasks.withType(Jar). The plain `jar` task also has an empty
+// classifier, so giving every Jar this base name would make it write massql-java-cli.jar too -- the
+// exact path shadowJar produces, with one silently overwriting the other. `jar` keeps the default
+// name; it is an unused intermediate here, since the publication is built from shadowJar.
+tasks.named('sourcesJar') { archiveBaseName = 'massql-java-cli' }
+tasks.named('javadocJar') { archiveBaseName = 'massql-java-cli' }
 
 dependencies {
     implementation project(':')
@@ -156,7 +174,7 @@ tasks.named('shadowJar') {
     archiveBaseName = 'massql-java-cli'
     archiveClassifier = ''
     manifest {
-        attributes 'Main-Class': 'edu.ucsd.idekerlab.massql.cli.Main'
+        attributes 'Main-Class': 'org.cytoscape.massql.cli.Main'
     }
 }
 
@@ -191,13 +209,17 @@ publishing {
     }
     repositories {
         maven {
+            // Same lookup as the SDK's (see build.gradle): credentials keyed by the repository id
+            // the version selects, from ~/.gradle/gradle.properties, falling back to the
+            // environment so release.yml keeps working with its GitHub secrets.
             name = 'nexus'
-            url = version.toString().endsWith('SNAPSHOT')
-                    ? 'https://nrnb-nexus.ucsd.edu/repository/cytoscape_snapshots/'
-                    : 'https://nrnb-nexus.ucsd.edu/repository/cytoscape_releases/'
+            def repoId = version.toString().endsWith('SNAPSHOT')
+                    ? 'cytoscape_snapshots'
+                    : 'cytoscape_releases'
+            url = "https://nrnb-nexus.ucsd.edu/repository/${repoId}/"
             credentials {
-                username = System.getenv('REPO_USER')
-                password = System.getenv('REPO_PWD')
+                username = findProperty("${repoId}User") ?: System.getenv('REPO_USER')
+                password = findProperty("${repoId}Pwd") ?: System.getenv('REPO_PWD')
             }
         }
     }

@@ -10,41 +10,131 @@ run it over an `.mgf` / `.mzML` / `.mzXML` file, get rows back.
 
 ---
 
-## Getting it
+## Quick start
 
-Published to the NRNB-hosted Nexus at `nrnb-nexus.ucsd.edu`. Add that repository and the coordinate
-below; there is nothing else to configure.
+Three files, no clone required. **JDK 17** is the only prerequisite.
 
-**Gradle**
+### 1. `build.gradle`
 
 ```groovy
+plugins {
+    id 'application'
+}
+
 repositories {
-    maven { url = 'https://nrnb-nexus.ucsd.edu/repository/cytoscape_releases/' }
+    mavenCentral()
+    maven { url = 'https://nrnb-nexus.ucsd.edu/repository/cytoscape_snapshots/' }
 }
 
 dependencies {
-    implementation 'edu.ucsd.idekerlab:massql-java:<version>'
+    implementation 'org.cytoscape:massql-java:0.0.1-SNAPSHOT'
+}
+
+application {
+    mainClass = 'Main'
 }
 ```
 
-**Maven**
+The Nexus repository is required — this artifact is not on Maven Central. Use the
+`cytoscape_snapshots` URL for a `-SNAPSHOT` version and `cytoscape_releases` for a released one; a
+version resolved against the wrong repository simply fails to resolve.
 
-```xml
-<repositories>
-  <repository>
-    <id>nrnb-nexus</id>
-    <url>https://nrnb-nexus.ucsd.edu/repository/cytoscape_releases/</url>
-  </repository>
-</repositories>
+The two runtime dependencies arrive transitively — you never name them.
 
-<dependency>
-  <groupId>edu.ucsd.idekerlab</groupId>
-  <artifactId>massql-java</artifactId>
-  <version>[version]</version>
-</dependency>
+Beside it, `settings.gradle`:
+
+```groovy
+rootProject.name = 'massql-hello'
 ```
 
-Snapshots are at the matching `_snapshots` repository on the same host.
+### 2. `sample.mgf`
+
+Three scans, so the query below has something to match and something to reject. Save it next to
+`build.gradle`:
+
+```
+BEGIN IONS
+TITLE=micro.scan1
+PEPMASS=250.25
+100.0 250.0
+200.5 1500.0
+END IONS
+
+BEGIN IONS
+TITLE=micro.scan3
+PEPMASS=500.0
+RTINSECONDS=60.0
+100.0 250.0
+200.5 1500.0
+201.0 100.0
+300.0 750.0
+END IONS
+
+BEGIN IONS
+TITLE=micro.scan5
+PEPMASS=500.0
+CHARGE=2+
+RTINSECONDS=120.0
+123.456789012345 4096.0
+END IONS
+```
+
+### 3. `src/main/java/Main.java`
+
+```java
+import java.nio.file.Path;
+import java.util.List;
+
+import org.cytoscape.massql.Massql;
+import org.cytoscape.massql.MassqlException;
+import org.cytoscape.massql.result.ScanInfoResult;
+
+public class Main {
+
+    // Every MS2 scan containing a fragment ion at m/z 200.5, within a 0.5 Da window.
+    private static final String QUERY =
+            "QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.5:TOLERANCEMZ=0.5";
+
+    public static void main(String[] args) {
+        try {
+            List<ScanInfoResult> rows = Massql.run(QUERY, Path.of("sample.mgf"), null);
+
+            System.out.println(rows.size() + " matching scans");
+            for (ScanInfoResult r : rows) {
+                System.out.printf(
+                        "scan=%d  precursor=%s  rt=%.2f min  tic=%.1f%n",
+                        r.scan(),
+                        r.precmz() == null ? "-" : String.format("%.4f", r.precmz()),
+                        r.rt(),
+                        r.tic());
+            }
+        } catch (MassqlException e) {
+            System.err.println("massql: " + e.getMessage());
+            System.exit(1);
+        }
+    }
+}
+```
+
+`gradle run` prints:
+
+```
+2 matching scans
+scan=1  precursor=250.2500  rt=0.00 min  tic=1750.0
+scan=2  precursor=500.0000  rt=1.00 min  tic=2600.0
+```
+
+The third scan has no peak near 200.5, so it does not match. Scans are numbered by **document
+order** — nothing is read from `TITLE`.
+
+Two details in that snippet are worth carrying into your own code:
+
+- **`precmz` is null-guarded.** Every column is a boxed type and several are genuinely nullable.
+  [`RESULT_SCHEMA.md`](RESULT_SCHEMA.md) is the full 12-key contract and says exactly which.
+- **`rt` is in minutes**, not seconds — `RTINSECONDS=60.0` above comes back as `1.00`.
+
+To point it at your own data, change the path: `.mgf`, `.mzML` and `.mzXML` all work, and the format
+is detected from content rather than the extension.
 
 ### The three artifacts
 
@@ -54,8 +144,7 @@ Snapshots are at the matching `_snapshots` repository on the same host.
 | `-javadoc` | **the API reference** — IDEs attach it automatically and show it inline |
 | `-sources` | sources for stepping through in a debugger |
 
-The SDK is versioned **independently of the CLI**, so `massql-java` and `massql-java-cli` will not
-share a version number. That is deliberate: a CLI fix should not force a new SDK coordinate.
+Snapshots live in `cytoscape_snapshots` on the same host, releases in `cytoscape_releases`.
 
 ### What it drags in
 
@@ -71,15 +160,11 @@ need not think about it.
 
 ---
 
-## Using it
+## Beyond the one-shot form
 
-```java
-List<ScanInfoResult> rows = Massql.run(queryText, Path.of("spectra.mzML"), null);
-```
-
-That is the one-shot form. When you want to own the resource, or need the diagnostics a
-valid-but-degenerate query produces, use the explicit form — **see the javadoc on `Massql`**, which
-documents all four entry points and the resource rules in full.
+`Massql.run(query, path, null)` above is the one-shot form. When you want to own the resource, or
+need the diagnostics a valid-but-degenerate query produces, use the explicit form — **see the javadoc
+on `Massql`**, which documents all four entry points and the resource rules in full.
 
 Two behaviours are worth knowing before you start, because they are easy to assume wrongly:
 
@@ -122,18 +207,25 @@ that looks like a bug if you compare our output against `massql_query.py` withou
 
 ---
 
-## Building from source
+## Working on the SDK itself
+
+Nothing above requires a clone — this section is for changing the library, not using it.
 
 The `Makefile` is the only entry point; do not invoke `./gradlew` directly.
 
 ```sh
-make build          # both jars -> build/libs/ and cli/build/libs/
-make test           # unit tests, seconds
+make build             # jar, -sources.jar and -javadoc.jar -> build/libs/
+make test              # unit tests, seconds
 make integration-test  # unit + integration tests, coverage gate, lint, banned deps
-make publish-sdk    # publish to the nexus (needs REPO_USER / REPO_PWD)
+make publish-local     # install into ~/.m2, to try a coordinate before releasing it
+make publish-sdk       # publish to the nexus
 ```
 
 `make` with no argument lists every target. JDK 17 is required, and the build enforces it.
 
-`make build` produces all three artifacts, and writes the browsable javadoc on the way — open
+`make build` produces all three artifacts and writes the browsable javadoc on the way — open
 `build/docs/javadoc/index.html` to read it locally without publishing.
+
+Publishing reads credentials from `~/.gradle/gradle.properties` as `<repo-id>User` / `<repo-id>Pwd`
+(e.g. `cytoscape_snapshotsUser`), falling back to `REPO_USER` / `REPO_PWD` in the environment, which
+is how CI supplies them. ⚠ Gradle does **not** read `~/.m2/settings.xml`.

@@ -4,7 +4,7 @@ A standalone batch filter: give it a spectra file and a query, get JSON on stdou
 as an uber-jar, so it needs nothing on the classpath.
 
 ```sh
-java -jar massql-java-cli-<version>.jar spectra.mzML query.massql | jq '.[0].scan'
+java -jar massql-java-cli.jar spectra.mzML query.massql
 ```
 
 The query can come from a **file**, from **stdin**, or **inline** — see [Examples](#examples).
@@ -18,7 +18,7 @@ deliberate additions on top of that interface.
 ## Getting it
 
 Attach it from a GitHub release, or resolve it from the NRNB Nexus as
-`edu.ucsd.idekerlab:massql-java-cli` — the uber-jar is the primary artifact, with `-javadoc` and
+`org.cytoscape:massql-java-cli` — the uber-jar is the primary artifact, with `-javadoc` and
 `-sources` beside it.
 
 Versioned **independently of the SDK**: `massql-java-cli` and `massql-java` will not share a version
@@ -27,7 +27,7 @@ number.
 To build it from this repository:
 
 ```sh
-make cli            # -> cli/build/libs/massql-java-cli-<version>.jar
+make build          # -> cli/build/libs/massql-java-cli.jar
 ```
 
 ---
@@ -76,21 +76,56 @@ written after cloning — no data of your own, and no download. Paths are relati
 > The `data/DP00570_F02.*` fixtures are *not* used here: those are fetched by `make fixtures` rather
 > than committed. Everything referenced below ships in the repo.
 
-Build the jar first with `make cli`, then set:
+**Prerequisites:** JDK 17, and `make build` to produce the jar. The examples pipe through
+[`jq`](https://jqlang.github.io/jq/) purely to format and count — the tool itself never needs it, and
+the first example below runs without it.
 
 ```sh
-JAR=cli/build/libs/massql-java-cli-0.1.0-SNAPSHOT.jar
+JAR=cli/build/libs/massql-java-cli.jar
 RES=src/test/resources
 ```
 
-**A query file** — the classic form. 6 rows from a 48-spectrum mzML:
+**Start here — what a result actually looks like.** One MS2 scan whose precursor is within 1.0 Da of
+m/z 810.79:
+
+```sh
+java -jar $JAR $RES/data/small.mzML \
+  -q 'QUERY scaninfo(MS2DATA) WHERE MS2PREC=810.79:TOLERANCEMZ=1.0'
+```
+
+The output is a compact JSON array, one object per matching scan. Formatted, its first element is:
+
+```json
+{
+  "scan": 3,
+  "precmz": 810.79,
+  "ms1scan": 2,
+  "rt": 0.011218333333333334,
+  "charge": null,
+  "tic": 586278.8533592224,
+  "mslevel": 2,
+  "base_peak_i": 161140.859375,
+  "base_peak_mz": 736.6370849609375,
+  "ms1_i": null,
+  "ms1_precmz": null,
+  "ms1_base_peak_i": 183838.71875
+}
+```
+
+Twelve keys on every row, always in that order, `null` where a value genuinely does not exist —
+[`RESULT_SCHEMA.md`](RESULT_SCHEMA.md) defines each one. `rt` is in **minutes**. The remaining
+examples pipe through `jq length` and show only the row count, now that the shape is known.
+
+**A query file** — the classic form. Precursor 810.79 ± 1.0 again, this time read from a file. 6 rows
+from a 48-spectrum mzML:
 
 ```sh
 java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql | jq length
 # 6
 ```
 
-**Inline with `-q`** — best for a short query. 2 rows from the tiny mzML fixture:
+**Inline with `-q`** — best for a short query. *Fragment ion at m/z 200.5 ± 0.5.* 2 rows from the
+tiny mzML fixture:
 
 ```sh
 java -jar $JAR $RES/fixtures/micro/micro.mzML \
@@ -99,7 +134,7 @@ java -jar $JAR $RES/fixtures/micro/micro.mzML \
 ```
 
 **Inline, MS1 scans** — `MS1DATA` selects survey scans instead of fragmentation ones, so the same file
-yields a different set. 14 rows:
+yields a different set. *Survey scans containing a peak at m/z 810.79 ± 1.0.* 14 rows:
 
 ```sh
 java -jar $JAR $RES/data/small.mzML \
@@ -115,7 +150,8 @@ cat $RES/goldens/queries/test.massql | java -jar $JAR $RES/data/PlusRise.mgf - |
 # 664
 ```
 
-**Stdin from a heredoc** — no temp file, no shell quoting to fight. 6 rows from the mzXML:
+**Stdin from a heredoc** — no temp file, no shell quoting to fight. *Precursor at m/z 810.79 ± 1.0.*
+6 rows from the mzXML:
 
 ```sh
 java -jar $JAR $RES/data/small.mzXML - <<'EOF' | jq length
@@ -124,8 +160,8 @@ EOF
 # 6
 ```
 
-**Inline, writing to a file** — `--output` keeps stdout empty, so nothing needs redirecting. 2 rows
-from the MGF fixture:
+**Inline, writing to a file** — `--output` keeps stdout empty, so nothing needs redirecting.
+*Fragment ion at m/z 200.5 ± 0.5.* 2 rows from the MGF fixture:
 
 ```sh
 java -jar $JAR $RES/fixtures/micro/micro.mgf \
@@ -148,8 +184,16 @@ java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql --prec
 # 0   -- at 60 ppm every one of the six matches
 ```
 
-Each `(fixture, query)` pair above is one the differential test suite already asserts against the
-Python reference, so the row counts are pinned by tests rather than typed by hand.
+Then point it at your own data — `.mgf`, `.mzML` and `.mzXML` all work, and the format is detected
+from the file's content rather than its extension, so a misnamed file still reads correctly:
+
+```sh
+java -jar $JAR /path/to/your/run.mzML -q 'QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.5:TOLERANCEMZ=0.5'
+```
+
+Every row count above is pinned by a test rather than typed by hand: the `small.*` and `PlusRise.mgf`
+pairs by the differential suite, which compares them against the Python reference, and the `micro.*`
+pairs by the unit suite.
 
 ## Streams
 
