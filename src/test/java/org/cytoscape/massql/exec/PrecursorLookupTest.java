@@ -13,9 +13,8 @@ import org.junit.jupiter.api.Test;
 /**
  * The most important test in the collation.
  *
- * <p>{@code SPIKE.md} §6a calls rule 1 <i>"the test that catches the most likely misreading of the whole
- * contract"</i>: the matched precursor peak is the one <b>closest in m/z</b> to {@code precmz}, not the
- * most intense one in the window. Every case below is built so that a plausible-but-wrong implementation
+ * <p>⛔ Rule 1 catches the most likely misreading of the whole contract: the matched precursor peak is the
+ * one <b>closest in m/z</b> to {@code precmz}, not the most intense one in the window. Every case below is built so that a plausible-but-wrong implementation
  * gives a different answer.
  */
 class PrecursorLookupTest {
@@ -95,7 +94,7 @@ class PrecursorLookupTest {
 
     @Test
     void equidistantCandidatesResolveToTheLOWERMz() {
-        // 499.99 and 500.01 are both exactly 0.01 from 500.0. pandas' argmin returns the FIRST
+        // 499.99 and 500.01 are both exactly 0.01 from 500.0. The reference returns the FIRST
         // occurrence, which given ascending m/z is the lower one.
         //
         // ⚠ 40 ppm, NOT 20, and that matters. At 20 ppm tol is exactly 0.01, so both peaks land
@@ -117,7 +116,7 @@ class PrecursorLookupTest {
         assertEquals(
                 499.99,
                 r.ms1Precmz(),
-                "a tie must resolve to the lower m/z (first row), matching pandas argmin");
+                "a tie must resolve to the lower m/z (first row), matching the reference");
         assertEquals(
                 100.0,
                 r.ms1I(),

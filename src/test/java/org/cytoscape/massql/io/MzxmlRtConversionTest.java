@@ -17,9 +17,9 @@ import org.junit.jupiter.api.Test;
  * formats, three rules — so a reader that shares one code path passes two of the three suites and is
  * silently 60x wrong on the third.
  *
- * <p>Every expectation below was produced by running pyteomics' own
+ * <p>Every expectation below was produced by running the reference's own
  * {@code XMLValueConverter.duration_str_to_float}, not derived by hand. Its arithmetic is
- * {@code minutes = M; minutes += H*60.; minutes += S/60.} (`pyteomics/xml.py:136-141`) and the ORDER
+ * {@code minutes = M; minutes += H*60.; minutes += S/60.} and the ORDER
  * matters for the last bit — MassQL then uses the value as-is.
  */
 class MzxmlRtConversionTest {
@@ -47,7 +47,7 @@ class MzxmlRtConversionTest {
         assertEquals(
                 Double.doubleToLongBits(0.023),
                 Double.doubleToLongBits(MzxmlReader.retentionTimeMinutes("PT1.38S")),
-                "PT1.38S must be the same double pyteomics produces, to the bit");
+                "PT1.38S must be the same double the reference produces, to the bit");
     }
 
     @Test
@@ -59,7 +59,7 @@ class MzxmlRtConversionTest {
 
     @Test
     void yearsMonthsAndDaysAreParsedThenIgNored() {
-        // Quirk 1, verified against pyteomics: only H/M/S after the T contribute. A reader that
+        // Quirk 1, verified by execution: only H/M/S after the T contribute. A reader that
         // "correctly" honoured the day component would report 1500 minutes where MassQL reports 60.
         rt("P1DT1H", 60.0);
         rt("P1Y2M3DT1H", 60.0);
@@ -76,7 +76,7 @@ class MzxmlRtConversionTest {
 
     @Test
     void degenerateFormsAreZeroNotAnError() {
-        // pyteomics' regex has every group optional and uses search(), so these match emptily.
+        // The reference's regex has every group optional and uses a search, so these match emptily.
         rt("P", 0.0);
         rt("PT", 0.0);
         // Trailing garbage after a complete match is ignored: search() stops at the first match.
@@ -85,7 +85,7 @@ class MzxmlRtConversionTest {
 
     @Test
     void aBareNumberIsUsedAsIs() {
-        // pyteomics: not starting with 'P' -> unitfloat(s). MassQL then treats it as minutes.
+        // Not starting with 'P' -> parsed as a bare number and treated as minutes.
         rt("1.5", 1.5);
         rt("0", 0.0);
     }
@@ -99,9 +99,9 @@ class MzxmlRtConversionTest {
 
     @Test
     void aNegativeDurationIsRefusedRatherThanInvented() {
-        // Quirk 3, and a DOCUMENTED DEVIATION. "-PT90S" does not start with 'P', so pyteomics falls
-        // through to float(), fails, and returns the raw STRING -- MassQL would then carry a
-        // non-numeric rt. Verified: duration_str_to_float("-PT90S") == '-PT90S'.
+        // Quirk 3, and a DELIBERATE DEVIATION. "-PT90S" does not start with 'P', so the reference
+        // falls through to a numeric parse, fails, and returns the raw STRING -- carrying a
+        // non-numeric rt. Verified by execution: "-PT90S" comes back as the literal string.
         //
         // There is no numeric golden to match, so we refuse instead of guessing. Returning +1.5
         // (ignoring the sign, as the regex does) or -1.5 would both be inventions.
@@ -111,7 +111,7 @@ class MzxmlRtConversionTest {
         assertTrue(e.getMessage().contains("retentionTime"), e.getMessage());
         assertTrue(
                 e.getMessage().contains("string"),
-                "the message should explain that pyteomics yields a string here: "
+                "the message should explain that the reference yields a string here: "
                         + e.getMessage());
     }
 

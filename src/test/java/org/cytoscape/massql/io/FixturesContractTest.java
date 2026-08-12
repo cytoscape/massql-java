@@ -10,12 +10,10 @@ import org.opentest4j.TestAbortedException;
 /**
  * Guards: a missing fixture must <b>fail</b>, never skip.
  *
- * <p><b>Why this test exists at all.</b> {@code Fixtures} previously resolved to a sibling
- * {@code ../massql} directory and gated on {@code Assumptions.assumeTrue}. CI checks out only
- * {@code massql-java}, so that directory never existed there and every fixture-dependent test — the
- * oracle cross-checks, the Step 8 parity assertions, {@code Ms1ScanDocumentOrderIT} — <b>skipped</b>.
- * A skipped test still counts as one that ran, so the CI test-count guard could not see it. CI was green
- * and proved only that the code compiled.
+ * <p><b>Why this test exists at all.</b> If {@code Fixtures} gated on {@code Assumptions.assumeTrue},
+ * every fixture-dependent test — the oracle cross-checks, the parity assertions,
+ * {@code Ms1ScanDocumentOrderIT} — would <b>skip</b> rather than fail when a fixture was absent. A
+ * skipped test still counts as one that ran, so a green build would prove only that the code compiled.
  *
  * <p>The fix is easy to undo by accident: one {@code assumeTrue} added to "make CI pass" restores the
  * silent hole. So the contract is asserted here rather than left to a comment. CI additionally asserts

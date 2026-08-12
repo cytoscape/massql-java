@@ -30,12 +30,12 @@ target/
 *~
 
 # ---------------------------------------------------------------------------------------
-# The two Ewing-lab fixtures are the ONLY test data not committed (Correction C26).
+# The two Ewing-lab fixtures are the ONLY test data not committed.
 #
-# data/CONVERSION_NOTES.md records them as "unstated licence": they are downloaded from
-# ewinglab.org, which publishes no redistribution terms, so we do not republish them.
-# Everything else under src/test/resources/ IS committed, deliberately -- see C26 (CI could not
-# see the fixtures at all, so every parity assertion silently skipped and CI proved nothing).
+# They are downloaded from ewinglab.org, which publishes no redistribution terms, so this
+# project does not republish them.
+# Everything else under src/test/resources/ IS committed, deliberately: CI checks out only this
+# repository, and a fixture it cannot see would make every parity assertion skip silently.
 #
 # Their GOLDENS are committed, and that is not an inconsistency: loader-parity dumps hold
 # per-scan counts, hex sums and SHA-256 digests; query-result goldens hold matched-scan metadata.
@@ -56,7 +56,6 @@ src/test/resources/data/DP00570_F02.mgf
 # ParseConformanceTest reads every one and asserts the count is exactly 46, so ignoring them
 # turns the parser conformance suite into a vacuous pass and then a hard failure.
 #
-# Same for reference_parses/corpus-manifest.tsv and dependency-audit.txt: both are
-# checked-in review artifacts, not generated noise. The audit file is content-deterministic
-# (no timestamp) precisely so it only shows a diff when the closure actually changes.
+# Same for reference_parses/corpus-manifest.tsv: it is a checked-in record of the expected
+# parser disposition, not generated noise.
 # ---------------------------------------------------------------------------------------

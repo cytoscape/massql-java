@@ -92,7 +92,7 @@ public final class QueryExecutor {
             }
 
             // (2) Retain the most recent non-empty MS1, for MS1MZ here and the precursor lookup in
-            // Step 10.
+            // collation.
             if (v.msLevel() == 1) retainedMs1 = v.materialize();
 
             if (v.msLevel() != wantedLevel) continue;

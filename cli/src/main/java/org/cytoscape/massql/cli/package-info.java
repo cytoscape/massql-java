@@ -1,5 +1,5 @@
 /**
- * Standalone CLI wrapper mirroring massql_query.py's interface.
+ * Standalone CLI wrapper mirroring the reference tool's interface.
  *
  */
 package org.cytoscape.massql.cli;

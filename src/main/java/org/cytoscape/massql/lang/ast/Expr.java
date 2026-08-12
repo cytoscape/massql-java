@@ -38,7 +38,7 @@ public sealed interface Expr {
      * <p>Exists because this grammar's {@code FLOAT} token is unsigned, unlike Lark's
      * {@code floating: /[-+]?(...)/}. ANTLR's maximal-munch lexer would otherwise read
      * {@code X+2} as {@code VARIABLE FLOAT(+2)} and break every additive expression in
-     * the corpus. See docs/harness/GRAMMAR_NOTES.md.
+     * the corpus. See docs/internals/GRAMMAR_NOTES.md.
      */
     record Unary(Op op, Expr operand) implements Expr {
         public Unary {

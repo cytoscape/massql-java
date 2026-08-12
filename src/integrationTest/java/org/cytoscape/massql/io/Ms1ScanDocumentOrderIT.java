@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>MassQL never reads a file's own precursor linkage — {@code spectrumRef} (mzML) and
  * {@code precursorScanNum} (mzXML) appear <b>zero times</b> in all 892 lines of
- * {@code msql_fileloading.py}. It tracks {@code previous_ms1_scan} in document order instead. A reader
+ * the reference loader. It tracks the previous MS1 scan in document order instead. A reader
  * that "correctly" resolves the declared linkage disagrees with MassQL whenever the reference is not the
  * immediately preceding MS1 scan.
  *
@@ -36,8 +36,8 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>This test must never skip.</b> The fixture is gitignored for licence reasons only;
  * {@code Fixtures.require} fails with the fetch command when it is absent, CI runs
- * {@code scripts/fetch-fixtures.sh} and caches the result, and CI asserts the skipped-test count is 0
- * ( — previously this skipped silently in CI, which is how the gate came to prove nothing).
+ * {@code scripts/fetch-fixtures.sh} and caches the result, and CI asserts the skipped-test count is 0.
+ * A silent skip here would leave the gate proving nothing.
  */
 class Ms1ScanDocumentOrderIT {
 
@@ -72,10 +72,11 @@ class Ms1ScanDocumentOrderIT {
         // streaming walk, so agreement means both got document order right rather than both sharing
         // one bug.
         //
-        // NOT from the loader-parity dump: that is built from ms1_df then ms2_df, so its `scans`
+        // NOT from the loader-parity dump: that lists all MS1 entries then all MS2, so its `scans`
         // list
         // is GROUPED BY LEVEL (229 MS1 entries, then 687 MS2) and cannot express document order at
-        // all. Deriving the chain from it yields 913 -- the last MS1 -- for every MS2. Step 8 needs
+        // all. Deriving the chain from it yields 913 -- the last MS1 -- for every MS2. the parity
+        // gate needs
         // to know this about the dump too.
         Map<Integer, Integer> expected = new LinkedHashMap<>();
         Matcher scanTag = Pattern.compile("<scan\\s([^>]*)>").matcher(raw);

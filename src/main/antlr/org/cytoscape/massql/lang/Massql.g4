@@ -1,6 +1,5 @@
 /*
- * MassQL grammar, translated from docs/harness/oracle/msql.ebnf (165 lines, Lark EBNF) at pinned
- * SHA dad2a28c01e6e5132240270fc6700fbae29f1652.
+ * MassQL grammar, translated from MassQL's Lark EBNF grammar (165 lines).
  *
  * TRANSLATION PHILOSOPHY: this grammar is DELIBERATELY PERMISSIVE. It admits the whole
  * MassQL language, including everything out of scope for v1, so that AstBuilder can
@@ -9,7 +8,7 @@
  * "formula() is not supported in this version", and 31 of the 46 reference parses need a
  * named rejection.
  *
- * Divergences from the Lark source are listed in docs/harness/GRAMMAR_NOTES.md. The two that
+ * Divergences from the Lark source are listed in docs/internals/GRAMMAR_NOTES.md. The two that
  * affect parsing:
  *   1. FLOAT carries NO sign; unary +/- is a parser rule. Lark's
  *      floating: /[-+]?(...)/ works under Earley's contextual lexing, but ANTLR's
@@ -121,7 +120,7 @@ numericalExpression
    VARIABLE and "formula(Fe)" lexes Fe as IDENT. Since all three of these functions are
    rejected by AstBuilder anyway, accepting either token here buys a named rejection
    without needing lexer modes. Lexer modes remain the documented fallback if these are
-   ever brought in scope (docs/harness/GRAMMAR_NOTES.md). */
+   ever brought in scope (docs/internals/GRAMMAR_NOTES.md). */
 formulaBody : (IDENT | VARIABLE | floating)+ ;
 
 floating : FLOAT ;

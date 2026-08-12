@@ -6,14 +6,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * Locates the repository root for the few tests that read committed files rather than classpath
- * resources — {@code docs/RESULT_SCHEMA.md} and the vendored sources under {@code io/vendor/}.
+ * Locates the repository root for tests that read committed files rather than classpath resources — the
+ * vendored sources under {@code io/vendor/}.
  *
- * <p><b>Why this exists rather than a relative path.</b> The working directory differs between
- * Gradle and an IDE run configuration, so neither test can trust {@code user.dir}. Both previously
- * derived the root from their own class file with a fixed {@code getParent().getParent()} — correct
- * for Maven's {@code target/test-classes}, silently wrong for Gradle's
- * {@code build/classes/java/test}, which is two levels deeper.
+ * <p><b>Why this exists rather than a relative path.</b> The working directory differs between Gradle and
+ * an IDE run configuration, so a test cannot trust {@code user.dir}. Deriving the root from the class
+ * file with a fixed number of {@code getParent()} calls is equally unsafe, since the depth of the output
+ * directory is a build-layout detail.
  *
  * <p>So the depth is not hardcoded at all: this walks <i>up</i> until it finds the directory holding
  * {@code settings.gradle}. That survives any future layout change, and it is why the marker is the

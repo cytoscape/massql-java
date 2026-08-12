@@ -18,7 +18,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  *
  * <h2>Why this is a gate item rather than a nicety</h2>
  *
- * <p>The mzML and mzXML readers <b>memory-map</b> their input (Step 6), so a leak costs a file
+ * <p>The mzML and mzXML readers <b>memory-map</b> their input (the readers), so a leak costs a file
  * descriptor <i>and</i> address space. Neither shows up in a single-file test: the symptom is "too many
  * open files" much later, in unrelated code, after a user has opened a few hundred files in one
  * session. A long-lived host process is the exact environment where a slow leak is worst, and it is
@@ -118,7 +118,7 @@ class ResourceLeakIT {
     }
 
     /**
-     * {@code close()} is idempotent — Step 6 requires it, and {@link SpectraStream#close()} documents it.
+     * {@code close()} is idempotent — the readers requires it, and {@link SpectraStream#close()} documents it.
      *
      * <p>try-with-resources plus an explicit {@code close()} is ordinary caller code; a second close
      * that threw, or that released a mapping twice, would break it.

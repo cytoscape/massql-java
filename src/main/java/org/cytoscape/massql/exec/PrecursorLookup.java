@@ -9,17 +9,17 @@ import org.cytoscape.massql.spectra.SpectrumTable;
  * Finds the precursor peak in the linked MS1 scan — {@code ms1_i}, {@code ms1_precmz},
  * {@code ms1_base_peak_i}.
  *
- * <p>Isolated from {@link ScaninfoCollation} because {@code SPIKE.md} §6a calls the test for its first
- * rule <i>"the test that catches the most likely misreading of the whole contract"</i>, and a rule that
- * important deserves to be directly testable without building a whole result row.
+ * <p>Isolated from {@link ScaninfoCollation} because its first rule is the most likely thing to misread in
+ * the whole contract, and a rule that important deserves to be directly testable without building a whole
+ * result row.
  *
- * <p>Mirrors {@code massql_query.py:62-116}. Four rules, each independently wrong-able:
+ * <p>Four rules, each independently wrong-able:
  *
  * <ol>
  *   <li><b>Closest in m/z to {@code precmz}, NOT the most intense.</b> The intuitive reading is wrong.</li>
  *   <li><b>{@code ms1_base_peak_i} does not depend on the match.</b> It is populated whenever the linked
  *       MS1 scan exists, so a tolerance miss nulls only the other two.</li>
- *   <li><b>Ties resolve to the LOWER m/z</b>, matching pandas {@code argmin}'s first-occurrence.</li>
+ *   <li><b>Ties resolve to the LOWER m/z</b> — first occurrence wins.</li>
  *   <li><b>The window is INCLUSIVE.</b> See {@link #candidates}.</li>
  * </ol>
  */
@@ -85,13 +85,13 @@ public final class PrecursorLookup {
      * The candidate peaks: MS1 m/z within {@code precmz ± precmz * tolPpm / 1e6}.
      *
      * <p>⛔ <b>INCLUSIVE bounds — {@code mzWindow}, never {@code mzWindowExclusive}</b>.
-     * {@code massql_query.py:101-103} filters with {@code >=} / {@code <=}, whereas the condition
+     * The lookup filters with {@code >=} / {@code <=}, whereas the condition
      * filters use {@code >} / {@code <} and therefore the exclusive variant. <b>The two genuinely differ
      * and must not be unified.</b>
      *
      * <p>The choice is asserted against the reference at two layers: {@code PrecursorLookupTest}
      * exercises an on-bound peak directly on the store, and {@code DifferentialIT}'s
-     * {@code micro_onbound.mzML} pair exercises it end to end against a Python-generated golden whose
+     * {@code micro_onbound.mzML} pair exercises it end to end against a golden whose
      * {@code ms1_i} is 7000.0. The exclusive variant returns null for that peak and fails both.
      */
     private static IntRange candidates(SpectrumTable ms1, double precmz, double tolPpm) {
@@ -103,11 +103,11 @@ public final class PrecursorLookup {
      * The candidate closest in m/z to {@code precmz}.
      *
      * <p>Rules 1 and 3 together. Intensity is <b>not consulted</b>: picking the most intense peak in the
-     * window is the intuitive reading and it is wrong ({@code massql_query.py:104} —
-     * {@code cand.iloc[(cand["mz"] - precmz).abs().argmin()]}).
+     * window is the intuitive reading and it is <b>wrong</b>: the reference selects by minimum absolute
+     * distance in m/z, not by intensity.
      *
      * <p>Strict {@code <} on the distance comparison is what makes a tie resolve to the <b>first</b> row,
-     * i.e. the lower m/z given the store's ascending-m/z invariant — matching pandas {@code argmin}.
+     * i.e. the lower m/z given the store's ascending-m/z invariant.
      */
     private static int closestTo(SpectrumTable ms1, IntRange cand, double precmz) {
         int best = cand.start();

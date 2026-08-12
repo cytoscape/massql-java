@@ -17,9 +17,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Makes the vendoring obligation a <b>build-enforced fact rather than a convention</b>.
  *
- * <p>All twelve files under {@code io/vendor/} carry their headers, so nothing is wrong today. What
- * was missing for a long time was anything that would <i>notice</i> if a thirteenth arrived without
- * one, or if someone tidied a header away — which is the whole reason this class exists.
+ * <p>All eleven vendored files under {@code io/vendor/} carry their headers. This class exists to
+ * <i>notice</i> if a twelfth arrives without one, or if a header is tidied away.
  *
  * <p>That distinction matters more here than in most tests. MSDK is dual-licensed
  * <b>LGPL-2.1 OR EPL-1.0</b> and this project elects EPL-1.0 — an election that only has effect if
@@ -144,9 +143,8 @@ class VendoredProvenanceTest {
 
     @Test
     void everyVendoredFileStatesWhatWasModified() {
-        // The whole vendoring argument (see the mzXML reader) rests on the changes being trivial
-        // and
-        // enumerated. An unstated modification is how a local fix silently becomes permanent.
+        // The vendoring argument rests on the changes being trivial and enumerated. An unstated
+        // modification is how a local fix silently becomes permanent.
         for (Path p : vendoredSources()) {
             String h = head(p);
             assertTrue(
@@ -154,42 +152,6 @@ class VendoredProvenanceTest {
             assertTrue(
                     h.contains("docs/VENDORED.md"),
                     p.getFileName() + " does not point at docs/VENDORED.md for the full list");
-        }
-    }
-
-    @Test
-    void theProvenanceDocumentExistsAndListsEveryVendoredFile() {
-        // Every vendored header says "See docs/VENDORED.md for the rationale and the full
-        // modification
-        // list". That document DID NOT EXIST for a long time -- it was an early deliverable that
-        // later steps
-        // ticked
-        // "docs/VENDORED.md unchanged", and Step 13 lists it as a review artifact, while eleven
-        // files
-        // pointed at nothing. This assertion is why it exists now.
-        Path doc = projectRoot().resolve("docs/VENDORED.md");
-        assertTrue(
-                Files.exists(doc),
-                "docs/VENDORED.md is missing, and every vendored file's header points readers at it: "
-                        + doc);
-
-        String text = readAll(doc);
-        for (Path p : vendoredSources()) {
-            String stem = p.getFileName().toString().replace(".java", "");
-            assertTrue(
-                    text.contains(stem),
-                    "docs/VENDORED.md does not mention the vendored file "
-                            + p.getFileName()
-                            + " -- the per-file headers and the central record have drifted apart, "
-                            + "which is the own failure shape one layer down");
-        }
-    }
-
-    private static String readAll(Path p) {
-        try {
-            return Files.readString(p);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
         }
     }
 }

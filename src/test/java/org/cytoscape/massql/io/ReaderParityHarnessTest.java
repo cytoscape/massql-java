@@ -56,7 +56,8 @@ class ReaderParityHarnessTest {
 
     @Test
     void hexParsingReadsThePythonEmittedForm() {
-        // Python's float.hex() writes "0x1.436b8f9b13166p-8"; Java's Double.toHexString writes the
+        // The dumps write hex floats as "0x1.436b8f9b13166p-8"; Java's Double.toHexString writes
+        // the
         // same
         // shape. Assert against literals lifted from an actual dump, so a generator change is
         // caught here
@@ -114,10 +115,7 @@ class ReaderParityHarnessTest {
 
     @Test
     void reorderingChangesTheDigest() {
-        // The INVERSE of what the spec originally asked for (C32d): it wanted a multiset comparator
-        // where
-        // reordering compares EQUAL. The dumps store digests, which are order-sensitive, and that
-        // is a
+        // The dumps store digests, which are order-sensitive, and that is a
         // feature -- our array order must match MassQL's file order. PeakOrderPreconditionTest
         // asserts the
         // precondition that makes this safe.
@@ -147,7 +145,8 @@ class ReaderParityHarnessTest {
 
     @Test
     void theDigestMatchesTheDumpForARealScan() {
-        // End to end on real data: recompute a digest from OUR decode and compare to what Python
+        // End to end on real data: recompute a digest from this decode and compare to what the
+        // reference
         // wrote.
         // If this fails, either the packing convention or the decode is wrong, and every other test
         // in
@@ -190,9 +189,7 @@ class ReaderParityHarnessTest {
             assertTrue(d.peakRows() > 0, f + " reports no peak rows");
         }
         assertEquals(
-                16,
-                ParityFixtures.FIXTURES_WITH_DUMPS.size(),
-                "expected 16 fixtures with dumps; if this changed, update PARITY_REPORT.md's coverage table");
+                16, ParityFixtures.FIXTURES_WITH_DUMPS.size(), "expected 16 fixtures with dumps");
     }
 
     @Test
@@ -220,8 +217,8 @@ class ReaderParityHarnessTest {
         assertNotSame(phantom, real, "these must be two distinct entries sharing one scan id");
 
         // the fake MS1 row is NOT always an all-zero placeholder. MassQL's
-        // pyteomics MGF
-        // loader ends with `ms1_df = pd.DataFrame([peak_dict])` where peak_dict LEAKS from the MS2
+        // the reference MGF loader
+        // loader builds its 1-row MS1 table from a peak dict that LEAKS from the MS2
         // peak
         // loop, so the row is a byte-for-byte DUPLICATE of the last MS2 peak. The all-zero form
         // (scan=1, mz=0, i=0) is only the `except` branch, reached when the loop never ran -- which
@@ -233,7 +230,7 @@ class ReaderParityHarnessTest {
         // the gate skips MGF mslevel==1 entirely rather than trying to match them.
         assertEquals(1, phantom.peakCount(), "the fake MS1 row is always a single row");
         assertTrue(real.peakCount() >= 1, "the real MS2 scan has actual peaks");
-        // micro.mgf takes the pyteomics path, so its fake row duplicates the LAST MS2 peak --
+        // micro.mgf takes the primary loader path, so its fake row duplicates the LAST MS2 peak --
         // meaning a
         // REAL intensity, not zero. Asserting 0.0 here (as this test first did) fails on correct
         // data.

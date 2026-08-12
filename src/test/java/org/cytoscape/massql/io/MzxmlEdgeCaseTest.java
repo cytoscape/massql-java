@@ -17,7 +17,7 @@ import org.cytoscape.massql.spectra.SpectrumTable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** mzXML edge cases, each derived from {@code msql_fileloading.py} rather than invented. */
+/** mzXML edge cases, each derived from the reference loader rather than invented. */
 class MzxmlEdgeCaseTest {
 
     private static List<Integer> scanIdsOf(Path p) {
@@ -36,7 +36,7 @@ class MzxmlEdgeCaseTest {
         // -- the resolution of the long-standing open item, derived from
         // source and then verified by execution rather than guessed at.
         //
-        // pyteomics converts msLevel="" to None; MassQL tests `mslevel == 1` and `mslevel == 2`
+        // The reference reads msLevel="" as absent and tests `mslevel == 1` and `mslevel == 2`
         // (:434, :450), so None matches neither branch and the scan contributes ZERO rows. Not a
         // default of 1, not a diagnostic-and-keep, not a failure.
         //
@@ -53,8 +53,7 @@ class MzxmlEdgeCaseTest {
     @Test
     void droppedScansAreReportedNotSilent() {
         // "10 scans became 2" needs an explanation at the point of use, so the count goes through
-        // diagnostics() rather than being swallowed. The SDK returns diagnostics; it never logs
-        // (DEPENDENCY_POLICY constraint 2).
+        // diagnostics() rather than being swallowed. The SDK returns diagnostics; it never logs.
         Path p = Fixtures.require("fixtures/edge/empty_msLevel_tag.mzXML");
         try (SpectraStream s = SpectraFile.open(p)) {
             while (s.hasNext()) {
@@ -94,7 +93,7 @@ class MzxmlEdgeCaseTest {
         // and NOT parity: MassQL raises KeyError: 'precursorMz' here (verified
         // on
         // micro_noprecursor.mzXML), so no golden can exist. We give the 0 "not recorded" sentinel,
-        // matching mzML's absent-MS:1000744 rule, which Step 10 converts to null. Throwing would
+        // matching mzML's absent-MS:1000744 rule, which collation converts to null. Throwing would
         // make
         // mzXML stricter than mzML for the very same missing field.
         Path p = Fixtures.require("fixtures/micro/micro_noprecursor.mzXML");
@@ -116,7 +115,7 @@ class MzxmlEdgeCaseTest {
 
     @Test
     void aBarePrecursorMzWithNoAttributesIsFine() {
-        // The Step 2 finding: pyteomics returns a bare STRING instead of a dict when <precursorMz>
+        // The reference returns a bare STRING instead of a dict when <precursorMz>
         // carries no attributes, and MassQL then dies at :450 with "string indices must be
         // integers".
         // We read the element TEXT, so the attributes are irrelevant -- but the reader must not
@@ -153,7 +152,7 @@ class MzxmlEdgeCaseTest {
 
     @Test
     void aScanWithNoPeaksElementIsNotAMassSpectrum() {
-        // msql_fileloading.py:424: `if not "m/z array" in spectrum: continue` -- "This is not a
+        // The reference skips a scan with no m/z array -- "This is not a
         // mass
         // spectrum". So a <scan> carrying no <peaks> child at all is skipped, not an error.
         // Distinct

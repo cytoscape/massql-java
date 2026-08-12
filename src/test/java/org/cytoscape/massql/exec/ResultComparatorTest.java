@@ -78,7 +78,7 @@ class ResultComparatorTest {
     @Test
     void aSingleBitRtDifferenceFails() {
         // rt is bit-identical precisely so a float-precision scanRt cannot slip through. A float
-        // would pass Step 8's parity gate and fail here.
+        // would pass the parity gate and fail here.
         ScanInfoResult perturbed =
                 new ScanInfoResult(
                         3,

@@ -17,7 +17,7 @@ import org.cytoscape.massql.io.SpectraStream;
 import org.junit.jupiter.api.Test;
 
 /**
- * The intensity-algebra properties ported from {@code oracle/test_query_py_reference.py}.
+ * The intensity-algebra properties ported from MassQL's own test suite.
  *
  * <p>the condition filters called these *"pure profit — they need no reference data"*. Half right: the properties are
  * self-referential, but <b>the tests as written need two fixtures we do not have</b>

@@ -18,7 +18,7 @@ class SpectraStreamCloseTest {
 
     @Test
     void closeIsIdempotent() {
-        // mzXML added by Step 7: it memory-maps like mzML, so it carries the same release
+        // mzXML added by the mzXML reader: it memory-maps like mzML, so it carries the same release
         // obligation.
         for (String f : new String[] {"data/small.mzML", "data/PlusRise.mgf", "data/small.mzXML"}) {
             SpectraStream s = SpectraFile.open(Fixtures.require(f));
@@ -47,7 +47,8 @@ class SpectraStreamCloseTest {
 
     @Test
     void twoHundredOpenCloseCyclesOnAnMzxml() {
-        // Step 7 §5: MzxmlReader memory-maps via the same vendored FileMemoryMapper, so it can leak
+        // the mzXML reader: MzxmlReader memory-maps via the same vendored FileMemoryMapper, so it
+        // can leak
         // the
         // mapped region exactly as mzML can. 200 cycles over a 3 MB file is ~600 MB of address
         // space if

@@ -67,8 +67,8 @@ class PeakOrderPreconditionTest {
                                 + "  SpectrumTableBuilder sorts unsorted scans by m/z, so our array order "
                                 + "would no longer match MassQL's file order, and ReaderParityIT's "
                                 + "ORDER-SENSITIVE digest comparison is no longer valid for this fixture.\n"
-                                + "  Fix the harness (compare a multiset for this fixture, and say so in "
-                                + "PARITY_REPORT.md) -- do NOT assume the digest failure is a decode bug.");
+                                + "  Fix the harness by comparing a multiset for this fixture -- do NOT"
+                                + " assume the digest failure is a decode bug.");
             }
         }
     }
@@ -80,7 +80,7 @@ class PeakOrderPreconditionTest {
         // little --
         // but it would catch a future change that emitted peaks unsorted, which would break the
         // mz-window
-        // binary search in Step 5 as well as the digests.
+        // binary search in the store as well as the digests.
         try (SpectraStream s =
                 SpectraFile.open(
                         Fixtures.require(

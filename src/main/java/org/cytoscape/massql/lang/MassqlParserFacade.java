@@ -72,7 +72,7 @@ public final class MassqlParserFacade {
         if (queryText == null) {
             throw new MassqlParseException("<empty>", "query text is null");
         }
-        // massql_query.py strips the query file (load_query -> .read().strip()), and the
+        // The reference strips the query file before parsing, and the
         // .massql files on disk end with a newline.
         String text = queryText.strip();
         if (text.isEmpty()) {

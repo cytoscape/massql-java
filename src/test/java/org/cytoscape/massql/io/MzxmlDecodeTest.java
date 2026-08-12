@@ -77,13 +77,13 @@ class MzxmlDecodeTest {
 
     @Test
     void thirtyTwoBitIsWidenedNotReinterpreted() {
-        // THE bit-identity trap. pyteomics decodes with np.float32 and Python widens to double, so
+        // THE bit-identity trap. The reference decodes at 32-bit and widens to double, so
         // the
         // golden value is (double)(float)raw -- NOT the full-precision double. The micro table's
         // last
         // peak carries an m/z chosen to be inexact in float32 for exactly this assertion.
         //
-        // Asserted on RAW BITS: a near-miss here is what makes Step 8 confusing.
+        // Asserted on RAW BITS: a near-miss here is what makes the parity gate confusing.
         double mz32 = lastMz("micro.mzXML");
         double mz64 = lastMz("micro_p64.mzXML");
 
@@ -180,12 +180,12 @@ class MzxmlDecodeTest {
     void theRealFixtureIsThirtyTwoBit() {
         // Guards the premise of the widening assertion above: if small.mzXML were ever regenerated
         // at
-        // 64-bit, the parity comparison's 1e-7 mzXML tolerance (Step 12) would stop being
+        // 64-bit, the parity comparison's 1e-7 mzXML tolerance (the differential) would stop being
         // justified.
         String head = readHead(Fixtures.require("data/small.mzXML"));
         assertTrue(
                 head.contains("precision=\"32\""),
-                "small.mzXML is expected to be precision=32; the Step 12 ms1_precmz tolerance depends on it");
+                "small.mzXML is expected to be precision=32; the differential ms1_precmz tolerance depends on it");
         assertTrue(head.contains("byteOrder=\"network\""), "small.mzXML should be big-endian");
     }
 

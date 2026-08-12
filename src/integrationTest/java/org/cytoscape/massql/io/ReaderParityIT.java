@@ -13,11 +13,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * ⛔ <b>THE GATE.</b> All three readers must decode <b>bit-identically</b> to MassQL's own Python loader.
+ * ⛔ <b>THE GATE.</b> All three readers must decode <b>bit-identically</b> to MassQL's own loader.
  *
  * <p>If they do not, the decoder is wrong and every number produced downstream measures noise. This is the
- * cheapest place in the spike to learn that: a byte-order or float-precision mistake found here is a
- * one-line fix, while the same mistake found at Step 12 presents as a handful of mismatched result rows and
+ * cheapest place to learn that: a byte-order or float-precision mistake found here is a
+ * one-line fix, while the same mistake found in the differential presents as a handful of mismatched result rows and
  * gets misdiagnosed as a filtering or collation bug.
  *
  * <p><b>Do not loosen a comparison to make this pass.</b> A tolerance added here converts a found bug into a
@@ -54,10 +54,9 @@ class ReaderParityIT {
     /**
      * Relative tolerance for the intensity <b>sum</b> only.
      *
-     * <p><b>1e-6, and the reason is dtype rather than ordering.</b> the parity gate attributed the sum
-     * exception to numpy's pairwise accumulation and proposed 1e-15. Measured, that is far too tight:
-     * MassQL's intensity column is <b>float32</b>, and {@code dump_loader_parity.py:81} records
-     * {@code g["i"].sum()} — a <b>float32 accumulation</b>. On {@code small.mzML} MS1 scan 1 that gives
+     * <p><b>1e-6, and the reason is dtype rather than ordering.</b> A tolerance near 1e-15 is far too
+     * tight: the reference's intensity column is <b>float32</b> and the dumps record a <b>float32
+     * accumulation</b> of it. On {@code small.mzML} MS1 scan 1 that gives
      * {@code 69381840.0} where the true sum is {@code 69381842.11895752}, a relative error of
      * <b>3.05e-08</b>.
      *
@@ -206,10 +205,12 @@ class ReaderParityIT {
         //
         // The dumps have always carried these three; nothing compared them. So the gate proved
         // bit-identity of peaks, rt and polarity while leaving charge, precmz and ms1scan entirely
-        // unchecked -- and an MGF charge bug survived Step 8 green, reaching Step 11 as two wrong
+        // unchecked -- and an MGF charge bug survived the parity gate green, reaching the CLI as
+        // two wrong
         // rows in a query golden, five steps from its cause.
         //
-        // They belong here rather than at Step 12 because this is the difference between "the
+        // They belong here rather than in the differential because this is the difference between
+        // "the
         // reader
         // is wrong" and "some result rows differ".
         if (key.mslevel() == 2) {
@@ -230,7 +231,7 @@ class ReaderParityIT {
         // conditional
         // conversion, mzXML's unconditional one, MGF's RTINSECONDS/60 -- and requires the
         // double-precision
-        // scanRt from Step 5 §1. A float comparison passes here and fails the Step 12 differential.
+        // scanRt from the store A float comparison passes here and fails the differential.
         assertEquals(
                 Double.doubleToLongBits(want.rt()),
                 Double.doubleToLongBits(v.rt()),
@@ -246,7 +247,8 @@ class ReaderParityIT {
         assertDigest(at, "m/z", want.mzSha256(), mz, want.mzHexFirst8());
         assertDigest(at, "intensity", want.iSha256(), in, want.iHexFirst8());
 
-        // Secondary signal only: numpy may pairwise-accumulate where we go left to right, so the
+        // Secondary signal only: the reference may pairwise-accumulate where this goes left to
+        // right, so the
         // last bits
         // can differ from identical inputs. The digests above are what establish bit-identity.
         double sum = 0.0;

@@ -62,7 +62,7 @@ public interface ScanView {
     /**
      * Decodes this scan's peaks into a fresh single-scan {@link SpectrumTable}.
      *
-     * <p>This is the hinge of the streaming design: every Step 5 primitive — {@code Reductions.sum},
+     * <p>This is the hinge of the streaming design: every store primitive — {@code Reductions.sum},
      * {@code mzWindow}, {@code argmax}, the derived columns — works unchanged on a one-scan table, so
      * the store needed no modification to support streaming.
      *

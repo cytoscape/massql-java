@@ -98,21 +98,22 @@ final class MzxmlReader extends AbstractSpectraStream {
                             + " scans with ms level > 2 (out of scope for scaninfo)");
         }
         if (skippedNoMsLevel > 0) {
-            // MassQL drops these too -- pyteomics yields msLevel None and neither the ==1 nor
-            // the ==2 branch fires. Reported rather than silent, because "48 scans became 40" needs
-            // an explanation at the point of use.
+            // The reference drops these too: a missing msLevel matches neither the ==1 nor the ==2
+            // branch. Reported rather than silent, because "48 scans became 40" needs an
+            // explanation
+            // at the point of use.
             out.add(
                     "skipped "
                             + skippedNoMsLevel
                             + " scans with a missing or empty msLevel attribute"
-                            + " (MassQL drops these: pyteomics yields None, which matches neither ms level)");
+                            + " (dropped: a missing msLevel matches neither ms level)");
         }
         if (skippedNotASpectrum > 0) {
             out.add(
                     "skipped "
                             + skippedNotASpectrum
                             + " <scan> elements with no <peaks> child"
-                            + " (msql_fileloading.py:424 treats these as \"not a mass spectrum\")");
+                            + " (treated as \"not a mass spectrum\")");
         }
         return Collections.unmodifiableList(out);
     }
@@ -163,9 +164,8 @@ final class MzxmlReader extends AbstractSpectraStream {
     /**
      * Applies the ms-level rules and the document-order chain. False if the scan is dropped.
      *
-     * <p>Ordering matters and follows {@code _load_data_mzXML} (`msql_fileloading.py:419-470`): the
-     * zero-peak guard comes <b>before</b> {@code msLevel} is consulted, and the chain is updated only
-     * for a level-1 scan that survived it.
+     * <p>⛔ Ordering matters: the zero-peak guard comes <b>before</b> {@code msLevel} is consulted, and
+     * the chain is updated only for a level-1 scan that survived it.
      */
     private boolean admit() {
         if (scan.msLevel == 0) { // absent or empty msLevel
@@ -230,16 +230,16 @@ final class MzxmlReader extends AbstractSpectraStream {
         // absent CHARGE is 1. Three formats, three charge defaults.
         int charge = parseInt(attr("precursorCharge"), 0);
         // getElementText() consumes through </precursorMz>. The VALUE is element text, not an
-        // attribute -- which is why a bare <precursorMz> with no attributes, the Step 2 finding
-        // that
-        // crashes pyteomics/MassQL, costs us nothing.
+        // attribute -- which is why a bare <precursorMz> with no attributes, which crashes the
+        // reference, costs this reader nothing.
         CharArray text = xml.getElementText();
         double mz = parseDouble(text == null ? null : text.toString(), 0.0);
 
-        // FIRST wins. MassQL hard-indexes spectrum["precursorMz"][0]
-        // (msql_fileloading.py:450), and a scan may legitimately carry several -- multiplexed (MSX)
-        // acquisition co-fragments more than one precursor. This method used to overwrite on every
-        // occurrence, i.e. last-wins, and no fixture was multi-precursor so nothing caught it.
+        // FIRST wins. The reference hard-indexes the first precursor, and a scan may legitimately
+        // carry several -- multiplexed (MSX)
+        // acquisition co-fragments more than one precursor. Overwriting on each occurrence would
+        // take
+        // the LAST, and no single-precursor fixture can tell the difference.
         if (scan.precursorSeen) return;
         scan.precursorSeen = true;
         scan.precmz = mz;
@@ -275,9 +275,9 @@ final class MzxmlReader extends AbstractSpectraStream {
     /**
      * mzXML {@code num} attribute -> scan id.
      *
-     * <p>pyteomics returns {@code spectrum["id"]} as a <b>{@code str}</b> ({@code '1'}), which is the
-     * root cause of a subtle bug: {@code previous_ms1_scan} then propagates a string into
-     * {@code ms1scan} and every downstream {@code ms1_*} lookup misses. Parsing to int here is the fix.
+     * <p>⛔ <b>Must be parsed to an int here.</b> Carrying the raw attribute as a string would let it
+     * propagate into {@code ms1scan}, and every downstream {@code ms1_*} lookup would then miss on a
+     * string-vs-int comparison — silently, with no error.
      */
     static int scanNum(String num) {
         if (num == null) throw new MassqlException("mzXML <scan> has no num attribute");
@@ -290,12 +290,12 @@ final class MzxmlReader extends AbstractSpectraStream {
 
     /** {@code "+"} -> 1, {@code "-"} -> 2, present-but-other -> 0. Absent -> 0 is NON-PARITY. */
     static int polarityOf(String polarity) {
-        // _determine_scan_polarity_mzXML (:517-523) initialises 0 and tests "+" then "-", so
-        // present-but-other -> 0 IS parity. But it reads spec["polarity"] UNGUARDED, so an ABSENT
-        // attribute raises KeyError -- MassQL produces nothing and no golden can exist. Our 0 there
-        // is our own contract; micro_nopolarity.mzXML pins it and
-        // MzxmlPolarityTest
-        // keeps the two cases apart so a pass cannot imply parity we do not have.
+        // The reference initialises 0 and tests "+" then "-", so present-but-other -> 0 IS parity.
+        // But it reads the attribute UNGUARDED, so an ABSENT one raises and produces no output at
+        // all
+        // -- no golden can exist for that case. The 0 here is this SDK's own contract;
+        // micro_nopolarity.mzXML pins it, and MzxmlPolarityTest keeps the two cases apart so a pass
+        // cannot imply parity that does not exist.
         if (polarity == null) return 0;
         String p = polarity.trim();
         if (p.equals("+")) return 1;
@@ -304,15 +304,14 @@ final class MzxmlReader extends AbstractSpectraStream {
     }
 
     /**
-     * The pyteomics ISO-8601 duration parser, reproduced including its quirks.
+     * ISO-8601 duration parser, reproducing the reference's behaviour including its quirks.
      *
      * <p><b>mzXML retention time is ALWAYS converted to minutes</b> — unlike mzML, whose conversion is
      * conditional on the declared unit ({@link MzmlReader}). Three formats, three RT rules, and a silent
      * 60x error here passes every MGF-only and mzML-only test. That is why this lives in its own method
      * with its own test rather than sharing code with the mzML path.
      *
-     * <p>MassQL uses {@code spectrum["retentionTime"]} as-is because pyteomics has already converted it
-     * (`pyteomics/xml.py:126-143`). Its arithmetic, in this order:
+     * <p>The arithmetic, in this order:
      * <pre>
      *   minutes  = M
      *   minutes += H * 60.
@@ -321,15 +320,15 @@ final class MzxmlReader extends AbstractSpectraStream {
      * Reproduced literally: the order is what makes {@code PT1.38S} come back as exactly the double
      * {@code 0.023}, and {@code PT1H30M45S} as {@code 90.75}.
      *
-     * <p><b>Three quirks, all verified against pyteomics rather than inferred:</b>
+     * <p><b>Three quirks, all verified by execution rather than inferred. None may be "simplified":</b>
      * <ul>
      *   <li><b>Years, months and days are parsed and then IGNORED.</b> {@code P1DT1H} -> {@code 60.0},
      *       not 1500. Only H/M/S after the {@code T} contribute.</li>
      *   <li><b>{@code M} before {@code T} is months, after it is minutes.</b> {@code P1M} -> {@code 0.0}
      *       while {@code PT1M} -> {@code 1.0}.</li>
      *   <li><b>The sign is captured and ignored</b> — but a leading {@code -} means the string does not
-     *       start with {@code P}, so pyteomics falls through to {@code float()}, fails, and returns the
-     *       <i>string</i>. MassQL would then carry a string as {@code rt}. We throw instead: see below.</li>
+     *       start with {@code P}, so the reference falls through to a numeric parse, fails, and returns
+     *       the <i>string</i>, carrying a non-numeric {@code rt}. This throws instead: see below.</li>
      * </ul>
      */
     static double retentionTimeMinutes(String rt) {
@@ -338,25 +337,27 @@ final class MzxmlReader extends AbstractSpectraStream {
         if (s.isEmpty()) return 0.0;
 
         if (!s.startsWith("P")) {
-            // pyteomics: `unitfloat(s, 'duration')`, else `unitstr(s, 'duration')`. A bare number
-            // is
-            // used as-is; anything else becomes a STRING that MassQL would carry as rt (verified:
-            // "-PT90S" comes back as the literal string). We refuse rather than invent a number --
-            // a documented deviation, and a clean error beats a silently wrong retention time.
+            // A bare number is used as-is. Anything else would become a STRING in the reference and
+            // be
+            // carried as rt (verified: "-PT90S" comes back as the literal string). This refuses
+            // rather
+            // than inventing a number -- a deliberate deviation, and a clean error beats a silently
+            // wrong retention time.
             try {
                 return Double.parseDouble(s);
             } catch (NumberFormatException e) {
                 throw new MassqlException(
                         "cannot read mzXML retentionTime \""
                                 + rt
-                                + "\": not an ISO-8601 duration and not a number. pyteomics returns the raw"
-                                + " string here, which MassQL would carry as a non-numeric rt",
+                                + "\": not an ISO-8601 duration and not a number. The reference"
+                                + " returns the raw string here, which would carry a non-numeric"
+                                + " retention time, so this refuses rather than inventing a value",
                         e);
             }
         }
 
         Matcher m = DURATION.matcher(s);
-        if (!m.find()) return 0.0; // pyteomics returns the string; unreachable
+        if (!m.find()) return 0.0; // unreachable: the P-prefix check above already returned
         double hours = group(m, 5);
         double minutes = group(m, 6);
         double seconds = group(m, 7);
@@ -367,7 +368,11 @@ final class MzxmlReader extends AbstractSpectraStream {
         return minutes;
     }
 
-    /** Mirrors pyteomics' `_duration_parser` exactly, including the unused sign/Y/M/D groups. */
+    /**
+     * ⛔ The unused sign/Y/M/D groups are <b>deliberate</b> and must not be removed: they make
+     * {@code M} before {@code T} parse as months rather than minutes, which is what the quirks above
+     * depend on.
+     */
     private static final Pattern DURATION =
             Pattern.compile(
                     "(-?)P(?:(\\d+\\.?\\d*)Y)?(?:(\\d+\\.?\\d*)M)?(?:(\\d+\\.?\\d*)D)?"
@@ -448,7 +453,7 @@ final class MzxmlReader extends AbstractSpectraStream {
             msLevel = 0;
             rt = 0.0;
             polarity = 0;
-            precmz = 0.0; // 0 sentinel -- Step 10 converts, not us. Also our non-parity value
+            precmz = 0.0; // 0 sentinel -- collation converts it, not this reader
             // for an MS2 with no <precursorMz> at all.
             ms1scan = 0; // 0 = no preceding MS1; the origin of the sentinel
             charge = 0; // mzXML default -- NOT MGF's 1
@@ -532,12 +537,12 @@ final class MzxmlReader extends AbstractSpectraStream {
         /**
          * base64 -> (optional inflate) -> de-interleave, returning {@code {mz[], intensity[]}}.
          *
-         * <p><b>The 32-bit widening rule.</b> pyteomics decodes with
-         * {@code np.float32 if precision == '32' else np.float64} and Python then widens to double, so
-         * the golden values are {@code (double)(float)raw} — <b>not</b> full-precision doubles.
+         * <p><b>The 32-bit widening rule.</b> The reference decodes at the declared precision and then
+         * widens to double, so the golden values are {@code (double)(float)raw} — <b>not</b>
+         * full-precision doubles.
          * {@link ByteBuffer#getFloat()} assigned into a {@code double[]} is exactly that. Reading 8
          * bytes, or reinterpreting the bits as a double, gives values that are <i>nearly</i> right and
-         * turns Step 8 into a confusing near-miss. Observable: the Ewing file and {@code micro.mzXML}
+         * turns the parity gate into a confusing near-miss. Observable: the Ewing file and {@code micro.mzXML}
          * give {@code 123.456787109375} where {@code micro_p64.mzXML} gives {@code 123.456789012345}.
          */
         private double[][] decode() {

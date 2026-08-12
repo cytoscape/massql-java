@@ -17,8 +17,8 @@ import org.junit.jupiter.api.io.TempDir;
  * What is asserted here is the <i>shape</i> of what each stream receives, which an in-process
  * capture can establish perfectly. What it cannot establish is that real file descriptors keep the
  * two apart under a real fork — an in-process test would pass even if the CLI wrote both streams to
- * the same place, because it is handed two distinct objects by construction. Step 12 forks a
- * subprocess for exactly that reason.
+ * the same place, because it is handed two distinct objects by construction. {@code CliContractIT}
+ * forks a subprocess for exactly that reason.
  *
  * <p>Both streams are captured through {@code Main.run}'s {@code PrintStream} parameters.
  * <b>Never {@code System.setOut}</b>: that is global mutable state, and a test that mutates it makes

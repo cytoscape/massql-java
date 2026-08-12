@@ -5,14 +5,14 @@ import java.util.Arrays;
 /**
  * Columnar peak store for one MS level. Immutable once built.
  *
- * <p>This is the replacement for MassQL's pandas dataframe, and it is written rather than
+ * <p>This is the replacement for the reference's dataframe, and it is written rather than
  * imported because no Java dataframe library is usable here: Tablesaw pulls ~44 MB and finds
  * its I/O registry by classpath scanning, which is unreliable wherever the thread-context classloader
  * cannot see the caller's classes; and Arrow has split packages and needs {@code sun.misc.Unsafe} plus
  * JVM flags we do not control.
  *
  * <p><b>Two tables per file, not one.</b> MS1 and MS2 peaks live in separate instances,
- * mirroring MassQL's {@code ms1_df} / {@code ms2_df} split — {@code load_data()} returns
+ * mirroring MassQL's own MS1/MS2 table split — its loader returns
  * exactly that pair, and the precursor lookup queries the MS1 table while
  * collating MS2 rows.
  *
@@ -129,14 +129,14 @@ public final class SpectrumTable {
      * <table border="1">
      *   <caption>Bound semantics by caller</caption>
      *   <tr><th>Caller</th><th>Bound</th><th>Method</th></tr>
-     *   <tr><td>precursor lookup (`massql_query.py:101-103`, {@code >=}/{@code <=})</td>
+     *   <tr><td>precursor lookup ({@code >=}/{@code <=})</td>
      *       <td><b>inclusive</b></td><td><b>this method</b></td></tr>
-     *   <tr><td>condition windows (`msql_engine_filters.py:253` etc., {@code >}/{@code <})</td>
+     *   <tr><td>condition windows ({@code >}/{@code <})</td>
      *       <td><b>strict</b></td><td>{@link #mzWindowExclusive}</td></tr>
      * </table>
      *
      * <p>Two binary searches bounded to the scan's own slice, so this is O(log n) not O(n).
-     * If the MGF fixture is ever slower than pandas, this method is the first place to look
+     * If the MGF fixture is ever slower than the reference, this method is the first place to look
      *
      * <p><b>No epsilon is applied here, ever.</b> The caller computes {@code lo}/{@code hi}
      * from a tolerance; a "helpful" epsilon at this level would silently widen every tolerance
@@ -162,7 +162,7 @@ public final class SpectrumTable {
      *
      * <p>This is what the condition windows require. MassQL filters with
      * {@code (df["mz"] > mz_min) & (df["mz"] < mz_max)} in all four condition functions
-     * (`msql_engine_filters.py:253`, `:410`, `:493`, `:607`), and it was confirmed by execution rather than
+     * in all four condition functions, and it was confirmed by execution rather than
      * inferred: {@code micro.mzML} scan 3 has a peak at exactly {@code 201.0}, and
      * {@code MS2PROD=201.5:TOLERANCEMZ=0.5} — window {@code [201.0, 202.0]} — returns <b>0 rows</b>.
      * {@code test_micro_edge.massql} pins that with an empty golden.

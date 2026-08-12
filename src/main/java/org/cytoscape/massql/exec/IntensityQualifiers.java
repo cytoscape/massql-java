@@ -10,7 +10,7 @@ import org.cytoscape.massql.spectra.SpectrumTable;
 /**
  * The intensity predicate: three scales, three comparators, and an implicit floor.
  *
- * <p>Mirrors {@code _get_intensity_mask} (`msql_engine_filters.py:65-96`) — the real authority, which
+ * <p>Mirrors the reference's intensity masking, which
  * are easy to overlook.
  *
  * <h2>The rules, each a silent wrong answer if missed</h2>

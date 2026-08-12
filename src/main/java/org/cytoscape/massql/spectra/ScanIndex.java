@@ -9,7 +9,7 @@ import org.cytoscape.massql.MassqlException;
  *
  * <p><b>Why scan-level metadata lives here rather than as per-peak columns.</b> MassQL's
  * dataframe repeats {@code rt}, {@code polarity}, {@code precmz}, {@code ms1scan} and
- * {@code charge} on every peak row because pandas is a flat frame. Verified against the
+ * {@code charge} on every peak row because its dataframe is flat. Verified against the
  * loader: all of them are constant within a scan (exactly one distinct value each). Storing
  * them once per scan is both semantically right and much smaller — a 20,000-peak MS1 scan
  * would otherwise carry 20,000 copies of its retention time.

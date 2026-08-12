@@ -95,7 +95,8 @@ class QueryExecutorTest {
 
     @Test
     void resultsArriveInScanIdAscendingOrder() {
-        // Step 10 and Step 12 both require it, and the streaming design gets it free from document
+        // collation and the differential both require it, and the streaming design gets it free
+        // from document
         // order --
         // so assert it rather than assume the reader's order never changes.
         Run r = run(query("test_micro.massql"), "fixtures/micro/micro.mzML");
@@ -129,7 +130,8 @@ class QueryExecutorTest {
 
     @Test
     void aZeroPeakMs1IsNeverReturnedByAnMs1dataQuery() {
-        // micro.mzML scan 4 is a deliberate zero-peak MS1. MassQL's ms1_df holds only scan 2.
+        // micro.mzML scan 4 is a deliberate zero-peak MS1. The reference's MS1 table holds only
+        // scan 2.
         Run r = run("QUERY scaninfo(MS1DATA) WHERE POLARITY=Positive", "fixtures/micro/micro.mzML");
         assertEquals(List.of(2), r.scans(), "scan 4 is empty and cannot qualify");
     }
@@ -140,7 +142,7 @@ class QueryExecutorTest {
         // hardcoded 1
         // , so POLARITY=Positive matches everything and POLARITY=Negative nothing. This is
         // CORRECT
-        // behaviour, not a broken filter -- it is in the Step 13 known-deviations list for that
+        // behaviour, not a broken filter -- it is in the known-deviations list for that
         // reason.
         assertEquals(
                 21_942,
@@ -246,7 +248,7 @@ class QueryExecutorTest {
     // PARSE
     // tests -- AstShapeTest, KeywordCaseMatrixTest, ParseRejectionTest -- plus the two .massql
     // fixtures
-    // that Step 12's differential will eventually run. So the exit criterion "every 9a and
+    // that the differential will eventually run. So the exit criterion "every 9a and
     // 9b
     // condition has a positive and a negative test" was checked while 2 of the 10 conditions had
     // neither, and nothing could tell: the whole filter could have been inverted and the suite
@@ -273,7 +275,7 @@ class QueryExecutorTest {
         assertEquals(
                 List.of(1, 3),
                 run("QUERY scaninfo(MS2DATA) WHERE CHARGE=0", "fixtures/micro/micro.mzML").scans(),
-                "the 0 sentinel is matchable as itself; Step 10 is what converts it to null");
+                "the 0 sentinel is matchable as itself; collation is what converts it to null");
     }
 
     @Test

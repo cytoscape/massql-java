@@ -20,9 +20,9 @@ import org.cytoscape.massql.io.SpectraStream;
 import org.cytoscape.massql.result.ResultJson;
 
 /**
- * The standalone MassQL command-line tool — a batch filter mirroring {@code massql_query.py}.
+ * The standalone MassQL command-line tool — a batch filter mirroring the reference tool's interface.
  *
- * <p>Argument order and the {@code --precursor-tol-ppm} default match the Python reference exactly,
+ * <p>Argument order and the {@code --precursor-tol-ppm} default match the reference tool exactly,
  * because the differential invokes both with the same argv shape and compares the results.
  * {@code --output} and the two extra query sources below are deliberate additions.
  *
@@ -78,7 +78,7 @@ import org.cytoscape.massql.result.ResultJson;
  */
 public final class Main {
 
-    /** Matches {@code massql_query.py}'s {@code --precursor-tol-ppm} default. */
+    /** Matches the reference tool's {@code --precursor-tol-ppm} default. */
     private static final double DEFAULT_TOL_PPM = MassqlOptions.DEFAULT_PRECURSOR_TOL_PPM;
 
     private static final int OK = 0;
@@ -213,7 +213,7 @@ public final class Main {
      * one emptiness check. Splitting those per source is how the forms would come to disagree about
      * what counts as an empty query.
      *
-     * <p>{@code .strip()} mirrors {@code massql_query.py}'s {@code .read().strip()}; the committed
+     * <p>{@code .strip()} mirrors the reference's own strip on the query text; the committed
      * {@code .massql} files end with a newline, and a shell heredoc adds one too.
      */
     private static String resolveQuery(Args parsed, InputStream in) throws IOException {
@@ -314,7 +314,7 @@ public final class Main {
         }
 
         /**
-         * Positional order matches {@code massql_query.py}: spectra file, then query file.
+         * Positional order matches the reference tool: spectra file, then query file.
          *
          * <p>Every rejection here is exit 2 by construction — each one is knowable from the command
          * line alone, without opening a thing.

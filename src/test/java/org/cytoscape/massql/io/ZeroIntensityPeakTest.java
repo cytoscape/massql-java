@@ -17,13 +17,13 @@ import org.junit.jupiter.api.Test;
 /**
  * <b>MGF drops zero-intensity peaks; mzML and mzXML keep them</b>.
  *
- * <p>{@code _load_data_mgf_pyteomics} opens its peak loop with {@code if intensity == 0: continue}, so a
+ * <p>The reference's MGF loader skips any zero-intensity peak, so a
  * zero-intensity peak never becomes a row: MassQL cannot match it, count it or sum it. The mzML and mzXML
  * loaders have <b>no such guard</b>, and that asymmetry is real rather than an oversight — {@code small.mzML}'s
  * parity dump carries <b>eight leading {@code 0x0.0p+0} intensities</b>, retained on both sides.
  *
  * <p><b>Why this was latent.</b> Our {@code MgfReader} kept zero-intensity peaks, and not one of the three MGF
- * fixtures contained a single one — measured. So the Step 8 parity gate passed while being structurally unable
+ * fixtures contained a single one — measured. So the parity gate passed while being structurally unable
  * to detect the divergence. Exactly the recurring shape: a rule with no fixture that can
  * discriminate. {@code micro_zeroint.mgf} exists to close it.
  *
@@ -81,7 +81,7 @@ class ZeroIntensityPeakTest {
     void anAllZeroBlockBecomesAZeroPeakScanRatherThanVanishing() {
         // Block 2's every peak is zero-intensity, so MassQL emits no rows and the scan is absent
         // from its
-        // dataframe entirely (verified: its ms2_df holds scans 1 and 3 only).
+        // reference's tables entirely (verified: its MS2 table holds scans 1 and 3 only).
         //
         // Our reader still YIELDS the block, now with zero peaks -- consistent with the reader
         // rules,
@@ -123,7 +123,7 @@ class ZeroIntensityPeakTest {
     void normalisedColumnsAreUnaffectedByTheDrop() {
         // MassQL computes i_max/i_sum from the FULL array *before* the skip, and a zero alters
         // neither a
-        // max nor a sum -- so the denominators are identical either way and no Step 5 change was
+        // max nor a sum -- so the denominators are identical either way and no the store change was
         // needed.
         // Assert that rather than trusting the arithmetic: block 1's sum is 250+1500+750 = 2500,
         // max 1500.
@@ -156,7 +156,7 @@ class ZeroIntensityPeakTest {
         // with eight zero-intensity peaks -- its parity dump records i_hex_first8 as eight
         // `0x0.0p+0`
         // entries, and the gate compares that digest bit-for-bit. Dropping them here would fail
-        // Step 8 on
+        // the parity gate on
         // every mzML fixture.
         ParityDump dump = ParityDump.of("small.mzML");
         ParityDump.Scan want = dump.scans().get(new ParityDump.Key(1, 1));
@@ -183,7 +183,7 @@ class ZeroIntensityPeakTest {
                             "mzML must RETAIN zero-intensity peaks; row "
                                     + i
                                     + " should be 0.0. The MGF "
-                                    + "skip is MGF-only -- generalising it breaks the Step 8 gate");
+                                    + "skip is MGF-only -- generalising it breaks the parity gate");
                 }
                 assertEquals(want.peakCount(), t.rowCount(), "peak count includes the zeros");
                 return;

@@ -13,16 +13,16 @@ import org.junit.jupiter.api.Test;
  * — both verified by execution, not inference:
  *
  * <ul>
- *   <li>{@code mzWindow} — <b>inclusive</b>. the precursor lookup (`massql_query.py:101-103`,
- *       {@code >=}/{@code <=}): at {@code --precursor-tol-ppm 7.8125} a peak exactly on the bound
+ *   <li>{@code mzWindow} — <b>inclusive</b>. The precursor lookup uses {@code >=}/{@code <=}:
+ *       at {@code --precursor-tol-ppm 7.8125} a peak exactly on the bound
  *       <b>does</b> populate {@code ms1_i}.</li>
- *   <li>{@code mzWindowExclusive} — <b>strict</b>. the condition windows
- *       (`msql_engine_filters.py:253` and three siblings, {@code >}/{@code <}): {@code micro.mzML} scan 3 has
+ *   <li>{@code mzWindowExclusive} — <b>strict</b>. The condition windows
+ *       (all four condition functions use {@code >}/{@code <}): {@code micro.mzML} scan 3 has
  *       a peak at exactly {@code 201.0}, and {@code MS2PROD=201.5:TOLERANCEMZ=0.5} returns <b>0 rows</b>.</li>
  * </ul>
  *
- * <p>The spec originally assumed one rule served both. Collapsing them again would silently change
- * {@code ms1_i}/{@code ms1_precmz}, which the differential compares at 1e-9.
+ * <p>⛔ Collapsing the two rules into one would silently change {@code ms1_i}/{@code ms1_precmz}, which
+ * the differential compares at 1e-9.
  */
 class MzWindowTest {
 
@@ -110,7 +110,7 @@ class MzWindowTest {
         // backwards -- the condition windows are STRICT in MassQL, verified by execution.
         // This
         // inclusive method exists for the PRECURSOR LOOKUP, which really is inclusive
-        // (massql_query.py:101-103 uses >=/<=, also verified). Step 9 uses mzWindowExclusive.
+        // (the lookup uses >=/<=, also verified). Conditions use mzWindowExclusive.
         assertEquals(new IntRange(1, 3), t.mzWindow(0, 200.0, 300.0));
         assertEquals(new IntRange(0, 4), t.mzWindow(0, 100.0, 400.0));
         assertEquals(

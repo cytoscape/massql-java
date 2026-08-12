@@ -146,7 +146,7 @@ class ScaninfoCollationTest {
 
     @Test
     void anIntensityTieResolvesToTheFirstLowestMzRow() {
-        // pandas idxmax returns the first occurrence; a last-wins loop gives 300.0 here.
+        // The reference returns the first occurrence; a last-wins loop gives 300.0 here.
         SpectrumTable t =
                 oneScan(
                         1,
@@ -184,7 +184,7 @@ class ScaninfoCollationTest {
 
     @Test
     void ticIsTheSumOfPeakIntensitiesNotTheBasePeak() {
-        // The distinction massql_query.py:154 guards: `scanmaxint` puts the base peak in `i`,
+        // The distinction the reference guards: `scanmaxint` puts the base peak in `i`,
         // scaninfo
         // puts the sum. 250 + 1500 + 750 = 2500, while the base peak is 1500.
         SpectrumTable t =
@@ -287,7 +287,7 @@ class ScaninfoCollationTest {
         assertEquals(
                 0.0, r.basePeakI(), "argmax over all-zero picks row 0, whose intensity is 0.0");
         assertEquals(100.0, r.basePeakMz(), "and its m/z, which is a real value");
-        // The point: nothing here is NaN. Step 5's iNorm IS NaN for this scan, but i_norm is
+        // The point: nothing here is NaN. The store's iNorm IS NaN for this scan, but i_norm is
         // dropped
         // from the contract entirely and never reaches a row.
         assertFalse(Double.isNaN(r.tic()) || Double.isNaN(r.basePeakI()));
@@ -297,7 +297,7 @@ class ScaninfoCollationTest {
 
     @Test
     void nonFiniteComputedValuesBecomeNullSoTheJsonStaysValid() {
-        // Mirrors massql_query.py's clean_nan + allow_nan=False. `NaN` and `Infinity` are not valid
+        // Mirrors the reference's NaN cleaning. `NaN` and `Infinity` are not valid
         // JSON
         // tokens, so a non-finite value must become null BEFORE serialization -- ResultJson throws
         // if one

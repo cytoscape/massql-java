@@ -17,8 +17,8 @@ import org.junit.jupiter.api.io.TempDir;
  * Format is sniffed from CONTENT, never from the extension.
  *
  * <p>The fixtures disagree on case — msconvert writes {@code small.mzXML}, the Ewing download is
- * {@code DP00570_F02.mzxml} — and SPIKE.md uses both spellings, so an extension-driven reader is a
- * trap. These tests deliberately use misleading extensions.
+ * {@code DP00570_F02.mzxml}, so an extension-driven reader is a trap. These tests deliberately use
+ * misleading extensions.
  */
 class FormatSniffTest {
 
@@ -114,7 +114,8 @@ class FormatSniffTest {
 
     @Test
     void mzxmlIsSniffedAndReadable(@TempDir Path dir) throws IOException {
-        // Step 7 supplied the reader, so this no longer asserts a "not yet implemented" throw.
+        // the mzXML reader supplied the reader, so this no longer asserts a "not yet implemented"
+        // throw.
         // A scanCount="0" msRun is valid and simply yields nothing.
         Path p = write(dir, "a.mzXML", "<mzXML><msRun scanCount=\"0\"></msRun></mzXML>");
         assertEquals(Format.MZXML, SpectraFile.sniff(p));

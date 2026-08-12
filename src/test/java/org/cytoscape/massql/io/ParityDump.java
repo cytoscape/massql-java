@@ -22,15 +22,14 @@ import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 /**
- * Reads a Step 2 loader-parity dump: MassQL's own loaded tables, per scan, with floats as hex.
+ * Reads a loader-parity dump: MassQL's own loaded tables, per scan, with floats as hex.
  *
- * <p>Promoted to a shared helper because three tests now need the <b>full</b> per-scan record, and the
- * ad-hoc regex in {@code MzmlReaderTest} / {@code Ms1ScanDocumentOrderIT} only extracted three fields.
+ * <p>A shared helper because three tests need the <b>full</b> per-scan record.
  *
  * <p><b>Regex rather than a JSON library, deliberately.</b> Jackson discovers modules via
- * {@code ServiceLoader}, banned by `docs/DEPENDENCY_POLICY.md` constraint 1 — and a test-scoped dependency
- * would still be one more thing that can drift from the shipping closure. The dumps are machine-generated
- * with a fixed field order, so a regex is sufficient and adds nothing to the build.
+ * {@code ServiceLoader}, which this project does not use, and a test-scoped dependency would still be
+ * one more thing that can drift from the runtime closure. The dumps are machine-generated with a fixed
+ * field order, so a regex is sufficient and adds nothing to the build.
  *
  * <h2>Two properties of these dumps that are easy to get wrong</h2>
  *
@@ -39,9 +38,9 @@ import java.util.zip.GZIPInputStream;
  * {@code micro.mgf} (id 3) and {@code DP00570_F02.mgf} (id 625). Keying by scan id silently compares a real
  * spectrum against a row of zeros.
  *
- * <p><b>2. Entries are grouped by ms level, NOT document order</b>.
- * {@code dump_loader_parity.py} builds its list from {@code ms1_df} then {@code ms2_df} — 229 MS1 entries
- * then 687 MS2 on the Ewing file. Never infer sequence from a dump; re-derive order from the file.
+ * <p><b>2. Entries are grouped by ms level, NOT document order</b>. A dump lists all MS1 entries and
+ * then all MS2 — 229 then 687 on the Ewing file. Never infer sequence from a dump; re-derive order from
+ * the file.
  */
 final class ParityDump {
 
@@ -49,7 +48,7 @@ final class ParityDump {
      * One scan's worth of MassQL's loaded state. Hex fields are kept raw and parsed on demand.
      *
      * <p>The last three are <b>MS2 only</b> and are null on an MS1 record — the generator emits them
-     * under {@code if level == "2"}, because {@code ms1_df} has no such columns. That is a real
+     * for MS2 records only, because the reference's MS1 table has no such columns. That is a real
      * property of the reference's two-dataframe shape, not a gap: an MS1 survey scan has no
      * precursor to describe.
      */

@@ -105,7 +105,7 @@ class ErrorPathIT {
     /**
      * Markup whose root is neither mzML nor mzXML fails, and the {@code .mzML} name does not save it.
      *
-     * <p>Format is sniffed from <b>content</b>, never the extension (Step 6): the fixtures disagree on
+     * <p>Format is sniffed from <b>content</b>, never the extension (the readers): the fixtures disagree on
      * case — {@code small.mzXML} from msconvert, {@code DP00570_F02.mzxml} from Ewing — so trusting the
      * suffix was ruled out from the start.
      */
@@ -125,7 +125,7 @@ class ErrorPathIT {
      * ⚠ Text with <b>no</b> markup is a peak list by definition, and yields zero rows rather than an
      * error — the documented rule, not an oversight.
      *
-     * <p>Step 6: <i>"First non-blank line begins with {@code BEGIN IONS}, or the file contains no
+     * <p>the readers: <i>"First non-blank line begins with {@code BEGIN IONS}, or the file contains no
      * {@code <}, → MGF."</i> MGF has no magic header, so anything unmarked is treated as one; an MGF
      * with no {@code BEGIN IONS} block simply has no spectra. {@code FormatSniffTest} pins the sniff
      * itself, and this pins what the whole pipeline does with the result.
@@ -141,7 +141,7 @@ class ErrorPathIT {
 
         assertTrue(
                 Massql.run(microQuery(), plain, null).isEmpty(),
-                "Step 6's rule: no '<' means MGF, and an MGF with no BEGIN IONS has no spectra");
+                "the sniff rule: no '<' means MGF, and an MGF with no BEGIN IONS has no spectra");
     }
 
     // ------------------------------------------------------------------ missing paths
@@ -169,7 +169,7 @@ class ErrorPathIT {
     /**
      * An unsupported function names the construct it rejected.
      *
-     * <p>Naming it is the whole point: {@code scaninfo} is the only supported function in this spike,
+     * <p>Naming it is the whole point: {@code scaninfo} is the only supported function,
      * so a user who writes {@code scansum} needs the message to say {@code scansum} rather than
      * "syntax error at line 1".
      */
@@ -186,7 +186,7 @@ class ErrorPathIT {
     /**
      * {@code QUERY scaninfo WHERE …} — the function-call form is required, and the message says so.
      *
-     * <p>Step 4 §4: this is the most likely thing a user carries over from prose descriptions of MassQL,
+     * <p>the parser: this is the most likely thing a user carries over from prose descriptions of MassQL,
      * so the parse error explains the form rather than pointing at a token.
      */
     @Test
@@ -231,7 +231,7 @@ class ErrorPathIT {
     /**
      * An empty {@code msLevel} tag drops the scan silently — the reference's behaviour, not a failure.
      *
-     * <p>verified against MassQL: pyteomics converts {@code msLevel=""} to
+     * <p>verified against the reference, which reads {@code msLevel=""} as
      * {@code None}, and MassQL tests {@code mslevel == 1} / {@code == 2}, so {@code None} matches
      * neither branch and the scan contributes nothing. Of this file's 10 scans, 8 are {@code msLevel=""}
      * and only scans 4 (MS2) and 8 (MS1) survive.

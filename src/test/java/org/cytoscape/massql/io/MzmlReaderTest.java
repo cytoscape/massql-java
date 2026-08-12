@@ -32,9 +32,9 @@ class MzmlReaderTest {
 
     @Test
     void scanIdTakesTheLastScanEqualsSegment() {
-        // int(id.replace("scanId=","").split("scan=")[-1])  -- msql_fileloading.py:575.
+        // Take the trailing scan= token and parse it as an int, as the reference does.
         // This determines every row's identity; the LAST segment matters, and the rule was
-        // missing from the spec entirely until Correction the rewrite.
+        // missing from the spec entirely until it was derived from source.
         assertEquals(1, MzmlReader.scanIdFrom("controllerType=0 controllerNumber=1 scan=1"));
         assertEquals(48, MzmlReader.scanIdFrom("controllerType=0 controllerNumber=1 scan=48"));
         assertEquals(7, MzmlReader.scanIdFrom("scanId=7"));
@@ -53,7 +53,7 @@ class MzmlReaderTest {
 
     // ------------------------------------------------------------------ the oracle cross-check
 
-    /** One scan's worth of the Step 2 parity dump. */
+    /** One scan's worth of the parity dump. */
     private record DumpScan(int scan, int mslevel, int peakCount) {}
 
     private static List<DumpScan> loadDump(Path gz) {
@@ -64,8 +64,7 @@ class MzmlReaderTest {
             throw new UncheckedIOException(e);
         }
         // Light regex extraction rather than a JSON dependency: Jackson finds modules via
-        // ServiceLoader, banned by DEPENDENCY_POLICY constraint 1. Step 8 needs the digests too and
-        // can invest in a fuller reader; Step 6 only needs counts.
+        // ServiceLoader, which this project does not use. Only counts are needed here.
         Pattern p =
                 Pattern.compile(
                         "\"scan\":\\s*(\\d+),\\s*\"mslevel\":\\s*(\\d+),\\s*\"peak_count\":\\s*(\\d+)");
@@ -84,9 +83,9 @@ class MzmlReaderTest {
     /**
      * The check that matters: our reader against MassQL's own loaded tables.
      *
-     * <p>Step 8 formalises this across all fixtures with bit-identical digests. Running a counts-level
+     * <p>The parity gate formalises this across all fixtures with bit-identical digests. Running a counts-level
      * version <b>here</b> is deliberate — a decoder or walk bug found now points at code written
-     * minutes ago, whereas the same bug found at Step 8 looks like a query-layer problem.
+     * minutes ago, whereas the same bug found at the parity gate looks like a query-layer problem.
      */
     @Test
     void smallMzmlMatchesTheOracleParityDump() {
@@ -171,7 +170,7 @@ class MzmlReaderTest {
     void scanThreeMatchesTheGoldenRecordFieldForField() {
         // output/small_mzml_results.json's first record. rt is asserted BIT-exact: the value does
         // not
-        // survive a float round-trip, which is why ScanIndex carries rt as a double (Step 5 §1).
+        // survive a float round-trip, which is why ScanIndex carries rt as a double (the store).
         Path mzml = Fixtures.require("data/small.mzML");
         try (SpectraStream s = SpectraFile.open(mzml)) {
             while (s.hasNext()) {
@@ -180,7 +179,8 @@ class MzmlReaderTest {
                 assertEquals(2, v.msLevel());
                 assertEquals(810.79, v.precmz());
                 assertEquals(2, v.ms1scan(), "document order, not spectrumRef");
-                assertEquals(0, v.charge(), "not recorded -> 0 sentinel; Step 10 converts to null");
+                assertEquals(
+                        0, v.charge(), "not recorded -> 0 sentinel; collation converts to null");
                 assertEquals(1, v.polarity());
                 assertEquals(
                         Double.doubleToLongBits(0.011218333333333334),

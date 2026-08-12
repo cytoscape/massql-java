@@ -31,20 +31,18 @@ import org.junit.jupiter.api.TestInstance;
  * <p>A timing threshold tight enough to be meaningful is also tight enough to fail on a loaded CI box,
  * and a test that fails for reasons unrelated to the code gets disabled — taking its real coverage with
  * it. So the only assertions here are absurdity ceilings: they catch an accidental quadratic, not a
- * regression of 20%. The <i>numbers</i> are the deliverable, and they go in
- * {@code DIFFERENTIAL_REPORT.md}.
+ * regression of 20%. The <i>numbers</i> are the deliverable, written to the report fragment below.
  *
  * <h2>The host spec is captured, never transcribed</h2>
  *
  * <p>⚠ A machine spec typed into a review document by hand is a number that is wrong later. This class
  * writes {@code build/reports/performance/measurements.txt} with the processor count, heap ceiling, OS
- * and JVM it actually ran on, and the report quotes that file. The pandas comparison in the report is a
+ * and JVM it actually ran on, and the report quotes that file. Any cross-implementation comparison is a
  * dated historical datapoint from a different machine, and is labelled as one — the two are not
  * measured under the same conditions and must not be presented as if they were.
  *
- * <p>The MGF is the fixture that matters. {@code SPIKE.md} §7: <i>"if Java isn't at least as fast as
- * pandas on the MGF, something is quadratic (probably a linear scan where a binary search belongs)."</i>
- * If that ever fires, look at {@code mzWindowExclusive} first — it is the hotter of the two window
+ * <p>The MGF is the fixture that matters: if this is not at least as fast as the reference on it, something is
+ * quadratic — probably a linear scan where a binary search belongs. If that ever fires, look at {@code mzWindowExclusive} first — it is the hotter of the two window
  * methods, being called per condition per scan.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -72,7 +70,7 @@ class PerformanceIT {
     private final List<Measurement> measurements = new ArrayList<>();
 
     /**
-     * ⛔ The one that answers SPIKE §11 Q8 — 34,513 spectra of MGF.
+     * ⛔ The one that matters — 34,513 spectra of MGF.
      *
      * <p>Run first and reported first, because it is the fixture whose timing carries information.
      */
@@ -130,10 +128,10 @@ class PerformanceIT {
                                 + " ms"
                                 + " absurdity ceiling. This is not a performance regression threshold -- at this"
                                 + " magnitude, suspect an accidental quadratic. Check mzWindowExclusive first:"
-                                + " it runs per condition per scan (Step 5 §4).");
+                                + " it runs per condition per scan (the store).");
     }
 
-    /** Writes the measurements and the host they were taken on, for {@code DIFFERENTIAL_REPORT.md}. */
+    /** Writes the measurements and the host they were taken on. */
     @AfterAll
     void writeTheReportFragment() {
         Runtime rt = Runtime.getRuntime();

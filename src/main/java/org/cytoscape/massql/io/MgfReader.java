@@ -21,8 +21,8 @@ import org.cytoscape.massql.spectra.SpectrumTableBuilder;
  * <p>Hand-written because the alternative, {@code uk.ac.ebi.pride.tools:mgf-parser} (28 KB), drags
  * fastutil (23 MB), logback and both JAXB stacks — every one of which this project refuses.
  *
- * <p><b>The specification is {@code _load_data_mgf_pyteomics}</b> (`msql_fileloading.py:155-244`), not
- * the MGF format documentation. Where the two differ, MassQL wins, because Step 8 asserts bit-identity
+ * <p><b>The reference loader is the specification</b>, not
+ * the MGF format documentation. Where the two differ, MassQL wins, because the parity gate asserts bit-identity
  * against what MassQL loaded.
  *
  * <p>MGF is a text format, so peaks are parsed as the block is read rather than deferred behind an
@@ -79,7 +79,8 @@ final class MgfReader extends AbstractSpectraStream {
         // Skip to BEGIN IONS, tolerating blank lines, comments and file-level headers.
         //
         // The file-level header is not merely skipped: a CHARGE= there is the DEFAULT CHARGE for
-        // every block that does not carry its own. pyteomics copies the header into each spectrum's
+        // every block that does not carry its own. The reference copies the header into each
+        // spectrum's
         // params, so `CHARGE=2+ and 3+` reaches MassQL as [2, 3] on every spectrum and it takes the
         // first -- 2. Only the header before the FIRST block counts, which is why this is guarded
         // on
@@ -130,7 +131,7 @@ final class MgfReader extends AbstractSpectraStream {
             int sp = firstSeparator(t);
             if (sp < 0) {
                 // A malformed peak line is an error, not something to skip: silently dropping peaks
-                // would change tic and base_peak and look like a decoder bug at Step 8.
+                // would change tic and base_peak and look like a decoder bug at the parity gate.
                 throw new MassqlException(
                         "malformed peak line in "
                                 + path
@@ -149,18 +150,18 @@ final class MgfReader extends AbstractSpectraStream {
                         "unparseable peak in " + path + " block " + blockIndex + ": " + t, e);
             }
 
-            // MGF drops ZERO-INTENSITY peaks. `_load_data_mgf_pyteomics` opens its
+            // MGF drops ZERO-INTENSITY peaks. The reference loader opens its
             // peak
-            // loop with `if intensity == 0: continue` (msql_fileloading.py), so such a peak never
+            // peak loop by skipping any zero intensity, so such a peak never
             // becomes
             // a row and MassQL cannot match it, count it, or sum it.
             //
             // ⚠ MGF ONLY. The mzML and mzXML loaders have no such guard -- small.mzML's parity dump
             // carries eight leading `0x0.0p+0` intensities, retained on both sides. Applying this
             // to the
-            // other readers would break the Step 8 gate on every mzML fixture.
+            // other readers would break the parity gate on every mzML fixture.
             //
-            // This was latent: no MGF fixture contained a zero-intensity peak, so the Step 8 gate
+            // This was latent: no MGF fixture contained a zero-intensity peak, so the parity gate
             // passed
             // while unable to detect the divergence. micro_zeroint.mgf exists to close that.
             //
@@ -198,7 +199,7 @@ final class MgfReader extends AbstractSpectraStream {
      *
      * <p>Handles every form the fixtures use: {@code 2}, {@code 2+}, {@code 2-}, and the multi-charge
      * {@code 2+ and 3+}. The multi-charge case is why this takes the <b>first</b> value rather than
-     * rejecting the line: pyteomics parses it to a list and MassQL reads element 0, so
+     * rejecting the line: the reference parses it to a list and reads element 0, so
      * {@code CHARGE=2+ and 3+} means charge 2 and the 3 is never consulted.
      *
      * <p>An unparseable value yields {@code fallback} rather than throwing, matching the reference
@@ -313,13 +314,13 @@ final class MgfReader extends AbstractSpectraStream {
          * <p>It is tempting to reason that MGF polarity "is not read on the live path" and infer 0 from that. The
          * first half is true: no MGF header supplies polarity. The inference was wrong. Both MGF loaders
          * write {@code "polarity": 1  # Default} into every peak dict
-         * (`msql_fileloading.py:67` and `:86`), so MassQL reports **positive** for every MGF row.
+         * hardcoded, so the reference reports **positive** for every MGF row.
          *
          * <p>Measured across all three MGF fixtures — {@code micro.mgf} 7 rows, {@code DP00570_F02.mgf}
          * 107,178, {@code PlusRise.mgf} 758,544 — the polarity distribution is {@code {1: all}}. Not one 0.
          *
-         * <p>Found by {@code ReaderParityIT}, the Step 8 gate, before any query logic existed. Returning 0
-         * here would have failed the Step 12 differential on the polarity column for **every MGF row**, and
+         * <p>Found by {@code ReaderParityIT}, the parity gate, before any query logic existed. Returning 0
+         * here would have failed the differential on the polarity column for **every MGF row**, and
          * at that layer it would have looked like a collation bug.
          */
         @Override
@@ -335,7 +336,7 @@ final class MgfReader extends AbstractSpectraStream {
         @Override
         public int ms1scan() {
             return 0;
-        } // hardcoded 0 (msql_fileloading.py:394)
+        } // hardcoded 0 in the reference
 
         @Override
         public int charge() {

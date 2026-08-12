@@ -9,7 +9,7 @@ import org.cytoscape.massql.spectra.SpectrumTable;
 import org.junit.jupiter.api.Test;
 
 /**
- * Proves Correction the memory claim instead of restating it.
+ * Proves the memory claim instead of restating it.
  *
  * <p>The whole justification for the streaming redesign is that retained memory is bounded by the
  * largest <b>scan</b>, not by the file. That claim came from arithmetic — 10.7–20.0 bytes of file per
@@ -67,7 +67,7 @@ class StreamingMemoryTest {
         // 758,544 real MS2 peak rows. The parity dump reports 758,545 because MassQL's MGF loader
         // synthesises a 1-row all-zero MS1 placeholder -- mz=0, i=0, scan=1, its
         // digests are the SHA of a zero. That row is not a peak, and our reader correctly omits it.
-        // Step 8's parity comparison must exclude it too, or it will report a phantom MS1 scan.
+        // the parity comparison must exclude it too, or it will report a phantom MS1 scan.
         assertEquals(
                 758_544L,
                 peaks,
@@ -155,7 +155,7 @@ class StreamingMemoryTest {
     }
 
     /**
-     * The same constrained-heap proof for <b>mzXML</b> (Step 7 §5).
+     * The same constrained-heap proof for <b>mzXML</b> (the mzXML reader).
      *
      * <p>mzXML is the format where a whole-file design is most tempting, because the interleaved array
      * decodes into two {@code double[]} at once. This asserts the streaming property holds there too:

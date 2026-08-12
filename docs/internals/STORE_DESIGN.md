@@ -1,17 +1,14 @@
 # Store design
 
-> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
-> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
-
 `SpectrumTable` and friends: the hand-written replacement for MassQL's pandas dataframe.
 
 ## Why this is written rather than imported
 
 No Java dataframe library is usable here. Tablesaw pulls ~44 MB and finds its I/O registry by
-**classpath scanning**, which breaks `DEPENDENCY_POLICY.md` constraint 1. Arrow has split
-packages and needs `sun.misc.Unsafe` plus JVM flags we do not control.
-So the dataframe is ours: parallel primitive arrays plus per-scan reductions. It is ordinary
-Java, and it is the bulk of the production LOC.
+**classpath scanning**, which this project does not permit. Arrow has split packages and needs
+`sun.misc.Unsafe` plus JVM flags an embedding application does not control. So the dataframe is
+hand-written: parallel primitive arrays plus per-scan reductions. It is ordinary Java, and it is the
+bulk of the production LOC.
 
 ## Layout
 
@@ -30,16 +27,16 @@ One instance per MS level. All arrays have length `rowCount`; no boxing, no per-
 
 ### ⚠ `rt` is stored twice, and the reason matters
 
-The per-peak column is `float`, per SPIKE.md §4. But **every `rt` that reaches the result JSON
+The per-peak column is `float`. But **every `rt` that reaches the result JSON
 comes from `ScanIndex.rtOf`, which is an exact `double`.**
 
 The mzML golden's first record has `rt = 0.011218333333333334`. That value does **not** survive
 a float round-trip — `ScanIndexTest` asserts exactly that, so the requirement is pinned rather
-than remembered. A float-only design would fail the Tech_Step12 differential with a tiny,
+than remembered. A float-only design would fail the differential with a tiny,
 confusing delta that looks like a reader bug.
 
 So: keep the cheap `float[]` for row-level RT filtering, and read `ScanIndex.rtOf` for anything
-that is reported. This is a real divergence from a literal reading of SPIKE.md §4.
+that is reported.
 
 ### Scan-level metadata lives on `ScanIndex`, not as peak columns
 
@@ -50,7 +47,7 @@ right and much smaller; a 20,000-peak MS1 scan would otherwise carry 20,000 copi
 retention time.
 
 `precmz`, `ms1scan` and `charge` carry MassQL's raw **0 sentinel** when the file recorded
-nothing. **The 0-to-null conversion is Tech_Step10's job, not this layer's** — converting early
+nothing. **The 0-to-null conversion belongs to collation, not this layer** — converting early
 would destroy the distinction between "absent" and "already converted", and `ms1scan == 0` is
 specifically what the precursor lookup checks for.
 
@@ -60,14 +57,13 @@ specifically what the precursor lookup checks for.
 ## Two tables per file, not one
 
 MS1 and MS2 peaks live in separate instances, mirroring MassQL's `ms1_df` / `ms2_df` split:
-`load_data()` returns exactly that pair, and Tech_Step10's precursor lookup queries the MS1
+`load_data()` returns exactly that pair, and the precursor lookup queries the MS1
 table while collating MS2 rows.
 
 For MGF, the MS1 side is an **empty table, not null** (`SpectrumTable.empty(1)`), which keeps
-Tech_Step10 free of null checks. Note the *reason* differs from what Tech_Step6 originally
-said — see Correction C14: MassQL's own MGF `ms1_df` is a synthetic 1-row placeholder, not
-empty, so `massql_query.py`'s `len(ms1_df) == 0`'s `len(ms1_df) == 0` branch never fires for MGF. An empty Java
-table produces identical results regardless.
+collation free of null checks. MassQL's own MGF `ms1_df` is a synthetic 1-row placeholder rather than
+empty, so `massql_query.py`'s `len(ms1_df) == 0` branch never fires for MGF. An empty Java table
+produces identical results regardless.
 
 ## Invariants
 
@@ -85,14 +81,14 @@ only when assertions happen to be enabled.
    `sortedAnyScan()` reports whether any sorting was necessary; record it if a real fixture
    ever trips it.
 
-   > ⚠ **This sort became load-bearing for the Step 8 parity gate, in a non-obvious way.**
-   > `ReaderParityIT` compares **SHA-256 over each peak array**, which is order-sensitive — so
-   > our array order must equal MassQL's *file* order. If a fixture ever arrives with descending
-   > m/z, this sort silently reorders our array and the digest fails, looking exactly like a
-   > decode bug. Measured across all 14 parity fixtures: **zero scans descend**, so the sort never
-   > fires. `PeakOrderPreconditionTest` asserts that from both sides — ours *and* MassQL's own
-   > order via the dumps' `mz_hex_first8` — and fails with the right explanation if it ever
-   > changes. Checking only our side would be circular, since the builder sorts.
+   > ⚠ **This sort is load-bearing for the parity gate, in a non-obvious way.**
+   > `ReaderParityIT` compares **SHA-256 over each peak array**, which is order-sensitive — so the
+   > array order here must equal MassQL's *file* order. If a fixture ever arrives with descending
+   > m/z, this sort silently reorders it and the digest fails, looking exactly like a decode bug.
+   > Measured across all 14 parity fixtures: **zero scans descend**, so the sort never fires.
+   > `PeakOrderPreconditionTest` asserts that from both sides — this store's order *and* MassQL's own,
+   > via the dumps' `mz_hex_first8` — and fails with the right explanation if it ever changes.
+   > Checking only one side would be circular, since the builder sorts.
 4. **`iNorm` / `iTicNorm` are computed at freeze**, never lazily, so the engine reads them as
    plain columns.
 5. **The table is immutable after `build()`.** No setters, no exposed arrays; `scanIds()`
@@ -101,7 +97,7 @@ only when assertions happen to be enabled.
 ### NaN on an all-zero scan is deliberate
 
 A scan whose peaks are all zero divides by zero, so `iNorm` and `iTicNorm` are `NaN`. That is
-the correct in-band "undefined", and Tech_Step10 maps NaN to JSON `null`. Substituting `0`
+the correct in-band "undefined", and collation maps NaN to JSON `null`. Substituting `0`
 would report a real value where there is none; substituting `1` would claim every peak is the
 base peak. Meanwhile `sum` is genuinely `0.0` — the TIC of an all-zero scan really is zero.
 
@@ -113,17 +109,16 @@ IntRange mzWindowExclusive(int scanOrdinal, double lo, double hi)   // (lo, hi) 
 ```
 
 Two binary searches bounded to the scan's own slice: O(log n), not O(n). If the MGF fixture is
-ever slower than pandas, this is the first place to look (SPIKE.md §7: *"something is quadratic
-— probably a linear scan where a binary search belongs"*).
+ever slower than pandas, this is the first place to look: something quadratic, probably a linear scan
+where a binary search belongs.
 
-**There are two methods because MassQL genuinely has two rules** (Correction C37). This
-originally documented one inclusive method and attributed the bounds to Tech_Step9; that was
-backwards. The split, both halves verified by running the reference implementation:
+**There are two methods because MassQL genuinely has two rules.** The split, both halves verified by
+execution:
 
 | Caller | Bound | Method | Source |
 |---|---|---|---|
-| Tech_Step9 condition windows (`MS2PROD`, `MS2PREC`, `MS1MZ`, `MS2NL`) | **STRICT** | `mzWindowExclusive` | `msql_engine_filters.py:253` + three siblings, `>`/`<` |
-| Tech_Step10 precursor lookup | **INCLUSIVE** | `mzWindow` | `massql_query.py`'s `ms1_df["mz"] >= precmz - tol`, `>=`/`<=` |
+| Condition windows (`MS2PROD`, `MS2PREC`, `MS1MZ`, `MS2NL`) | **STRICT** | `mzWindowExclusive` | `msql_engine_filters.py:253` + three siblings, `>`/`<` |
+| Precursor lookup | **INCLUSIVE** | `mzWindow` | `massql_query.py`'s `ms1_df["mz"] >= precmz - tol`, `>=`/`<=` |
 
 **Do not unify them to remove the apparent duplication.** Each caller's parity depends on
 getting its own bound, so collapsing to one rule trades one silent divergence for another. The
@@ -153,7 +148,7 @@ with the inclusive *value* bounds.
 
 **`argmax` returns a ROW INDEX, not a value**, so the caller can read a *different* column at
 that row. That is exactly what `base_peak_mz` needs: argmax over intensity, then read m/z
-(Tech_Step10 §3). A value-returning `max` cannot express it.
+A value-returning `max` cannot express it.
 
 **Ties in `argmax` resolve to the lowest row index** — i.e. the lowest m/z, given invariant 3.
 This matches pandas `idxmax`, which returns the first occurrence, and `massql_query.py`'s `groupby("scan")["i"].idxmax()`
@@ -171,17 +166,17 @@ break it.
 | `count` | `0` |
 
 Nothing throws: `scaninfo(MS1DATA)` can legitimately report a scan with no peaks, and
-Tech_Step10 still needs its `rt` and `tic`.
+Collation still needs its `rt` and `tic`.
 
 ## `RowMask`, and the `OTHERSCAN` seam
 
-`RowMask` is `BitSet`-backed and **immutable**: `and`/`or`/`not` return new instances. Tech_Step9
+`RowMask` is `BitSet`-backed and **immutable**: `and`/`or`/`not` return new instances. The engine
 composes several conditions, and a mask mutated in place while another condition holds a
 reference is a wrong-answer bug with no exception to point at it. Length mismatch throws.
 
 `scansWithAnyRow(table)` returns the ordinals of scans retaining at least one selected row.
 This is the shape most MassQL conditions actually need — they mean *"this scan contains a peak
-matching X"*, not *"this row matches X"*. Tech_Step9 §1 intersects these scan sets, because two
+matching X"*, not *"this row matches X"*. The engine intersects these scan sets, because two
 conditions may be satisfied by **different peaks in the same scan** and a row-level AND would
 wrongly reject it.
 
@@ -197,7 +192,7 @@ feature.
 
 ## Measured baselines
 
-From `StoreScaleTest` on an Apple M2, for Tech_Step12 §5 to compare against:
+From `StoreScaleTest` on an Apple M2:
 
 | Operation | Scale | Time |
 |---|---|---|
@@ -214,5 +209,5 @@ binary search looks like. A linear scan would track table size. The tests assert
 bounded) rather than an absolute time, so they do not flake on a busy machine.
 
 Both methods are timed separately. `mzWindowExclusive` is the busier of the two in practice —
-Tech_Step9 calls it per condition per scan, while `mzWindow` runs once per *qualifying* scan in
-Tech_Step10's lookup — so timing only the inclusive one would have guarded the cooler path.
+The engine calls it per condition per scan, while `mzWindow` runs once per *qualifying* scan in the
+precursor lookup — so timing only the inclusive one would guard the cooler path.

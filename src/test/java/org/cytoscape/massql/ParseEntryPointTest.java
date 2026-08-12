@@ -13,7 +13,7 @@ class ParseEntryPointTest {
 
     @Test
     void surroundingWhitespaceAndTrailingNewlinesAreIgnored() {
-        // massql_query.py strips the query file (load_query -> read().strip()), and the
+        // The reference strips the query file before parsing, and the
         // .massql files on disk end with a newline, so this is the normal case, not an edge.
         String canonical = Massql.parse(Q).canonical();
         for (String variant :

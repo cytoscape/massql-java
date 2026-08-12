@@ -1,15 +1,11 @@
 # Condition semantics
 
-> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
-> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
+Every rule the engine implements, with the source line that establishes it. **Where this document and
+the cited source lines disagree, the source lines win.**
 
-Every rule the engine implements, with the source line that establishes it. **Where this document and the
-pinned Python source disagree, the source wins** — and it has, five times.
-
-> ⚠ **The authority is `msql_engine_filters.py`, not `msql_engine.py`.** Tech_Step9 §3 cited only the latter.
-> The tolerance computation, the intensity comparators and **all four condition functions** live in
-> `msql_engine_filters.py`; only the scan-level conditions are in `msql_engine.py`. Two rules were wrong and
-> three incomplete, and mis-citing the file is the likeliest reason nobody checked (Correction C37).
+> ⚠ **The authority is `msql_engine_filters.py`, not `msql_engine.py`.** The tolerance computation, the
+> intensity comparators and **all four condition functions** live in `msql_engine_filters.py`; only the
+> scan-level conditions are in `msql_engine.py`.
 
 Each rule below is **one line of code and a silent wrong answer if missed** — no exception, no warning, just a
 different set of rows than MassQL returns.
@@ -41,12 +37,11 @@ differ, both verified:
 
 | Caller | Bound | Evidence |
 |---|---|---|
-| Step 9 condition windows | **strict** | the empty golden above |
-| Step 10 precursor lookup | **inclusive** | `massql_query.py`'s `ms1_df["mz"] >= precmz - tol` uses `>=`/`<=`; at `--precursor-tol-ppm 7.8125` an exactly-on-bound peak **does** populate `ms1_i` |
+| Condition windows | **strict** | the empty golden above |
+| Precursor lookup | **inclusive** | `massql_query.py`'s `ms1_df["mz"] >= precmz - tol` uses `>=`/`<=`; at `--precursor-tol-ppm 7.8125` an exactly-on-bound peak **does** populate `ms1_i` |
 
-Unifying them would introduce a fresh divergence in `ms1_i`/`ms1_precmz` — the columns Step 12 compares at
-1e-9 — while fixing this one. Tech_Step9 §3 originally said "both bounds inclusive… a peak exactly at an edge
-matches" (Correction C37a).
+Unifying them would introduce a divergence in `ms1_i`/`ms1_precmz` — the columns the differential compares
+at 1e-9.
 
 ## 2. Comparators
 
@@ -61,11 +56,11 @@ with a threshold of 300, a peak of 600 must match. Under true equality it would 
 
 ### There is no `Comparator.NONE`
 
-Tech_Step9 named it in four places. `Comparator` is `{EQ, GT, LT}` and `Qualifier` **rejects a null
+`Comparator` is `{EQ, GT, LT}` and `Qualifier` **rejects a null
 comparator**. Verified against the reference corpus: every in-scope qualifier carries `=`, `>` or `<`; the only
 comparator-less ones are out-of-scope and rejected at parse. So *"a missing comparator defaults to
 greater-than"* is about an **absent qualifier** — the implicit `> 0` above — not a qualifier that parsed
-without one (Correction C35a). The engine never has to ask "what if the comparator is missing", because it
+without one. The engine never has to ask "what if the comparator is missing", because it
 cannot be.
 
 ## 3. Intensity scales — three different denominators
@@ -76,8 +71,7 @@ cannot be.
 | `INTENSITYPERCENT` | `iNorm` (÷ **max** in scan) | **100** | `:77` |
 | `INTENSITYTICPERCENT` | `iTicNorm` (÷ **sum** in scan) | **100** | `:78` |
 
-Both "percent" qualifiers divide by 100 — Tech_Step9 §3 stated the rule for `INTENSITYPERCENT` only
-(Correction C37c). Confusing `iNorm` with `iTicNorm` gives a *plausible wrong answer* rather than an error,
+Both "percent" qualifiers divide by 100. Confusing `iNorm` with `iTicNorm` gives a *plausible wrong answer* rather than an error,
 which is why `IntensitySemanticsTest` uses a scan where all three scales disagree.
 
 ### The 0.99 cap
@@ -86,8 +80,7 @@ For `>` **only**, on **both** percent qualifiers: the threshold is clamped to `0
 
 `iNorm`'s maximum is exactly 1.0, so `INTENSITYPERCENT>100` would otherwise match nothing — the source's
 comment: *"if people set it to 100, then they won't get anything"*. The guard is `if scale > 1.0` (`:82-83`),
-so it covers `INTENSITYTICPERCENT` too; Tech_Step9's Known traps said "`INTENSITYPERCENT` only" (Correction
-C37d). It never applies to `INTENSITYVALUE`, and never to `>=` or `<`.
+so it covers `INTENSITYTICPERCENT` too. It never applies to `INTENSITYVALUE`, and never to `>=` or `<`.
 
 **Consequence worth knowing:** no `>` threshold on a percent column can be made unsatisfiable by raising it —
 monotonicity *flattens* above 99. `INTENSITYVALUE` has no cap and does eventually match nothing.
@@ -111,10 +104,10 @@ RT is in **minutes**, from `scanRt` at double precision.
 (`msql_engine.py:440-444`). `CHARGE` → equality (`:466`).
 
 > ⚠ **`POLARITY` cannot filter an MGF, and matches EVERYTHING there.** MGF polarity is a hardcoded `1`
-> (Correction C33 — our reader returned `0` until the Step 8 gate caught it), so `POLARITY=Positive` matches
+>, so `POLARITY=Positive` matches
 > every MGF scan and `POLARITY=Negative` none, whatever the spectra are. A `POLARITY=Positive` query over
-> `PlusRise.mgf` returning all **21,942** loaded scans is **correct**. It is in the Step 13 known-deviations
-> list because there is no way to tell from the output.
+> `PlusRise.mgf` returning all **21,942** loaded scans is **correct**, and there is no way to tell from the
+> output.
 
 ## 6. Structure — scan-level, not row-level
 
@@ -134,7 +127,7 @@ implementation returns `[]` where the correct answer is `[3]`.
 Because no predicate ever sees a *reduced* peak list, each condition is a pure intersection `S ← S ∩ P` with
 `P` fixed by the file — and intersection commutes. The constructs that **do** read filtered state
 (`OTHERSCAN`, `INTENSITYMATCH*`, `CARDINALITY`, `EXCLUDED`) are all **rejected at parse**, which is what makes
-this airtight rather than merely plausible (Correction C37g).
+this airtight rather than merely plausible.
 
 Empirical backing needed a new fixture: `small.mzML`'s MS1 scans are profile-mode on an **identical m/z grid**
 (19,800 peaks each), so no `MS1MZ` value distinguishes them, and `micro.mzML` has one usable MS1 scan.
@@ -147,16 +140,16 @@ MassQL's loaders `continue` on an empty intensity array, so its dataframes hold 
 
 A peak-based condition fails an empty scan by itself — but a **scan-level** condition never looks at peaks. So
 without an explicit guard a scan-level-only query returns **34,513** scans on `PlusRise.mgf` where MassQL
-returns **21,942**: a third of the result set, silently (Correction C35c).
+returns **21,942**: a third of the result set, silently.
 
 The guard sits **before** the MS1 retention, because an empty MS1 must not become an `ms1scan` link either
-(C27b) — the same rule one layer up.
+ — the same rule one layer up.
 
 ## 8. `MS2NL` — neutral loss
 
 The source matches **per peak** on `(precmz − mz)` against `(value − tol, value + tol)`, rather than building
-one target (`:311-315`). Algebraically the same window, so either form is faithful; we rearrange to a window
-on `mz` so the binary search does the work.
+one target (`:311-315`). Algebraically the same window, so either form is faithful; this SDK rearranges to a
+window on `mz` so the binary search does the work.
 
 - A `precmz == 0` scan is excluded — **naturally**, since `0 − mz` is negative while the window is positive.
   The explicit guard states the rule rather than relying on the arithmetic.
@@ -179,15 +172,14 @@ matching it bit-for-bit is the goal, so `0.1 + 0.2` must stay `0.300000000000000
 Division by zero yields **infinity, not an exception** — an infinite target matches nothing, which is the right
 outcome for a degenerate query.
 
-⚠ The AST is `Expr.Literal` / `Expr.Binary` / **`Expr.Unary`**. Tech_Step9 §4 named "`BinaryExpr` over
-`NumberLiteral`s" — neither type exists — and omitted `Unary` entirely, so a folder written to the spec would
-silently leave `MS2NL=-18` unfolded (Correction C35e).
+⚠ The AST is `Expr.Literal` / `Expr.Binary` / **`Expr.Unary`**. A folder that omits `Unary` silently leaves
+`MS2NL=-18` unfolded.
 
 ## 11. Diagnostics
 
-The SDK **logs nothing** — `DEPENDENCY_POLICY.md` **constraint 2** (Tech_Step9 §5 cited constraint 5, which is
-"No split packages"). A valid-but-degenerate query returns its explanation in `ExecutionSummary.diagnostics()`
-instead: the CLI writes them to stderr; a GUI could show them in a dialog.
+The SDK **logs nothing**, to either stream. A valid-but-degenerate query returns its explanation in
+`ExecutionSummary.diagnostics()` instead: the CLI writes them to stderr; a GUI could show them in a
+dialog.
 
 An empty result set is a legitimate answer. A **silent** empty result set is a poor one.
 
@@ -195,9 +187,9 @@ An empty result set is a legitimate answer. A **silent** empty result set is a p
 
 ## The properties, and their preconditions
 
-Ported from `oracle/test_query_py_reference.py`. Tech_Step9 called these *"pure profit — no reference data
-needed"*: the properties are self-referential, but the tests as written need two fixtures we do not have
-(`featurelist_pos.mgf`, `GNPS00002_A3_p.mzML` — MassQL's own test data), so they are reconstructed on ours.
+Ported from MassQL's own `tests/test_query.py`. The properties are self-referential, but the tests as
+written need two fixtures this project does not have (`featurelist_pos.mgf`, `GNPS00002_A3_p.mzML` —
+MassQL's own test data), so they are reconstructed on the fixtures here.
 
 | Property | General? |
 |---|---|
@@ -211,6 +203,5 @@ another below it, placing it in *both* sets — correctly. The reference test av
 `TOLERANCEMZ=0.01`; `IntensityAlgebraTest` constructs that precondition and **asserts it** rather than
 assuming it.
 
-**There is no "tripartite partition."** Tech_Step9 described `<` ∪ `=` ∪ `>` as "covering everything exactly
-once". That is impossible: `=` means `>=`, which *contains* `>` by construction. The reference test asserts the
-real relationship — `>` ⊆ `=` — and so do we (Correction C37h).
+**`<` ∪ `=` ∪ `>` is not a partition.** `=` means `>=`, which *contains* `>` by construction. The reference
+test asserts the real relationship, `>` ⊆ `=`, and so does this SDK.

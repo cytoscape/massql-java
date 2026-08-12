@@ -158,7 +158,7 @@ class MassqlApiTest {
 
     @Test
     void nullOptionsMeanDefaults() {
-        // 20.0 ppm is the documented default and what massql_query.py uses, so passing null must
+        // 20.0 ppm is the documented default and what the reference uses, so passing null must
         // not
         // silently produce a zero tolerance -- which would match nothing and look like a data bug.
         List<ScanInfoResult> withNull = Massql.run(Q, smallMzml(), null);

@@ -31,7 +31,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  *
  * <ul>
  *   <li>{@code hasNext()} is <b>repeatable</b> — the classic peek bug is a second call silently
- *       swallowing a scan, and nothing previously could detect it.</li>
+ *       swallowing a scan.</li>
  *   <li>{@code next()} past the end <b>throws</b> instead of handing back the last scan again.</li>
  *   <li>A drained stream <b>stays</b> drained, so reusing one fails loudly rather than looking like a
  *       query that matched nothing.</li>

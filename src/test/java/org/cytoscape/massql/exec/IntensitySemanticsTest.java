@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The comparator and intensity-scale rules, from {@code _get_intensity_mask}
- * (`msql_engine_filters.py:65-96`).
+ * as the reference's intensity masking does.
  *
  * <p>Every rule here is one line of code and a silent wrong answer if missed. Two of them were **wrong or
  * incomplete** in the condition filters until — the ÷100 on `INTENSITYTICPERCENT`, and the cap's scope.
@@ -234,7 +234,7 @@ class IntensitySemanticsTest {
 
         // A generous absolute threshold cannot rescue the row: iNorm/iTicNorm still face > 0, and
         // NaN
-        // fails every comparison -- which is also how pandas behaves.
+        // fails every comparison -- which is also how the reference behaves.
         assertFalse(
                 IntensityQualifiers.rowQualifies(
                         t, 0, List.of(q(QualifierType.INTENSITYVALUE, Comparator.LT, 1_000_000))),

@@ -23,16 +23,16 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * ⛔ <b>THE GATE.</b> Every fixture/golden pair, compared column by column against the answers
- * MassQL's own Python implementation produced.
+ * MassQL's own reference implementation produced.
  *
- * <p>This table <i>is</i> the spike's exit criterion. Green means the SDK reproduces MassQL on real
+ * <p>This table is the project's exit criterion. Green means the SDK reproduces MassQL on real
  * files in all three formats; anything less is a finding to report, not a threshold to adjust.
  *
  * <h2>What makes this different from the parity gate</h2>
  *
- * <p>Step 8 proves the three <b>readers</b> decode bit-identically. This proves the whole
+ * <p>the parity gate proves the three <b>readers</b> decode bit-identically. This proves the whole
  * <b>pipeline</b> — parse, filter, collate, precursor lookup — arrives at the same rows. A decode
- * error surfaces at Step 8, where it is a one-line fix; a filtering or collation error surfaces
+ * error surfaces at the parity gate, where it is a one-line fix; a filtering or collation error surfaces
  * here. Keeping them apart is what makes a failure here attributable.
  *
  * <p>⚠ The comparison policy lives in {@link ResultComparator}, deliberately in one place, and
@@ -165,14 +165,14 @@ class DifferentialIT {
                 () ->
                         "⛔ DIFFERENTIAL FAILURE -- "
                                 + diffs.size()
-                                + " difference(s) vs the Python golden:\n  "
+                                + " difference(s) vs the golden:\n  "
                                 + String.join("\n  ", diffs.subList(0, Math.min(diffs.size(), 20)))
                                 + (diffs.size() > 20
                                         ? "\n  … and " + (diffs.size() - 20) + " more"
                                         : "")
                                 + "\n\nDo NOT loosen a tolerance to make this pass. If ms1_i or ms1_precmz"
                                 + " is null where the golden has a value, check the m/z window method"
-                                + " first: Step 10's lookup must use the INCLUSIVE mzWindow.");
+                                + " first: the precursor lookup must use the INCLUSIVE mzWindow.");
     }
 
     /** The two empty goldens deserve their own assertion, so `[]` can never read as "not checked". */

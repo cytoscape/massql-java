@@ -60,7 +60,7 @@ public final class Massql {
     /**
      * Parses query text into a typed, immutable AST.
      *
-     * <p>Leading and trailing whitespace is ignored, matching {@code massql_query.py}.
+     * <p>Leading and trailing whitespace is ignored, matching the reference.
      *
      * @throws MassqlParseException on a syntax error, or on a construct that is valid MassQL but
      *     outside this version's {@code scaninfo} subset. The exception's

@@ -22,7 +22,7 @@ import org.cytoscape.massql.spectra.SpectrumTable;
  *
  * <p>That is not an interpretation; it is what the source does. Every condition function reduces its matches
  * to a <i>scan set</i> and then re-admits <b>all rows of those scans</b>
- * (`msql_engine_filters.py:283-288`, `:557-562`), so the next condition sees every peak of each surviving
+ * so the next condition sees every peak of each surviving
  * scan. A consequence worth knowing: because no predicate ever sees a reduced peak list, each condition is a
  * pure set intersection and **condition order is irrelevant** — proven, and pinned by
  * {@code micro_ms1var.mzML}, the only fixture that can discriminate.
@@ -52,13 +52,13 @@ public final class ConditionFilters {
      * Evaluates a scan-level condition against metadata only.
      *
      * <p>Bound strictness is deliberately <b>asymmetric</b> and must not be unified:
-     * {@code RTMIN}/{@code RTMAX} are <b>strict</b> ({@code >} / {@code <}, `msql_engine.py:425,432`), while
+     * {@code RTMIN}/{@code RTMAX} are <b>strict</b> ({@code >} / {@code <}), while
      * {@code SCANMIN}/{@code SCANMAX} are <b>inclusive</b> ({@code >=} / {@code <=}, `:452,459`). Verified;
      * the difference is real.
      */
     public static boolean scanLevelHolds(Condition c, ScanView v) {
         if (c instanceof Condition.PolarityIs p) {
-            // polarity == 1 positive / == 2 negative (msql_engine.py:440-444). 0 (unknown) matches
+            // polarity == 1 positive / == 2 negative. 0 (unknown) matches
             // neither.
             int want = p.polarity() == Polarity.POSITIVE ? 1 : 2;
             return v.polarity() == want;
@@ -74,7 +74,7 @@ public final class ConditionFilters {
                     cv.values(),
                     target -> {
                         // The scan's own precursor m/z, in a STRICT window
-                        // (msql_engine_filters.py:410).
+                        // for the precursor condition.
                         double lo = Tolerance.loFor(cv.qualifiers(), target);
                         double hi = Tolerance.hiFor(cv.qualifiers(), target);
                         return v.precmz() > lo && v.precmz() < hi;

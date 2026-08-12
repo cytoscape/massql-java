@@ -28,10 +28,10 @@ import com.google.gson.JsonParser;
 /**
  * Layer 4 — the CLI contract, established by forking the <b>assembled uber-jar</b> as a real process.
  *
- * <h2>Why a subprocess, when Step 11 already tests {@code Main.run} in-process</h2>
+ * <h2>Why a subprocess, when the CLI already tests {@code Main.run} in-process</h2>
  *
  * <p>{@code Main.run(String[], PrintStream, PrintStream)} takes both streams as parameters, which is
- * what lets Step 11's {@code MainStreamDisciplineTest} capture them without {@code System.setOut}.
+ * what lets the CLI's {@code MainStreamDisciplineTest} capture them without {@code System.setOut}.
  * That design is also the reason an in-process test <b>cannot</b> prove the thing this class exists
  * for: passing two {@code ByteArrayOutputStream}s proves the code writes to the right
  * <i>parameter</i>, not that a real process keeps two real file descriptors apart. Only a fork can
@@ -164,7 +164,7 @@ class CliContractIT {
      *
      * <p>At 0.001 ppm no MS1 peak can match, so every {@code ms1_i}/{@code ms1_precmz} is null — while
      * every {@code ms1_base_peak_i} <b>survives</b>, because the scan-level base peak is not a lookup
-     * and does not depend on the tolerance at all (Step 10 §3.2).
+     * and does not depend on the tolerance at all (collation).
      *
      * <p>This is the only place that rule is observable from <i>outside</i> the SDK, which is why the
      * spec asks for it explicitly. A CLI that silently ignored {@code --precursor-tol-ppm} would still
@@ -197,7 +197,7 @@ class CliContractIT {
                 0,
                 nullCount(rows, "ms1_base_peak_i"),
                 "⛔ ms1_base_peak_i SURVIVES a tolerance miss -- it is the MS1 scan's base peak, not a"
-                        + " matched precursor peak (Step 10 §3.2). A null here means the lookup and the"
+                        + " matched precursor peak (collation). A null here means the lookup and the"
                         + " scan-level base peak have been conflated.");
     }
 
@@ -348,7 +348,7 @@ class CliContractIT {
                 () -> "usage text reached stdout on a SUCCESSFUL run:\n" + out);
     }
 
-    /** Matches {@code massql_query.py}'s {@code sys.stdout.write("\n")}. */
+    /** Matches the reference tool's trailing newline on stdout. */
     @Test
     void thePipedPayloadEndsWithExactlyOneTrailingNewline() {
         Run r = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery());
@@ -416,7 +416,7 @@ class CliContractIT {
     /**
      * A missing file is a <b>usage</b> error: exit 2, message names the path, stdout untouched.
      *
-     * <p>Step 11's {@code MainExitCodeTest} owns the code mapping in-process. What is added here is that
+     * <p>the CLI's {@code MainExitCodeTest} owns the code mapping in-process. What is added here is that
      * the failing path writes <b>nothing</b> to a real stdout — a partial array followed by an error is
      * the failure mode that would corrupt a consumer pipeline.
      */

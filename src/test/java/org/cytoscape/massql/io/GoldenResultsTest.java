@@ -19,12 +19,12 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * ⛔ <b>Tests the test.</b> A golden reader that silently returns fewer rows turns the differential
- * differential — the spike's exit criterion — into a green light that proves nothing.
+ * differential into a green light that proves nothing.
  *
  * <p>This is not a hypothetical failure mode in this repository. {@code ParityDump}'s hand-rolled
  * regex stopped at {@code polarity} and silently dropped {@code charge}, {@code ms1scan} and
  * {@code precmz}; three columns went uncompared, and an MGF charge bug survived a <b>green</b>
- * the parity gate gate for five steps before surfacing at Step 11. Every rejection below
+ * the parity gate gate for five steps before surfacing at the CLI. Every rejection below
  * is one that regex-shaped parsing would have let through.
  */
 class GoldenResultsTest {

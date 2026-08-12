@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 /** Loads the checked-in reference-parse corpus and its disposition manifest. */
 final class Corpus {
 
-    /** Measured at the pinned SHA. SPIKE.md claims 47; 46 is the real count. */
+    /** Measured at the pinned SHA. */
     static final int EXPECTED_SIZE = 46;
 
     static final int EXPECTED_PARSE = 15;

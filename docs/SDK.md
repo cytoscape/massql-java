@@ -161,7 +161,7 @@ Results follow the contract in [`RESULT_SCHEMA.md`](RESULT_SCHEMA.md).
 
 ---
 
-## Some deviations from the Python reference
+## Known deviations
 
 Six differences. 
 

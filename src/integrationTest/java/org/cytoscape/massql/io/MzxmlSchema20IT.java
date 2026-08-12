@@ -98,7 +98,8 @@ class MzxmlSchema20IT {
 
     @Test
     void theElevenNearEmptyScansAreReadNotSkipped() {
-        // Step 2 recorded peaksCount="3" scans as worth hand-checking. There are 11 of them (the
+        // the fixtures recorded peaksCount="3" scans as worth hand-checking. There are 11 of them
+        // (the
         // spec
         // implies fewer). A three-peak scan is where an off-by-one in the interleaved
         // de-interleaving

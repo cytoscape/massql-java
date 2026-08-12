@@ -71,7 +71,7 @@ class CollationAnchorIT {
     /**
      * {@code tic} is compared at RELATIVE 1e-6, not bit-identically.
      *
-     * <p>MassQL's intensity column is {@code float32} and {@code tic} is a pandas {@code groupby.sum()}
+     * <p>The reference's intensity column is {@code float32} and {@code tic} is a per-scan sum over it
      * over it, so the golden carries float32 accumulation error while our float64 sum is <b>exact</b>. The
      * error is in the reference, not in us: golden {@code 586278.875} vs our {@code 586278.8533592224},
      * relative <b>3.691e-08</b>. All six golden rows differ.

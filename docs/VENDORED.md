@@ -2,12 +2,10 @@
 
 Everything under `src/main/java/org/cytoscape/massql/io/vendor/`.
 
-> ⚠ **This file is a redistribution obligation, not a courtesy.** It is asserted to exist and to match the
-> artifact. **All twelve vendored files' headers point readers here** (*"See docs/VENDORED.md for the rationale
-> and the full modification list"*) and there was nothing to point at.
->
-> per-file headers by `VendoredProvenanceTest`. Every vendored file's header points readers here, so this
-> record and those headers have to agree — the test is what keeps them agreeing.
+> ⚠ **This file is a redistribution obligation, not a courtesy.** All eleven vendored files' headers point
+> readers here (*"See docs/VENDORED.md for the rationale and the full modification list"*), so this record
+> and those headers have to agree. `VendoredProvenanceTest` asserts each header carries its provenance,
+> licence election and modification note.
 
 ## Why anything is vendored at all
 
@@ -18,7 +16,7 @@ embeddable. So the
 **decode path only** is vendored — the smallest set that decodes an mzML binary array — and everything above it
 (readers, the store, the engine) is written here.
 
-`DEPENDENCY_POLICY.md` constraint 5 (no split packages) is why these live under our own
+Split packages are not permitted, which is why these live under the project's own
 `…massql.io.vendor` package rather than keeping their upstream `io.github.msdk.*` names.
 
 ## Licence election
@@ -32,7 +30,7 @@ Original copyright is retained verbatim in each header: *(C) Copyright 2015-2016
 
 ## The vendored files
 
-12 files, ~2,670 lines, all from `msdk-io-mzml` at the commit above.
+11 files, ~2,670 lines, all from `msdk-io-mzml` at the commit above.
 
 | File | Lines | Upstream path (under `msdk-io-mzml/src/main/java/io/github/msdk/io/mzml/`) | Modifications |
 |---|---|---|---|
@@ -48,8 +46,8 @@ Original copyright is retained verbatim in each header: *(C) Copyright 2015-2016
 | `MzMLBitLength.java` | 52 | `data/MzMLBitLength.java` | package declaration only |
 | `MzMLArrayType.java` | 49 | `data/MzMLArrayType.java` | package declaration only |
 
-Ten of the eleven are **byte-identical to upstream apart from the package line**, which is the property that
-makes a future re-sync a mechanical diff rather than a merge.
+Nine of the eleven are **byte-identical to upstream apart from the package line**, which is the property
+that makes a future re-sync a mechanical diff rather than a merge.
 
 ### `MzMLPeaksDecoder` — the only substantive edits
 
@@ -57,18 +55,18 @@ Three substitutions, each removing a dependency rather than changing behaviour:
 
 | Upstream | Here | Why |
 |---|---|---|
-| Guava `com.google.common.io.LittleEndianDataInputStream` | our `LittleEndianDataInput` | Guava cannot be a dependency. See below |
+| Guava `com.google.common.io.LittleEndianDataInputStream` | `LittleEndianDataInput` here | Guava cannot be a dependency. See below |
 | commons-io `IOUtils.toByteArray(dis)` | `InputStream.readAllBytes()` | JDK 9+ has it; the dependency bought nothing |
-| `MSDKException` | `MassqlException` | MSDK types must not appear in our signatures |
+| `MSDKException` | `MassqlException` | MSDK types must not appear in this project's signatures |
 
 ### `MzMLBinaryDataInfo` — one removal
 
-`javax.annotation.Nonnull` dropped. jsr305 is banned by `DEPENDENCY_POLICY.md`, and the annotation carries no
+`javax.annotation.Nonnull` dropped. jsr305 is a banned dependency, and the annotation carries no
 runtime behaviour, so removing it changes nothing observable.
 
 ## Not vendored, despite living in this package
 
-Two files under `io/vendor/` are **ours** and deliberately carry no provenance header.
+Two files under `io/vendor/` are **written for this project** and deliberately carry no provenance header.
 `VendoredProvenanceTest` skips them by detecting the explicit *"Not vendored"* marker in their javadoc rather
 than by a filename list, so a genuinely vendored file cannot be quietly exempted by adding it to an allowlist.
 
@@ -77,9 +75,9 @@ than by a filename list, so a genuinely vendored file cannot be quietly exempted
 | `LittleEndianDataInput.java` | Written here as a drop-in replacement for the Guava class `MzMLPeaksDecoder` used. Implements only the four methods the decoder calls — `readInt`, `readLong`, `readFloat`, `readDouble` — because anything else would be untested code. Extends `FilterInputStream` so `readAllBytes()` comes free, which is what replaces the commons-io call. Little-endian is load-bearing: mzML binary arrays are little-endian while mzXML's are big-endian, and getting it wrong yields plausible garbage rather than an error |
 | `package-info.java` | Package documentation, written here |
 
-It sits in `io/vendor/` because it exists solely to serve the vendored decoder; moving it out would separate it
-from its only caller. That it is *not* vendored is the reason this section exists at all — the first version of
-`VendoredProvenanceTest` assumed everything in the directory was upstream code and failed on this file.
+It sits in `io/vendor/` because it exists solely to serve the vendored decoder; moving it out would separate
+it from its only caller. ⚠ Not everything in that directory is upstream code, which is why
+`VendoredProvenanceTest` detects the marker rather than assuming.
 
 ## Re-syncing against upstream
 
@@ -93,7 +91,6 @@ from its only caller. That it is *not* vendored is the reason this section exist
 
 ## References
 
-- `DEPENDENCY_POLICY.md` — constraint 5 (no split packages), the jsr305 and Guava bans, the size budget
-- `docs/harness/` — the project's historical engineering record, including what was vendored and why, and
-  why the mzXML parser was **hand-written** instead: reusing MSDK's would have dragged in 7 `datamodel`
-  types and Guava via `SimpleMsScan`
+- `bannedDependencies` in `build.gradle` — the jsr305 and Guava bans, and the closure-size budget
+- The mzXML parser is **hand-written** rather than vendored: reusing MSDK's would have dragged in 7
+  `datamodel` types and Guava via `SimpleMsScan`

@@ -186,12 +186,10 @@ class AstShapeTest {
 
     @Test
     void comparatorHasExactlyThreeConstantsAndNoNONE() {
-        // removed Comparator.NONE. the AstShapeTest row previously required
-        // the
-        // OPPOSITE -- "Comparator.NONE survives when the source omits a comparator" -- so the spec
-        // contradicted the code for five steps and the same fact was rediscovered from scratch
-        // at
-        // Step 9. Asserting the enum's arity directly is what makes reintroducing NONE fail HERE,
+        // There is no Comparator.NONE. An omitted comparator is not a comparator constant --
+        // it is an absent qualifier, handled at
+        // the engine. Asserting the enum's arity directly is what makes reintroducing NONE fail
+        // HERE,
         // rather
         // than in whatever downstream switch forgets to handle it.
         assertEquals(

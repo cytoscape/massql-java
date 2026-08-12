@@ -18,8 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * MGF rules, all derived from {@code _load_data_mgf_pyteomics} (`msql_fileloading.py:155-244`) rather
- * than from the MGF format documentation — where the two differ, MassQL wins, because Step 8 asserts
+ * MGF rules, all derived from the reference loader rather
+ * than from the MGF format documentation — where the two differ, MassQL wins, because the parity gate asserts
  * bit-identity against what MassQL loaded.
  */
 class MgfReaderTest {
@@ -63,10 +63,10 @@ class MgfReaderTest {
     @Test
     void chargeFallsBackToOneOnlyWhenTheFileDeclaresNoneEither(@TempDir Path dir)
             throws IOException {
-        // ⚠ SPIKE.md §3 says MGF charge is "null if absent"; the live
-        // pyteomics loader uses params.get('charge', [1]) with `except: charge = 1`. Since only 0
+        // ⚠ MGF charge is NOT "null if absent": the reference loader uses
+        // params.get('charge', [1]) with `except: charge = 1`. Since only 0
         // is
-        // null-converted (Step 10 §4), MGF charge is NEVER null -- a genuine 1+ and an absent
+        // null-converted (collation), MGF charge is NEVER null -- a genuine 1+ and an absent
         // CHARGE are indistinguishable. 1 is the fallback for a file with no CHARGE anywhere; a
         // file-level header supplies a different default, which is the case below this one.
         Path p =
@@ -88,7 +88,7 @@ class MgfReaderTest {
             throws IOException {
         // ⛔ -- and it is a real file's behaviour, not a hypothetical:
         // DP00570_F02.mgf declares `CHARGE=2+ and 3+` once, then omits CHARGE= from 583 of its 625
-        // blocks. pyteomics copies the file header into EVERY spectrum's params, so MassQL sees
+        // blocks. The reference copies the file header into EVERY spectrum's params, so it sees
         // [2, 3] on all of them and takes element 0. Reading only per-block CHARGE= lines gave 1
         // for
         // 93% of that file.
@@ -129,7 +129,8 @@ class MgfReaderTest {
 
     @Test
     void onlyTheHeaderBeforeTheFirstBlockCounts(@TempDir Path dir) throws IOException {
-        // A CHARGE= sitting between two blocks is not a file header -- pyteomics stops reading the
+        // A CHARGE= sitting between two blocks is not a file header -- the reference stops reading
+        // the
         // header at the first BEGIN IONS. Treating it as one would silently re-default every
         // following block.
         Path p =
@@ -166,7 +167,7 @@ class MgfReaderTest {
         assertEquals(2, rows.get(597).charge(), "and so does block 598");
 
         // The whole-file distribution, taken from the oracle itself:
-        //     pyteomics + msql_fileloading -> {2: 583, 1: 42}
+        //     the reference loader -> {2: 583, 1: 42}
         // The 42 are the blocks carrying their own `CHARGE=1+`; the 583 inherit the header. Before
         // This once read {1: 625} and nothing noticed, because the loader-parity dumps did not
         // record
@@ -233,7 +234,7 @@ class MgfReaderTest {
     void retentionTimeIsSecondsOver60AndAbsentMeansZeroNotNull(@TempDir Path dir)
             throws IOException {
         // 0.0 is a REAL value here, not a missing one. plusrise_results.json has rt: 0.0 on all 664
-        // records, so an over-eager null conversion would fail 664 rows at once (Step 10 §4).
+        // records, so an over-eager null conversion would fail 664 rows at once (collation).
         Path p =
                 write(
                         dir,
@@ -256,7 +257,7 @@ class MgfReaderTest {
 
     @Test
     void scanIdIsScansWhenPresentElseTheOneBasedBlockIndex(@TempDir Path dir) throws IOException {
-        // Getting this wrong shifts every row's identity and makes the Step 12
+        // Getting this wrong shifts every row's identity and makes the differential
         // differential fail in a way that looks like a filtering bug.
         Path withScans =
                 write(
@@ -309,19 +310,16 @@ class MgfReaderTest {
                 """);
         Row r = readAll(p).get(0);
         assertEquals(2, r.msLevel(), "MGF is an MS2-only peak list");
-        assertEquals(0, r.ms1scan(), "hardcoded 0 (msql_fileloading.py:394) -> null downstream");
+        assertEquals(0, r.ms1scan(), "hardcoded 0 in the reference -> null downstream");
 
-        // ⚠ -- this assertion used to require 0, reasoning that "polarity is not read on
-        // the
-        // live path"). the premise is right (no MGF header carries polarity) but its conclusion
-        // was
-        // wrong: both MGF loaders write `"polarity": 1  # Default` into every peak dict
-        // (msql_fileloading.py:67 and :86), so MassQL reports POSITIVE for every MGF row. Measured
+        // ⚠ No MGF header carries polarity, but that does NOT make it 0: both MGF loaders write
+        // `"polarity": 1  # Default` into every peak dict
+        // hardcoded, so the reference reports POSITIVE for every MGF row. Measured
         // across
         // all three MGF fixtures -- 7 + 107,178 + 758,544 rows -- the distribution is {1: all}, not
         // one 0.
         //
-        // Caught by ReaderParityIT, the Step 8 gate. Returning 0 would have failed the Step 12
+        // Caught by ReaderParityIT, the parity gate. Returning 0 would have failed the differential
         // differential on the polarity column for EVERY MGF row, where it would have looked like a
         // collation bug rather than a reader default.
         assertEquals(1, r.polarity(), "MGF polarity is a hardcoded 1 (positive), not 0");
@@ -345,7 +343,7 @@ class MgfReaderTest {
         // Not hypothetical: 12,571 of PlusRise.mgf's 34,513 blocks have no peak lines. They are
         // real
         // spectra and the reader must yield them; MassQL's dataframe simply has no ROWS for them,
-        // which is why it reports 21,942 unique scans. Step 8's parity must expect that asymmetry.
+        // which is why it reports 21,942 unique scans. The parity gate must expect that asymmetry.
         Path p =
                 write(
                         dir,
@@ -367,7 +365,8 @@ class MgfReaderTest {
 
     @Test
     void malformedPeakLineThrowsRatherThanSkipping(@TempDir Path dir) throws IOException {
-        // Silently dropping a peak would change tic and base_peak and surface at Step 8 as a
+        // Silently dropping a peak would change tic and base_peak and surface at the parity gate as
+        // a
         // decoder bug with no obvious cause.
         Path p =
                 write(
@@ -427,7 +426,8 @@ class MgfReaderTest {
             assertEquals(500.5, t.index().precmzOf(0));
             assertEquals(2, t.index().chargeOf(0));
             assertEquals(0, t.index().ms1scanOf(0));
-            // Step 5's builder sorts by ascending m/z, so windows work on the out-of-order input.
+            // the store's builder sorts by ascending m/z, so windows work on the out-of-order
+            // input.
             assertEquals(100.0, t.mz(0));
             assertEquals(300.0, t.mz(2));
             assertEquals(10.0, t.intensity(0));

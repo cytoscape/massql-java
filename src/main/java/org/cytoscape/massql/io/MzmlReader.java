@@ -107,7 +107,7 @@ final class MzmlReader extends AbstractSpectraStream {
                     continue;
                 }
                 // A ZERO-PEAK scan never becomes an ms1scan link.
-                // msql_fileloading.py:559 does `if len(spectrum["intensity array"]) == 0: continue`
+                // The reference skips any spectrum with an empty intensity array
                 // BEFORE previous_ms1_scan is ever assigned, so an empty MS1 is invisible to the
                 // chain and the next MS2 links to the MS1 *before* it. Confirmed against MassQL's
                 // own loader on micro.mzML: scan 5 -> ms1scan 2, NOT the empty MS1 at scan 4.
@@ -156,7 +156,7 @@ final class MzmlReader extends AbstractSpectraStream {
         Binary bin = null;
 
         // MassQL hard-indexes
-        // precursorList.precursor[0].selectedIonList.selectedIon[0] (msql_fileloading.py:603), so
+        // precursorList.precursor[0].selectedIonList.selectedIon[0] in the reference, so
         // only
         // the FIRST selectedIon of the FIRST precursor counts. mzML legitimately carries more --
         // multiplexed (MSX) acquisition co-fragments several precursors -- and this reader used to
@@ -220,7 +220,7 @@ final class MzmlReader extends AbstractSpectraStream {
             // ⚠ CONDITIONAL on the declared unit. small.mzML says unitName="minute" -> pass
             // through.
             // A blind /60 is a silent 60x error that passes every MGF-only test
-            // (msql_fileloading.py:564-571).
+            // as the reference does.
             String unitName = str(xml.getAttributeValue(null, "unitName"));
             String unitAcc = str(xml.getAttributeValue(null, "unitAccession"));
             boolean seconds = "second".equalsIgnoreCase(unitName) || "UO:0000010".equals(unitAcc);
@@ -272,7 +272,7 @@ final class MzmlReader extends AbstractSpectraStream {
     /**
      * mzML spectrum id -> scan number.
      *
-     * <p>{@code int(id.replace("scanId=","").split("scan=")[-1])} (`msql_fileloading.py:575`) — strip any
+     * <p>Take the trailing {@code scan=} token and parse it as an int — strip any
      * {@code scanId=} prefix, split on {@code scan=}, take the <b>LAST</b> segment. This determines every
      * row's identity, so getting it wrong shifts the whole result set.
      *
@@ -373,7 +373,7 @@ final class MzmlReader extends AbstractSpectraStream {
             msLevel = 0;
             rt = 0.0;
             polarity = 0;
-            precmz = 0.0; // 0 sentinel -- Step 10 converts, not us
+            precmz = 0.0; // 0 sentinel -- collation converts, not us
             ms1scan = 0; // 0 = no preceding MS1; the origin of the sentinel
             charge = 0;
             peakCount = 0;

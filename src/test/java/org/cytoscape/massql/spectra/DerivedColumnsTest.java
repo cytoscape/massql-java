@@ -29,7 +29,7 @@ class DerivedColumnsTest {
     @Test
     void singlePeakScanNormalisesToExactlyOne() {
         // Exact equality, not approximate: this is why i_norm is "structurally always 1.0"
-        // for base-peak queries, and why massql_query.py drops that column entirely.
+        // for base-peak queries, and why the reference drops that column entirely.
         SpectrumTableBuilder b = new SpectrumTableBuilder(1);
         b.startScan(1, 0.0, 1).addPeak(123.456, 987.0);
         SpectrumTable t = b.build();

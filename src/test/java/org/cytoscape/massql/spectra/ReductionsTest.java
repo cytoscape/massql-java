@@ -44,8 +44,8 @@ class ReductionsTest {
 
     @Test
     void argmaxTiesResolveToTheLOWESTRowIndex() {
-        // Matches pandas idxmax, which returns the FIRST occurrence, and
-        // massql_query.py:163 uses idxmax. A last-wins implementation would disagree with the
+        // The reference returns the FIRST occurrence on a tie. A last-wins implementation would
+        // disagree with the
         // goldens on any spectrum with two equal-intensity peaks.
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
         b.startScan(1, 0.0, 1);

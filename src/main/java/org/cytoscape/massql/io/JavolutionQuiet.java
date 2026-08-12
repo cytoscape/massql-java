@@ -17,11 +17,9 @@ import javolution.context.LogContext;
  * is the whole defect; which stream it chose is incidental — which is why {@code StdoutCleanlinessTest}
  * asserts <i>both</i> streams stay silent.
  *
- * <p>Secondarily, and at a <b>different layer</b>: stray stdout output would also corrupt the <b>Java
- * CLI</b>'s JSON payload in its default output mode (the differential is such a
- * consumer). Real, but not the governing rule here. See <i>Terminology</i> in
- * the SDK/CLI layer distinction — this justification was originally
- * written the other way round, which read as "the SDK treats stdout as a data pipe". It does not.
+ * <p>Secondarily, and at a <b>different layer</b>: stray stdout output would also corrupt the CLI's JSON
+ * payload in its default output mode. Real, but not the governing rule here — the SDK does not treat
+ * stdout as a data pipe at all.
  *
  * <p>{@code LogContext.LEVEL} is a {@code Configurable}, so raising it above {@code INFO} suppresses these
  * without touching {@code System.out} — swapping the stream would be both racy and rude to the host

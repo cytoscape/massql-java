@@ -93,7 +93,7 @@ public final class ScaninfoCollation implements QualifyingScanConsumer {
 
         // ---- base peaks, from THIS scan's own table, whatever its MS level.
         //
-        // The reference computed these from ms2_df and left-joined on scan, so
+        // The reference computed these from its MS2 table and left-joined on scan, so
         // MS1DATA
         // rows missed the join and came back null. The rule is: MS1 ids join only to MS1 data. Here
         // that
@@ -142,7 +142,7 @@ public final class ScaninfoCollation implements QualifyingScanConsumer {
     /**
      * NaN and ±infinity → null, so the serialized output is always valid JSON.
      *
-     * <p>Mirrors {@code massql_query.py:51-59} ({@code clean_nan}), which the reference applies
+     * <p>Mirrors the reference's NaN cleaning, which it applies
      * recursively to every float before {@code json.dump(..., allow_nan=False)}.
      */
     private static Double clean(Double v) {

@@ -11,9 +11,9 @@ import org.cytoscape.massql.lang.ast.QualifierType;
 import org.junit.jupiter.api.Test;
 
 /**
- * The tolerance rules, from {@code _get_mz_tolerance} (`msql_engine_filters.py:5-17`).
+ * The tolerance rules, from the reference's tolerance resolution.
  *
- * <p>That file — not `msql_engine.py` — is the authority for this rule. Getting any of these wrong is a
+ * <p>Getting any of these wrong is a
  * silent wrong answer: no exception, just a different set of
  * rows than MassQL returns.
  */

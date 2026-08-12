@@ -12,12 +12,12 @@ import org.junit.jupiter.api.Test;
  * The mzML retention-time conversion is <b>conditional on the declared unit</b>, and this is the test
  * that catches a silent 60× error.
  *
- * <p>{@code msql_fileloading.py:564-571} reads {@code scan start time} and divides by 60 <i>only</i>
+ * <p>The reference reads {@code scan start time} and divides by 60 <i>only</i>
  * when {@code unit_info == "second"}. {@code data/small.mzML} declares {@code unitName="minute"}, so a
  * blind ÷60 would still pass every MGF-only test and every mzXML-only test — mzXML converts
  * unconditionally — while quietly making every mzML retention time 60× too small.
  *
- * <p>Step 2 built two fixtures for exactly this: {@code micro.mzML} declares minutes,
+ * <p>the fixtures built two fixtures for exactly this: {@code micro.mzML} declares minutes,
  * {@code micro_rtseconds.mzML} declares seconds, and they carry the same underlying times.
  */
 class MzmlRtUnitTest {
@@ -72,7 +72,7 @@ class MzmlRtUnitTest {
     @Test
     void smallMzmlDeclaresMinutesSoItsGoldenRtIsUnconverted() {
         // The real fixture. Its golden rt for scan 3 is 0.011218333333333334; ÷60 would give
-        // 0.000186972... and the Step 12 differential would fail on every mzML row.
+        // 0.000186972... and the differential would fail on every mzML row.
         try (SpectraStream s = SpectraFile.open(Fixtures.require("data/small.mzML"))) {
             while (s.hasNext()) {
                 ScanView v = s.next();

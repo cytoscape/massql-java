@@ -21,11 +21,11 @@ import org.cytoscape.massql.spectra.SpectrumTable;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@code MzxmlReader} against the oracle, cross-checked <b>inside Step 7</b> rather than deferred.
+ * {@code MzxmlReader} against the oracle, cross-checked <b>inside the mzXML reader</b> rather than deferred.
  *
  * <p>Running a counts-level parity check here is deliberate: a decode or walk bug found now points at
- * code written minutes ago, whereas the same bug surfacing at Step 8 looks like a query-layer problem.
- * Step 8 formalises this across all fixtures with bit-identical digests.
+ * code written minutes ago, whereas the same bug surfacing at the parity gate looks like a query-layer problem.
+ * The parity gate formalises this across all fixtures with bit-identical digests.
  */
 class MzxmlReaderTest {
 
@@ -39,7 +39,7 @@ class MzxmlReaderTest {
             throw new UncheckedIOException(e);
         }
         // Light regex extraction rather than a JSON dependency: Jackson finds modules via
-        // ServiceLoader, banned by DEPENDENCY_POLICY constraint 1. Step 8 needs the digests too.
+        // ServiceLoader, which this project does not use.
         Pattern p =
                 Pattern.compile(
                         "\"scan\":\\s*(\\d+),\\s*\"mslevel\":\\s*(\\d+),\\s*\"peak_count\":\\s*(\\d+)");
@@ -208,7 +208,7 @@ class MzxmlReaderTest {
 
     @Test
     void chargeAbsentIsZeroNotOne() {
-        // The cross-format trap: mzXML's absent precursorCharge is 0 (msql_fileloading.py:451),
+        // The cross-format trap: mzXML's absent precursorCharge is 0,
         // while
         // MGF's absent CHARGE is 1. micro scans 1 and 3 omit it; scan 5 has charge
         // 2.

@@ -15,10 +15,8 @@ import org.junit.jupiter.api.Test;
 /**
  * The published JSON contract: key set, key order, null rendering, and round-trip bit-exactness.
  *
- * <p><b>One shape</b>. Both {@code MS1DATA} and {@code MS2DATA} emit the same 12 keys in
- * the same order — this class's predecessor spec required MS1DATA to emit 4 keys with the precursor keys
- * <i>absent</i>, and the assertions below deliberately check the <b>opposite</b>: present, with the value
- * {@code null}.
+ * <p><b>One shape.</b> Both {@code MS1DATA} and {@code MS2DATA} emit the same 12 keys in the same order.
+ * A key that does not apply to a row is <i>present</i> with the value {@code null}, never omitted.
  */
 class ResultJsonTest {
 
@@ -88,9 +86,7 @@ class ResultJsonTest {
 
     @Test
     void anMs1RowEmitsTheSAMEtwelveKeysInTheSameOrder() {
-        // ⛔ The key assertion. This is what the old spec got backwards: it required MS1DATA to emit
-        // 4
-        // keys with precmz/ms1scan/charge ABSENT. There is one shape.
+        // ⛔ There is one shape: an MS1 row does not omit precmz/ms1scan/charge.
         assertEquals(
                 EXPECTED_12,
                 keysInOrder(ResultJson.write(List.of(ms1Row()))),
@@ -110,7 +106,6 @@ class ResultJsonTest {
     @Test
     void inapplicableFieldsArePRESENTwithJsonNullNotOmitted() {
         String json = ResultJson.write(List.of(ms1Row()));
-        // The old contract's test asserted !json.has("precmz"). The opposite is required.
         assertTrue(
                 json.contains("\"precmz\":null"),
                 "precmz must be present and null, not omitted: " + json);
@@ -123,7 +118,7 @@ class ResultJsonTest {
 
     @Test
     void anMs1RowsBasePeaksAreRealValuesNotNull() {
-        // The other half: the old golden's nulls here were an ms2_df join artifact.
+        // The other half: a null here would be a join artifact, not a property of an MS1 scan.
         String json = ResultJson.write(List.of(ms1Row()));
         assertTrue(json.contains("\"base_peak_i\":1471224.875"), json);
         assertTrue(json.contains("\"base_peak_mz\":810.4154747204038"), json);
@@ -180,7 +175,8 @@ class ResultJsonTest {
 
     @Test
     void everyEmittedFloatParsesBackToIDENTICALBITS() {
-        // The actual requirement -- not byte-matching Python. Guards against a formatter that
+        // The actual requirement -- not byte-matching the reference. Guards against a formatter
+        // that
         // rounds.
         double[] awkward = {
             0.011218333333333334, // the mzML golden's rt; does NOT survive a float round-trip

@@ -19,14 +19,12 @@ import org.junit.jupiter.api.Test;
  * fires on essentially every real file. Measured on {@code small.mzML} before the fix: 6 lines, on
  * <b>stdout</b>.
  *
- * <p><b>The rule this enforces is an SDK rule</b>, so it is stated at that layer:
- * {@code docs/DEPENDENCY_POLICY.md} constraint 2 — <b>the SDK logs nothing at all</b>, to stdout or stderr.
- * That is why there are two tests below rather than one: "logs only to stderr" would not be compliance.
- * Diagnostics are returned via {@link SpectraStream#diagnostics()} for the caller to route.
+ * <p><b>The SDK logs nothing at all</b>, to stdout or stderr. That is why there are two tests below
+ * rather than one: "logs only to stderr" would not satisfy the rule. Diagnostics are returned via
+ * {@link SpectraStream#diagnostics()} for the caller to route.
  *
- * <p>Stray stdout output would <i>also</i> corrupt the <b>Java CLI</b>'s JSON payload in its default
- * output mode (the public API), but that is a different layer, and a consequence rather than the reason.
- * See in the engineering record.
+ * <p>Stray stdout output would <i>also</i> corrupt the CLI's JSON payload in its default output mode,
+ * but that is a different layer, and a consequence rather than the reason.
  *
  * <p>{@code JavolutionQuiet} suppresses it by raising {@code LogContext.LEVEL} above {@code INFO}.
  * Nothing else in the test suite would notice if that stopped working.
@@ -67,8 +65,7 @@ class StdoutCleanlinessTest {
         assertEquals(
                 "",
                 c.out(),
-                "the SDK wrote to stdout; DEPENDENCY_POLICY constraint 2 requires it to write to no "
-                        + "stream at all and return diagnostics instead. Got:\n"
+                "the SDK must write nothing to stdout; it returns diagnostics instead. Got:\n"
                         + c.out());
         assertFalse(
                 c.out().contains("Data buffer"),

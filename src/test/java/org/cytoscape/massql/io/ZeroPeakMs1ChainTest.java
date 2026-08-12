@@ -13,11 +13,11 @@ import org.junit.jupiter.api.Test;
  * A zero-peak MS1 scan must <b>not</b> become an {@code ms1scan} link.
  *
  * <p><b>The rule, and where it comes from.</b> Both MassQL loaders open with
- * {@code if len(spectrum["intensity array"]) == 0: continue} — {@code msql_fileloading.py:559} for mzML,
+ * skipping any spectrum with an empty intensity array — for mzML
  * {@code :421} for mzXML — and that {@code continue} happens <b>before</b> {@code previous_ms1_scan} is
  * assigned. An empty MS1 is therefore invisible to the chain, and the next MS2 links to the MS1
- * <i>before</i> it. {@code docs/harness/READER_RULES.md} originally stated the document-order rule
- * unconditionally, and {@code MzmlReader} implemented it that way.
+ * <i>before</i> it. Stating the document-order rule unconditionally, and implementing it that way, is
+ * the easy mistake here.
  *
  * <p><b>Verified against the oracle, not assumed.</b> Running MassQL's own loader over
  * {@code micro.mzML} gives {@code scan 5 -> ms1scan 2}, skipping the empty MS1 at scan 4:

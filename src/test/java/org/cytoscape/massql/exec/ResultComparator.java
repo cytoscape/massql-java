@@ -27,13 +27,13 @@ import org.cytoscape.massql.result.ScanInfoResult;
  *           it, so the same peak reads 4.9e-9 to 2.9e-8 apart from its 64-bit mzML twin</td></tr>
  *   <tr><td>{@code tic}</td><td>relative <b>1e-6</b></td>
  *       <td>⛔ NOT bit-identical. MassQL's intensity column is {@code float32} and {@code tic} is a
- *           pandas sum over it, so the <i>reference</i> carries accumulation error our float64 sum
+ *           float32 sum over it, so the <i>reference</i> carries accumulation error this float64 sum
  *           does not — measured worst case 3.69e-8</td></tr>
  *   <tr><td>{@code base_peak_i}, {@code ms1_i}, {@code ms1_base_peak_i}</td><td><b>bit-identical</b></td>
  *       <td>maxima and lookups — <i>selected</i> values with no accumulation, so that error does not reach
  *           them. This is a split, not a blanket loosening</td></tr>
  *   <tr><td>{@code rt}</td><td><b>bit-identical</b></td>
- *       <td>requires the double-precision {@code scanRt}; a float would pass Step 8 and fail here</td></tr>
+ *       <td>requires the double-precision {@code scanRt}; a float would pass the parity gate and fail here</td></tr>
  *   <tr><td><i>every</i> column</td><td><b>exact null-vs-value</b></td>
  *       <td>a null where the golden has a value is a failure regardless of any tolerance — it is how
  *           a wrong m/z-window choice surfaces</td></tr>

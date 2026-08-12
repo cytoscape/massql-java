@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>Both readers had this wrong.</b> MassQL hard-indexes {@code [0]} at every level —
  * {@code spectrum["precursorList"]["precursor"][0]["selectedIonList"]["selectedIon"][0]} for mzML
- * (`msql_fileloading.py:603`) and {@code spectrum["precursorMz"][0]} for mzXML (`:450`). Both of our
+ * and the first {@code precursorMz} for mzXML. Both
  * readers instead <b>overwrote</b> {@code precmz}/{@code charge} on every occurrence, so the <i>last</i>
  * declared precursor won.
  *

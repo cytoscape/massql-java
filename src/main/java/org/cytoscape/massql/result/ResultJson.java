@@ -7,8 +7,8 @@ import java.util.List;
  *
  * <p><b>This output is a published contract, not an implementation detail.</b> A consumer may write the
  * string into a table column verbatim and read it back later, so the key names,
- * the key set and the key order are frozen. They are defined in {@code docs/RESULT_SCHEMA.md} and pinned
- * by {@code ResultSchemaContractTest}.
+ * the key set and the key order are frozen. {@code ScanInfoResult.KEYS} defines them and
+ * {@code ResultJsonTest} pins them.
  *
  * <p><b>One shape, always</b>: every row carries the same 12 keys in the same order,
  * whether the query was {@code MS1DATA} or {@code MS2DATA}. No key is ever omitted; an inapplicable field
@@ -25,8 +25,8 @@ import java.util.List;
  * <h2>Number formatting</h2>
  *
  * {@code Double.toString} / {@code Integer.toString} — shortest round-trip-exact form, compact, no
- * indentation. <b>Round-trip bit-exactness is the requirement</b>, not byte-matching Python: Java differs
- * from Python's {@code repr} in known ways (exponents {@code 1.0E-5} vs {@code 1e-05}; always emitting
+ * indentation. <b>Round-trip bit-exactness is the requirement</b>, not byte-matching the reference's
+ * text: the two differ in known ways (exponents {@code 1.0E-5} vs {@code 1e-05}; always emitting
  * {@code .0} on integral values), which is exactly why the differential compares <b>parsed values, never
  * text</b>. Never round, truncate or reformat — that would destroy the bit-identity Steps 8 and 12
  * establish.

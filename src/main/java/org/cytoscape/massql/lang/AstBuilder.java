@@ -165,7 +165,8 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
     private ConditionType conditionType(MassqlParser.ConditionFieldContext ctx) {
         String t = ctx.getText();
         // MS2MZ is an alias for MS2PROD. Collapsed here rather than in the grammar so the
-        // grammar stays a faithful mirror of msql.ebnf and the engine sees one spelling.
+        // grammar stays a faithful mirror of the reference grammar and the engine sees one
+        // spelling.
         if (t.equals("MS2MZ")) return ConditionType.MS2PROD;
         return ConditionType.valueOf(t);
     }

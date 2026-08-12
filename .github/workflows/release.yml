@@ -67,9 +67,8 @@ jobs:
       - name: Stamp the version
         run: make set-version-${{ steps.rel.outputs.artifact }} V=${{ steps.rel.outputs.version }}
 
-      # REQUIRED, and it was once missing. An absent fixture is a HARD FAILURE
-      # rather than a skip, so the suite cannot pass without the two gitignored Ewing files --
-      # Ms1ScanDocumentOrderIT and ReaderParityIT both need them. Cached, like ci.yml.
+      # REQUIRED, the suite cannot pass without the temporary Ewing files --
+      # Ms1ScanDocumentOrderIT and ReaderParityIT both need them. 
       - name: Cache the fetched Ewing fixtures
         uses: actions/cache@v4
         with:
@@ -85,13 +84,11 @@ jobs:
       - name: Test
         run: make integration-test
 
+      # Both artifacts, regardless of which one this tag releases: `assemble` depends on shadowJar,
+      # so one target covers the SDK jar and the CLI uber-jar. Only the tagged one is uploaded and
+      # published below.
       - name: Build the release artifact
-        run: |
-          if [ "${{ steps.rel.outputs.artifact }}" = "cli" ]; then
-            make cli
-          else
-            make build
-          fi
+        run: make build
 
       # Attach only the artifact this tag is for. Publishing the other one here would attach a jar
       # whose version was never stamped by this run.

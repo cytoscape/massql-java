@@ -8,8 +8,7 @@ import org.cytoscape.massql.lang.ast.QualifierType;
 /**
  * The m/z tolerance window, computed in exactly one place.
  *
- * <p>Mirrors {@code _get_mz_tolerance} (`msql_engine_filters.py:5-17`) — which is the real authority for this
- * rule, not `msql_engine.py`.
+ * <p>Mirrors the reference's tolerance resolution.
  *
  * <p><b>The three rules, in the source's own order:</b>
  * <ol>

@@ -35,7 +35,7 @@ public record MassqlQuery(
      * flat sequence and MassQL evaluates conditions as a conjunction, so order carries no
      * semantics — but preserving it means this form round-trips the source query and a
      * reordering bug in {@code AstBuilder} stays visible instead of being normalised away.
-     * See docs/harness/GRAMMAR_NOTES.md.
+     * See docs/internals/GRAMMAR_NOTES.md.
      */
     public String canonical() {
         StringBuilder b = new StringBuilder();

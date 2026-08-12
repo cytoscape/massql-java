@@ -10,7 +10,7 @@ class MassqlOptionsTest {
 
     @Test
     void defaultPrecursorToleranceIs20Ppm() {
-        // The documented default in SPIKE.md §4, RESULT_SCHEMA.md and massql_query.py.
+        // The documented default, matching the reference.
         assertEquals(20.0, MassqlOptions.defaults().precursorTolPpm());
     }
 

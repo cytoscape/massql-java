@@ -8,10 +8,9 @@ import org.junit.jupiter.api.Test;
 /**
  * mzXML polarity, with the parity claims and the non-parity ones deliberately kept apart.
  *
- * <p><b>Why the split matters.</b> the mzXML reader originally specified
- * {@code "+"} → 1, {@code "-"} → 2, <i>absent</i> → 0 as one rule. But
- * {@code _determine_scan_polarity_mzXML} reads {@code spec["polarity"]} <b>unguarded</b>
- * (`msql_fileloading.py:517-523`), so an absent attribute raises {@code KeyError} and MassQL produces no
+ * <p><b>Why the split matters.</b> {@code "+"} → 1, {@code "-"} → 2, <i>absent</i> → 0 looks like one
+ * rule, but {@code _determine_scan_polarity_mzXML} reads {@code spec["polarity"]} <b>unguarded</b>
+ * so an absent attribute raises in the reference and it produces no
  * output at all — verified by running its loader over {@code micro_nopolarity.mzXML}:
  *
  * <pre>

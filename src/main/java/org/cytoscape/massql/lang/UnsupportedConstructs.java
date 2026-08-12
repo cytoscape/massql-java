@@ -25,7 +25,7 @@ public final class UnsupportedConstructs {
         REASONS.put("scanmaxint", "only scaninfo is supported in this version");
         REASONS.put("scanmz", "only scaninfo is supported in this version");
         // Worth the extra sentence: implementing this "correctly" would DISAGREE with
-        // MassQL, because the Python engine ignores its own TOLERANCE parameter and
+        // MassQL, because the reference engine ignores its own TOLERANCE parameter and
         // hardcodes 0.1 m/z bins.
         REASONS.put(
                 "scanrangesum",
@@ -66,7 +66,7 @@ public final class UnsupportedConstructs {
         REASONS.put("ANY", "the ANY wildcard is not supported in this version");
 
         // ---- mass-table functions -----------------------------------------------------
-        // These need monoisotopic mass tables that agree with pyteomics per element.
+        // These need monoisotopic mass tables that agree with the reference per element.
         REASONS.put(
                 "formula()",
                 "formula() requires monoisotopic mass tables and is not supported in this version");

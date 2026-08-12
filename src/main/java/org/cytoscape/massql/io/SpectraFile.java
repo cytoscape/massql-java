@@ -12,8 +12,8 @@ import org.cytoscape.massql.MassqlException;
  * Opens a spectra file as a {@link SpectraStream}, sniffing the format from its content.
  *
  * <p>Sniffing is by <b>content, not extension</b>. The fixtures disagree on case — msconvert writes
- * {@code small.mzXML} while the Ewing download is {@code DP00570_F02.mzxml} — and SPIKE.md uses both
- * spellings, so an extension-driven reader is a trap. Extension is not consulted at all.
+ * {@code small.mzXML} while the Ewing download is {@code DP00570_F02.mzxml}, so an extension-driven reader
+ * is a trap. Extension is not consulted at all.
  */
 public final class SpectraFile {
 

@@ -9,13 +9,10 @@ import java.nio.file.Paths;
 /**
  * Locates test fixtures, which live in this repository under {@code src/test/resources/}.
  *
- * <p><b> — this class used to make the whole verification story vacuous.</b> Fixtures
- * previously lived in a sibling {@code ../massql} oracle directory that is never shipped, and a missing
- * one was gated with {@code Assumptions.assumeTrue} — a <b>skip</b>. But {@code ci.yml} checks out only
- * {@code massql-java}, so {@code ../massql} never existed in CI: Step 6's oracle cross-check, Step 8's
- * bit-identity parity and {@code Ms1ScanDocumentOrderIT} — the assertion Step 7 exists for — all skipped
- * silently. A skipped test still counts as one that ran, so the CI test-count guard could not see it
- * either. A green build proved only that the code compiled.
+ * <p>⛔ <b>A missing fixture throws; it never skips.</b> Gating on {@code Assumptions.assumeTrue} would
+ * make the whole verification story vacuous: the oracle cross-checks, the bit-identity parity gate and
+ * {@code Ms1ScanDocumentOrderIT} would all skip silently, and a skipped test still counts as one that
+ * ran. A green build would prove only that the code compiled.
  *
  * <p>So: fixtures are committed here, and a missing fixture is a <b>hard failure</b>. There is no skip
  * path. If you are tempted to add one, re-read the paragraph above.

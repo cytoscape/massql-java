@@ -138,7 +138,7 @@ class MainTest {
 
     @Test
     void aQueryFileIsStrippedBeforeParsing() {
-        // massql_query.py does `.read().strip()`, and the committed .massql files end with a
+        // The reference strips the query text, and the committed .massql files end with a
         // newline.
         Path padded =
                 CliFixtures.write(

@@ -19,25 +19,22 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 
 /**
- * Reads a Python-generated golden from {@code goldens/query-results/} into {@link ScanInfoResult}
+ * Reads a reference-generated golden from {@code goldens/query-results/} into {@link ScanInfoResult}
  * rows.
  *
  * <h2>Why a JSON library, when the rest of this repository parses JSON with regex</h2>
  *
  * <p>Three other places ({@code ParityDump}, {@code MzmlReaderTest}, {@code MzxmlReaderTest}) hand-roll
- * their parsing, {@code ParityDump} citing {@code docs/DEPENDENCY_POLICY.md} constraint 1 — <i>"Jackson
- * discovers modules via ServiceLoader"</i>. But that constraint's stated <b>failure mechanism</b> is a
- * thread-context classloader that cannot see the caller's classes, and a test running under Gradle on a
- * flat classpath has no such split. The rule was being applied outside its own mechanism.
- * {@code gson} is {@code testImplementation} only, and
- * {@code checkBannedDependencies} inspects {@code runtimeClasspath}, so it provably cannot reach the
- * shipping closure.
+ * their parsing to avoid a JSON dependency, since Jackson discovers modules via {@code ServiceLoader}.
+ * That concern does not apply here: its failure mechanism is a thread-context classloader that cannot
+ * see the caller's classes, and a test running under Gradle on a flat classpath has no such split.
+ * {@code gson} is {@code testImplementation} only, and {@code checkBannedDependencies} inspects
+ * {@code runtimeClasspath}, so it provably cannot reach the runtime closure.
  *
- * <p>⛔ <b>The decisive argument is.</b> {@code ParityDump}'s regex stopped at
- * {@code polarity} and silently dropped {@code charge}, {@code ms1scan} and {@code precmz} — which let
- * an MGF charge bug survive a <b>green</b> the parity gate gate for five steps. This file feeds the
- * differential that <i>is</i> the spike's exit criterion. A parser whose failure mode is silent
- * truncation is the wrong tool for that job.
+ * <p>⛔ <b>The decisive argument is silent truncation.</b> A hand-rolled regex stops at the field its
+ * pattern happens to reach — dropping {@code charge}, {@code ms1scan} and {@code precmz} without a
+ * word — which lets a reader bug survive a <b>green</b> parity gate. This file feeds the differential
+ * against the reference, so a parser whose failure mode is silent truncation is the wrong tool.
  *
  * <h2>Strictness is the point</h2>
  *
@@ -51,9 +48,8 @@ import com.google.gson.JsonSyntaxException;
  * set, so it appears in no shipped artifact and on no public API surface.
  *
  * <p>The key list is duplicated from {@code ScanInfoResult.KEYS}, which is package-private to
- * {@code …massql.result}. {@code docs/RESULT_SCHEMA.md} is the single definition and
- * {@code ResultSchemaContractTest} holds the production side to it; this copy is checked against the
- * goldens themselves on every read, so a divergence surfaces immediately.
+ * {@code …massql.result}. This copy is checked against the goldens themselves on every read, so a
+ * divergence surfaces immediately.
  */
 public final class GoldenResults {
 

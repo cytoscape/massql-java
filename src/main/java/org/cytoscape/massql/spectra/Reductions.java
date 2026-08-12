@@ -62,8 +62,7 @@ public final class Reductions {
      * intensity, then read m/z.
      *
      * <p><b>Ties resolve to the LOWEST row index</b> — i.e. the lowest m/z, given the store's
-     * ascending-m/z invariant. This matches pandas {@code idxmax}, which returns the first
-     * occurrence, and {@code massql_query.py:163} uses {@code idxmax}. A last-wins
+     * ascending-m/z invariant. ⛔ <b>First occurrence wins on a tie</b>, matching the reference. A last-wins
      * implementation would disagree with the goldens on any spectrum containing two
      * equal-intensity peaks.
      */

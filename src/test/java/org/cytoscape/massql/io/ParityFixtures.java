@@ -15,9 +15,8 @@ import java.util.Map;
  * test, while {@code ReaderParityHarnessTest} and {@code PeakOrderPreconditionTest} are unit tests
  * that assert properties of the inventory itself and of the dumps it names.
  *
- * <p>It previously lived inside {@code ReaderParityIT}, which made the unit suite depend on an IT
- * class. That worked only while both compiled together; once integration tests moved to their own
- * source set the direction became impossible, since {@code integrationTest} already depends on
+ * <p>It lives here rather than inside {@code ReaderParityIT} so the unit suite does not depend on an
+ * integration-test class. That direction is impossible anyway, since {@code integrationTest} depends on
  * {@code test}.
  */
 final class ParityFixtures {

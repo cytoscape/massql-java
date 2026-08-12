@@ -1,22 +1,17 @@
 # Grammar notes
 
-> ⚠ **Historical record of the initial bootstrap coding effort.** Kept for reference only. It is not
-> maintained against the code and will diverge from it; the source and `docs/` are authoritative.
-
-Every deliberate divergence between `src/main/antlr/…/Massql.g4` ([C43](Tech_Step_INDEX.md#c43) moved it from `src/main/antlr4/`) and the Lark source it was
+Every deliberate divergence between `src/main/antlr/…/Massql.g4` and the Lark source it was
 translated from, plus the facts a future re-sync will need.
 
 ## Source
 
 | | |
 |---|---|
-| File | [`msql.ebnf`](oracle/msql.ebnf) |
-| Commit | `dad2a28c01e6e5132240270fc6700fbae29f1652` (tag `2026.03.14`) |
-| Length | **165 lines** — as SPIKE.md claims, confirmed |
+| Source | MassQL's Lark EBNF grammar, **165 lines** |
 | Parser | Lark, Earley algorithm with **contextual lexing** |
 
-Reference corpus: `src/test/resources/reference_parses/` — **46 files**, not the 47 SPIKE.md
-claims. 35 are `scaninfo` queries, 11 are not.
+Reference corpus: `src/test/resources/reference_parses/` — **46 files**. 35 are `scaninfo`
+queries, 11 are not.
 
 ---
 
@@ -61,7 +56,7 @@ Source writes `"(min="`, `"(max="`, `"(left="`, `"(right="` as single literals. 
 `LPAREN` + `MIN_EQ` / `MAX_EQ` / `LEFT_EQ` / `RIGHT_EQ` so the grammar uses one `LPAREN`
 token everywhere. Purely cosmetic; no behavioural difference.
 
-### 3. `statement` is split into `statement : query EOF` and `query`
+### 3. `statement` is split into `statement: query EOF` and `query`
 
 `EOF` on the top-level rule is mandatory — without it ANTLR parses a prefix and silently
 ignores trailing garbage, so `QUERY scaninfo(MS2DATA) junk` would succeed.
@@ -127,7 +122,7 @@ Source writes `wherefullcondition+`, so whitespace-separated conditions are lega
 
 ### `ANY`, `MATCHCOUNT` and the querytype asymmetries
 
-Three things in the source that SPIKE.md never mentions:
+Three things in the source that are easy to miss:
 
 - **`wildcard: "ANY"`** — `MS2PROD=ANY` is legal MassQL. Out of scope, rejected by name.
 - **`qualifiercardinality: "CARDINALITY" | "MATCHCOUNT"`** — two spellings. Both rejected.
@@ -148,8 +143,7 @@ Every qualifier the grammar can produce **in scope** carries `=`, `>` or `<`. Ve
 against the corpus: the only comparator-less qualifiers are the out-of-scope ones
 (`INTENSITYMATCHREFERENCE`, `EXCLUDED`, `CARDINALITY`, `MASSDEFECT`).
 
-So SPIKE.md §3's *"a missing comparator defaults to greater-than"* refers to an **absent
-qualifier** — the implicit `> 0` the engine applies to an unqualified intensity column —
+*"A missing comparator defaults to greater-than"* refers to an **absent qualifier** — the implicit `> 0` the engine applies to an unqualified intensity column —
 not to a qualifier that parsed without one. Adding `NONE` would model an unreachable state.
 Only `equal` and `greaterthan` actually occur in the corpus, though the grammar permits `<`.
 
@@ -184,16 +178,3 @@ for exactly this reason, so `MS1MZ=X-2:INTENSITYMATCH=Y` names `X`. The conforma
 asserts the reported construct is *one of* those present rather than a specific one:
 pinning which would pin traversal order, which carries no user-visible meaning.
 
----
-
-## Re-syncing against a newer MassQL
-
-1. Diff the new [`msql.ebnf`](oracle/msql.ebnf) against commit `dad2a28c…`.
-2. For each changed rule, check this file first — several rules here are deliberately not
-   literal translations.
-3. Regenerate `corpus-manifest.tsv` (the generator lives in the oracle working directory)
-   and re-run `ParseConformanceTest`; the counts assertion will fail loudly if the corpus
-   size changed.
-4. If a construct moved from out-of-scope to in-scope, remove it from
-   `UnsupportedConstructs` — the feature matrix in Tech_Step13 is generated from that list,
-   so it updates itself.

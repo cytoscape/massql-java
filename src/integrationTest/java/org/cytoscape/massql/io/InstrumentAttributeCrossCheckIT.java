@@ -20,12 +20,12 @@ import org.cytoscape.massql.spectra.SpectrumTable;
 import org.junit.jupiter.api.Test;
 
 /**
- * A free correctness check with <b>no Python in the loop</b>: the instrument's own summary attributes.
+ * A free correctness check with <b>no reference implementation in the loop</b>: the instrument's own summary attributes.
  *
  * <p>Every {@code <scan>} in the Ewing file carries {@code totIonCurrent}, {@code basePeakIntensity} and
  * {@code basePeakMz} — values the acquisition software computed from the same peaks it then encoded. So
  * they are an independent statement of what our decode should sum and argmax to. Unlike every other parity
- * assertion in this project, this one does not depend on MassQL, pyteomics, or a generated golden: if our
+ * assertion in this project, this one depends on no external loader and no generated golden: if the
  * base64/big-endian/interleaved/32-bit decode were wrong, these would not reconcile.
  *
  * <p><b>Expect minor float drift, and only minor.</b> The attributes were written as decimal text from
@@ -43,7 +43,7 @@ import org.junit.jupiter.api.Test;
  * <b>systematic</b> mismatch (a constant factor, a consistent sign, or one column far worse than the
  * others) is a decoder bug, not drift. The per-column worst case is therefore reported, not just asserted.
  *
- * <p>Step 8 takes the fuller form of this check against bit-identical digests.
+ * <p>the parity gate takes the fuller form of this check against bit-identical digests.
  */
 class InstrumentAttributeCrossCheckIT {
 

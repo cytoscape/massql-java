@@ -9,20 +9,12 @@ java -jar massql-java-cli.jar spectra.mzML query.massql
 
 The query can come from a **file**, from **stdin**, or **inline** — see [Examples](#examples).
 
-Its argument order and defaults mirror the reference implementation `massql_query.py`, so the two can
-be run over the same inputs and compared directly; the extra query sources and `--output` are
-deliberate additions on top of that interface.
-
 ---
 
 ## Getting it
 
 Attach it from a GitHub release, or resolve it from the NRNB Nexus as
-`org.cytoscape:massql-java-cli` — the uber-jar is the primary artifact, with `-javadoc` and
-`-sources` beside it.
-
-Versioned **independently of the SDK**: `massql-java-cli` and `massql-java` will not share a version
-number.
+`org.cytoscape:massql-java-cli`.
 
 To build it from this repository:
 
@@ -58,42 +50,33 @@ Exactly **one** of three sources, always chosen explicitly:
 | `-` | you are piping the query in |
 | `-q`, `--query` | it is a one-liner |
 
-Giving **none**, or **more than one**, is a usage error (exit 2). There is deliberately no precedence
-rule: two sources means it is unclear which one runs, and quietly choosing for you would hide that. A
-repeated `-q` is an ordinary last-wins override.
+Giving none, or more than one, is a usage error (exit 2). A repeated `-q` is last-wins.
 
-Whitespace is stripped from every source, so all three produce **identical output** for the same query
-— a heredoc's trailing newline changes nothing.
+Whitespace is stripped, so all three forms give identical output for the same query.
 
-> ⚠ `-` selects stdin for the **query** only. The spectra file must be a real path: readers memory-map
-> it and sniff the format by reading the head, so a non-seekable stream cannot work.
+> ⚠ `-` selects stdin for the **query** only. The spectra file must be a real path, not a stream.
 
 ## Examples
 
-Every command below runs against a fixture **committed to this repository**, so you can paste them as
-written after cloning — no data of your own, and no download. Paths are relative to the repo root.
+Every command below runs against a fixture committed to this repository — paste them as written, no
+data of your own needed. Paths are relative to the repo root.
 
-> The `data/DP00570_F02.*` fixtures are *not* used here: those are fetched by `make fixtures` rather
-> than committed. Everything referenced below ships in the repo.
-
-**Prerequisites:** JDK 17, and `make build` to produce the jar. The examples pipe through
-[`jq`](https://jqlang.github.io/jq/) purely to format and count — the tool itself never needs it, and
-the first example below runs without it.
+**Prerequisites:** JDK 17, and `make build`. Most examples pipe through
+[`jq`](https://jqlang.github.io/jq/) to format or count; the tool never needs it.
 
 ```sh
 JAR=cli/build/libs/massql-java-cli.jar
 RES=src/test/resources
 ```
 
-**Start here — what a result actually looks like.** One MS2 scan whose precursor is within 1.0 Da of
-m/z 810.79:
+**Start here — what a result looks like.** *MS2 scans with a precursor within 1.0 Da of m/z 810.79:*
 
 ```sh
 java -jar $JAR $RES/data/small.mzML \
   -q 'QUERY scaninfo(MS2DATA) WHERE MS2PREC=810.79:TOLERANCEMZ=1.0'
 ```
 
-The output is a compact JSON array, one object per matching scan. Formatted, its first element is:
+Output is a compact JSON array, one object per matching scan. Formatted, the first element:
 
 ```json
 {
@@ -112,20 +95,17 @@ The output is a compact JSON array, one object per matching scan. Formatted, its
 }
 ```
 
-Twelve keys on every row, always in that order, `null` where a value genuinely does not exist —
-[`RESULT_SCHEMA.md`](RESULT_SCHEMA.md) defines each one. `rt` is in **minutes**. The remaining
-examples pipe through `jq length` and show only the row count, now that the shape is known.
+Twelve keys per row, `null` where a value does not exist. `rt` is in **minutes**.
+[`RESULT_SCHEMA.md`](RESULT_SCHEMA.md) defines each key. The remaining examples show only row counts.
 
-**A query file** — the classic form. Precursor 810.79 ± 1.0 again, this time read from a file. 6 rows
-from a 48-spectrum mzML:
+**A query file.** *Same query, read from a file.* 6 rows from a 48-spectrum mzML:
 
 ```sh
 java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql | jq length
 # 6
 ```
 
-**Inline with `-q`** — best for a short query. *Fragment ion at m/z 200.5 ± 0.5.* 2 rows from the
-tiny mzML fixture:
+**Inline with `-q`** — for a short query. *Fragment ion at m/z 200.5 ± 0.5.* 2 rows:
 
 ```sh
 java -jar $JAR $RES/fixtures/micro/micro.mzML \
@@ -133,8 +113,8 @@ java -jar $JAR $RES/fixtures/micro/micro.mzML \
 # 2
 ```
 
-**Inline, MS1 scans** — `MS1DATA` selects survey scans instead of fragmentation ones, so the same file
-yields a different set. *Survey scans containing a peak at m/z 810.79 ± 1.0.* 14 rows:
+**MS1 scans** — `MS1DATA` selects survey scans instead of fragmentation ones. *Survey scans with a
+peak at m/z 810.79 ± 1.0.* 14 rows:
 
 ```sh
 java -jar $JAR $RES/data/small.mzML \
@@ -142,16 +122,16 @@ java -jar $JAR $RES/data/small.mzML \
 # 14
 ```
 
-**Piped from stdin with `-`** — the form to reach for when the query is long. This one ANDs three
-product-ion conditions across a 34,513-spectrum MGF and returns 664 rows:
+**Piped from stdin with `-`** — for a long query. *Three product-ion conditions ANDed, across a
+34,513-spectrum MGF.* 664 rows:
 
 ```sh
 cat $RES/goldens/queries/test.massql | java -jar $JAR $RES/data/PlusRise.mgf - | jq length
 # 664
 ```
 
-**Stdin from a heredoc** — no temp file, no shell quoting to fight. *Precursor at m/z 810.79 ± 1.0.*
-6 rows from the mzXML:
+**Heredoc on stdin** — no temp file, no shell quoting. *Precursor at m/z 810.79 ± 1.0.* 6 rows from
+the mzXML:
 
 ```sh
 java -jar $JAR $RES/data/small.mzXML - <<'EOF' | jq length
@@ -160,8 +140,8 @@ EOF
 # 6
 ```
 
-**Inline, writing to a file** — `--output` keeps stdout empty, so nothing needs redirecting.
-*Fragment ion at m/z 200.5 ± 0.5.* 2 rows from the MGF fixture:
+**Writing to a file** — `--output` keeps stdout empty, so nothing needs redirecting. 2 rows from the
+MGF fixture:
 
 ```sh
 java -jar $JAR $RES/fixtures/micro/micro.mgf \
@@ -171,8 +151,8 @@ jq length /tmp/hits.json
 # 2
 ```
 
-**Widening the precursor tolerance** — the same file and query, twice, differing only in the flag.
-At the default 20 ppm four of the six rows have a null `ms1_i`; at 60 ppm all six are populated:
+**Widening the precursor tolerance** — same file and query, differing only in the flag. At the default
+20 ppm four of the six rows have a null `ms1_i`; at 60 ppm all six are populated:
 
 ```sh
 java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql \
@@ -184,60 +164,44 @@ java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql --prec
 # 0   -- at 60 ppm every one of the six matches
 ```
 
-Then point it at your own data — `.mgf`, `.mzML` and `.mzXML` all work, and the format is detected
-from the file's content rather than its extension, so a misnamed file still reads correctly:
+Then point it at your own data. `.mgf`, `.mzML` and `.mzXML` all work, and the format is detected from
+content rather than the extension, so a misnamed file still reads correctly:
 
 ```sh
 java -jar $JAR /path/to/your/run.mzML -q 'QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.5:TOLERANCEMZ=0.5'
 ```
 
-Every row count above is pinned by a test rather than typed by hand: the `small.*` and `PlusRise.mgf`
-pairs by the differential suite, which compares them against the Python reference, and the `micro.*`
-pairs by the unit suite.
-
 ## Streams
 
 | | |
 |---|---|
-| **stdout** | the JSON array and **nothing else, ever**, plus a trailing newline |
-| **stderr** | diagnostics, warnings, errors and usage — on every output mode |
+| **stdout** | the JSON array and nothing else, plus a trailing newline |
+| **stderr** | diagnostics, warnings, errors and usage |
 
-That split is what makes `| jq` safe. It is also why `--help` prints to **stdout** when you ask for
-it (it is the output you requested) but to **stderr** when it accompanies an error — a failing run
-must never put non-JSON on stdout.
-
-> This is the **CLI's** contract. The SDK underneath writes to no stream at all; treating stdout as a
-> data pipe is a property of this tool, not of the library.
+That split is what makes `| jq` safe. `--help` goes to stdout when requested, to stderr when it
+accompanies an error.
 
 ## Output modes
 
-`--output FILE` writes the JSON to `FILE` and leaves stdout empty. The bytes are **identical** to
-what the same run puts on stdout — one render, two destinations.
+`--output FILE` writes the JSON to `FILE` and leaves stdout empty. The bytes are identical either way.
 
-The write is **atomic**: a temp file beside the target, then a rename. A consumer polling the path
-never sees a partial file, and a failure mid-write leaves **neither** the output file nor the temp
-behind. A truncated result that looks complete is worse than no result at all.
+The write is atomic — a consumer polling the path never sees a partial file, and a failed run leaves
+nothing behind.
 
 ## Exit codes
 
 | Code | Meaning |
 |---|---|
-| **0** | success — **including a query that matched nothing**, which prints `[]` |
-| **1** | the file exists and is readable, but its **content** will not parse |
+| **0** | success — including a query that matched nothing, which prints `[]` |
+| **1** | the file is readable, but its **content** will not parse |
 | **2** | usage — bad arguments, missing file, empty query, unsupported query, unwritable `--output` |
 
-The line between 1 and 2 is: *could the user have known from the command line alone?*
-
-Branch on `0` versus non-zero. Treating "no matches" as a failure would make an empty result
-indistinguishable from a broken tool — an empty result is a valid answer.
-
-An unsupported query names the offending construct on stderr, so the message says what to change.
+Branch on `0` versus non-zero; an empty result is a valid answer, not a failure. An unsupported query
+names the offending construct on stderr.
 
 ## Output format
 
-The JSON array follows the frozen 12-key contract in [`RESULT_SCHEMA.md`](RESULT_SCHEMA.md) — the
-same rows the SDK returns, one object per matching scan, ascending by scan id.
+One object per matching scan, ascending by scan id, following the 12-key contract in
+[`RESULT_SCHEMA.md`](RESULT_SCHEMA.md).
 
-Note it is **compact** rather than indented. The reference implementation emits `indent=2`; the
-values are identical and round-trip exactly, but the two are not byte-comparable. Pipe through `jq`
-if you want it formatted.
+The JSON is compact rather than indented — pipe through `jq` to format it.

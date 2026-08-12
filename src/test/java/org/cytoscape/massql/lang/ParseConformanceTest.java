@@ -41,7 +41,7 @@ class ParseConformanceTest {
         assertEquals(
                 Corpus.EXPECTED_SIZE,
                 all.size(),
-                "reference corpus size changed; the pinned SHA has 46 files (SPIKE.md's 47 is wrong)");
+                "reference corpus size changed; the pinned SHA has 46 files");
         assertEquals(Corpus.EXPECTED_PARSE, all.stream().filter(Corpus.Entry::shouldParse).count());
         assertEquals(Corpus.EXPECTED_REJECT, all.stream().filter(e -> !e.shouldParse()).count());
     }

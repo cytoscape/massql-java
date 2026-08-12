@@ -26,11 +26,11 @@ import org.junit.jupiter.api.Test;
  *
  * <h2>Why this is worth more than its size suggests</h2>
  *
- * <p>Every golden in {@code DifferentialIT} came through the same Python loader, so a bug present in
+ * <p>Every golden in {@code DifferentialIT} came through the same loader, so a bug present in
  * both our reader and MassQL's would agree with itself and pass. Comparing two <b>formats</b> of the
  * same data has no such blind spot: a byte-order slip, an interleaving error or an off-by-one in one
  * decoder shows up as a disagreement no per-format golden could reveal
- * ({@code SPIKE.md} §6b: <i>"Both are stronger than any single golden"</i>).
+ * Together they are stronger than any single golden.
  *
  * <p>The two pairs test opposite things, and both are needed:
  *
@@ -84,10 +84,10 @@ class CrossFormatEquivalenceIT {
                                     + " ppm -- the same data read through"
                                     + " two readers disagrees:\n  "
                                     + String.join("\n  ", diffs)
-                                    + "\n\nNo golden can catch this: both goldens came through the same Python"
-                                    + " loader. Suspect the readers, not the tolerances. Read"
-                                    + " docs/harness/oracle/CONVERSION_NOTES.md first -- if msconvert altered"
-                                    + " the mzXML, the cause is the conversion rather than the code.");
+                                    + "\n\nNo golden can catch this: both goldens came through the same"
+                                    + " loader. Suspect the readers, not the tolerances -- unless the mzXML"
+                                    + " fixture itself was altered, in which case the cause is the fixture"
+                                    + " rather than the code.");
         }
     }
 
@@ -117,8 +117,7 @@ class CrossFormatEquivalenceIT {
      * <p>the differential requires that a degraded comparison <b>say so</b> rather than quietly compare
      * fewer columns. This asserts the undegraded state positively, so if a future conversion does drop
      * the attribute the failure names the cause instead of surfacing as a puzzling null mismatch.
-     * {@code CONVERSION_NOTES.md} records 34 {@code precursorScanNum} attributes in {@code small.mzXML},
-     * one per MS2 spectrum.
+     * {@code small.mzXML} carries 34 {@code precursorScanNum} attributes, one per MS2 spectrum.
      */
     @Test
     void pairAsPrecursorLinkSurvivedTheConversion() {
@@ -129,10 +128,9 @@ class CrossFormatEquivalenceIT {
                         fixture
                                 + " scan "
                                 + r.scan()
-                                + ": ms1scan is null. If this is the mzXML, check"
-                                + " docs/harness/oracle/CONVERSION_NOTES.md -- msconvert dropping"
+                                + ": ms1scan is null. If this is the mzXML, a fixture missing"
                                 + " precursorScanNum degrades this pair to the non-ms1 columns, and that"
-                                + " is a conversion property, not a reader bug.");
+                                + " is a fixture property, not a reader bug.");
             }
         }
     }
@@ -170,7 +168,7 @@ class CrossFormatEquivalenceIT {
      * The mzXML side: {@code ms1scan} and all three {@code ms1_*} populated on <b>every</b> row.
      *
      * <p>The file has <b>zero</b> {@code precursorScanNum} attributes, so a populated {@code ms1scan} is
-     * only possible under Step 7's document-order rule. This is that rule observed end to end.
+     * only possible under the document-order rule. This is that rule observed end to end.
      *
      * <p>⚠ Every row, not "some rows" — a weaker assertion would pass on a reader that linked one
      * spectrum and gave up.
@@ -184,7 +182,7 @@ class CrossFormatEquivalenceIT {
             assertNotNull(
                     r.ms1scan(),
                     at
-                            + "ms1scan -- document-order linkage (Step 7), zero"
+                            + "ms1scan -- document-order linkage (the mzXML reader), zero"
                             + " precursorScanNum attributes in this file");
             assertNotNull(r.ms1I(), at + "ms1_i");
             assertNotNull(r.ms1Precmz(), at + "ms1_precmz");

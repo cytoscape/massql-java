@@ -8,9 +8,8 @@ package org.cytoscape.massql;
  * matches the precursor peak within an already-selected MS1 scan.
  * Conflating them is a silent wrong-answer bug.
  *
- * <p>The default of 20.0 is the documented default in SPIKE.md §4, RESULT_SCHEMA.md and
- * massql_query.py. The original mzML golden was found to have been generated at an
- * unrecorded ~60 ppm instead, so goldens now record their flags explicitly.
+ * <p>The default of 20.0 matches the reference. ⚠ A golden generated at a different tolerance
+ * is indistinguishable unless the flag is recorded, so every golden records the flags it was made with.
  */
 public final class MassqlOptions {
 

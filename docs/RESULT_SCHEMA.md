@@ -30,10 +30,7 @@ scan, precmz, ms1scan, rt, charge, tic, mslevel, base_peak_i, base_peak_mz, ms1_
 > Issue #26 defines the schema as *"a union of all possible attributes from ms1 and ms2"*, with **`mslevel`**
 > as the discriminator: `2` for `MS2DATA`, `1` for `MS1DATA`. **There is no second, smaller shape, and no key
 > is ever absent.** A field that does not apply to a row is present with the value `null`.
->
-> This corrects three documents that specified otherwise — [`SPIKE.md`](harness/SPIKE.md) §3 (*"a different, smaller shape …
-> absent, not null"*), the oracle's own `RESULT_SCHEMA.md`, and the `small_mzml_ms1_results.json` golden, which
-> shipped 9 keys. All are now aligned.
+
 >
 > **Why uniform is the right contract, not merely the specified one.** A consumer may write this string into
 > a table column verbatim and read back later. One stable key set means that round-trip is
@@ -122,9 +119,9 @@ lookup needs the **raw `0`** to detect "no linked MS1 scan", so converting senti
 - **Compact** — no indentation, no spaces after separators. The string is stored in a node-table cell, where
   size matters and layout does not.
 - **Never round, truncate or reformat** to make a diff pass. Any rounding here would destroy the bit-identity
-  the Step 8 and Step 12 gates establish.
+  the reader-parity and differential gates establish.
 - Java and Python differ in known ways on exponents (`1.0E-5` vs `1e-05`) and always emitting `.0` on integral
-  values. This is why the Step 12 differential compares **parsed values, never text**.
+  values. This is why the differential compares **parsed values, never text**.
 
 ## Columns MassQL produces that this contract drops
 
@@ -133,7 +130,7 @@ lookup needs the **raw `0`** to detect "no linked MS1 scan", so converting senti
 | `i_norm` | structurally always `1.0` — carries no information |
 | `i_norm_ms1` | only ever `null` or `1.0` |
 
-**`i` is renamed to `tic`**, and the rename is only valid because we support **`scaninfo` alone**. Other MassQL
+**`i` is renamed to `tic`**, and the rename is only valid because this SDK supports **`scaninfo` alone**. Other MassQL
 functions put a different quantity in `i` — `scanmaxint` puts the *base peak* there — which is why the
 reference guards the rename to `scaninfo` queries (`massql_query.py`'s `rename(columns={"i": "tic"})`). If another function is ever added,
 the rename must become conditional. Recorded here so it is not generalized incorrectly.
@@ -153,9 +150,8 @@ The precursor lookup's exact rules — **closest to `precmz`, not most intense**
 tolerance miss; ties → lower m/z; and the **inclusive** m/z window — live in `PrecursorLookup`, which is
 where they are implemented and tested.
 
-## How this file is kept honest
+## Where the contract is enforced
 
-- **`ResultSchemaContractTest`** asserts the serializer emits exactly these 12 keys, in this order, and
-  that this document declares the same twelve.
-- **`ResultSchemaContractTest`** parses the key table above and asserts `ResultJson` emits exactly those keys in
-  that order — so this document is executable rather than decorative. Reordering a row here fails the build.
+`ScanInfoResult.KEYS` is the definition of the key set and its order, and **`ResultJsonTest`** asserts
+that `ResultJson` emits exactly those keys in exactly that order, for both MS1 and MS2 rows. This
+document describes that contract; the code enforces it.

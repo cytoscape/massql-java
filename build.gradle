@@ -57,7 +57,7 @@ allprojects {
             // lines of it -- harmless semantically, unreviewable as a diff.
             googleJavaFormat('1.17.0').aosp().skipJavadocFormatting()
 
-            importOrder('java', 'javax', 'org', 'com', 'edu.ucsd')
+            importOrder('java', 'javax', 'org', 'com')
             removeUnusedImports()
 
             // No wildcard imports, anywhere.
@@ -165,8 +165,8 @@ allprojects {
     dependencies {
         // 2.39.0 is the NEWEST release still compiled for Java 17. From 2.40 onward ErrorProne
         // targets Java 21 (class file 65) and fails here with UnsupportedClassVersionError, because
-        // this project is pinned to JDK 17 by docs/DEPENDENCY_POLICY.md constraint 7.
-        // Do not bump this without changing that constraint first.
+        // this project targets JDK 17.
+        // Do not bump this without raising the JDK target first.
         errorprone 'com.google.errorprone:error_prone_core:2.39.0'
     }
 
@@ -181,7 +181,7 @@ allprojects {
 }
 
 dependencies {
-    // docs/DEPENDENCY_POLICY.md: these two are the entire shipping closure.
+    // These two are the entire runtime closure, and it stays that way -- see bannedDependencies below.
     implementation "com.github.chhh:javolution-core-java-msftbx:6.11.8"
     implementation "org.antlr:antlr4-runtime:${antlrVersion}"
 
@@ -193,12 +193,11 @@ dependencies {
     // `checkBannedDependencies` inspects runtimeClasspath, so this provably cannot reach the 0.749 MB
     // shipping closure, and checkBannedDependencies would fail if it did.
     //
-    // This reverses the convention in ParityDump, which parses JSON with a regex citing
-    // DEPENDENCY_POLICY constraint 1 ("Jackson discovers modules via ServiceLoader"). That
-    // constraint's stated failure mechanism is a thread-context classloader that cannot see the
-    // caller's classes -- a test in a plain JVM with a flat classpath has no such split, so the rule
-    // was applied outside its own mechanism. The decisive argument: that same regex silently stopped at `polarity`
-    // and dropped three columns, letting a reader bug survive a GREEN gate for five steps. For the
+    // Elsewhere the project avoids JSON libraries because Jackson discovers modules via
+    // ServiceLoader, whose failure mechanism is a thread-context classloader that cannot see the
+    // caller's classes. A test in a plain JVM with a flat classpath has no such split, so that
+    // reasoning does not apply here. The decisive argument: a hand-rolled regex parser silently stops at `polarity`
+    // and drops three columns, which lets a reader bug survive a GREEN gate. For the
     // artifact that IS the exit criterion, silent truncation is the wrong failure mode.
     //
     // gson rather than Jackson: one artifact, and it uses no ServiceLoader at all.
@@ -221,8 +220,8 @@ dependencies {
 //                                      16,187,701   = 15.44 MB
 //
 // against a shipping closure of 0.75 MB and a ~1.5 MB budget -- so ~21x over, not a rounding error.
-// antlr-runtime 3.x sitting beside antlr4-runtime is also exactly the duplicate-artifact situation
-// docs/DEPENDENCY_POLICY.md exists to prevent.
+// antlr-runtime 3.x sitting beside antlr4-runtime is also a duplicate artifact, which the
+// bannedDependencies list below exists to prevent.
 //
 // generateGrammarSource takes its tool classpath from the `antlr` configuration directly, so
 // severing the inheritance costs nothing.
@@ -290,8 +289,8 @@ tasks.named('check') {
 // Coverage gate
 // ---------------------------------------------------------------------------------------------
 
-// Replaces the old `make skipcheck`, whose hand-maintained test-count floor rotted on every test
-// added. 90% instruction coverage, enforced by the build.
+// 90% instruction coverage, enforced by the build. A coverage floor rather than a test-count floor: a
+// hand-maintained count rots on every test added, and cannot notice a test that stopped running.
 //
 // INSTRUCTION rather than BRANCH: measured branch coverage at this scope is ~83%, so a 90% branch
 // rule would fail on arrival and mean something different from "90% coverage".
@@ -309,8 +308,8 @@ def coverageExclusions = [
 ]
 
 tasks.withType(JacocoReportBase).configureEach {
-    // Both suites contribute. The Maven build only ever bound the agent to surefire, so its
-    // coverage numbers silently excluded every IT -- and in this project the gates ARE the ITs.
+    // Both suites contribute. Binding the agent to the unit suite alone would silently exclude every
+    // IT -- and in this project the gates ARE the ITs.
     dependsOn tasks.named('test'), tasks.named('integrationTest')
     executionData.setFrom(fileTree(layout.buildDirectory.dir('jacoco')).include('*.exec'))
     classDirectories.setFrom(
@@ -346,14 +345,15 @@ tasks.named('check') {
 // Dependency policy
 // ---------------------------------------------------------------------------------------------
 
-// Turns docs/DEPENDENCY_POLICY.md from prose into a failing build.
+// The dependency policy, enforced rather than written down: this list IS the policy, and each entry
+// carries the reason it is banned.
 //
-// Implemented directly rather than with a Maven-enforcer port: the only such plugin
-// (org.kordamp.gradle.project-enforcer) last released 0.14.0 in August 2024, predating Gradle 9,
-// and this is twenty lines with no supply-chain surface.
+// Implemented directly rather than with a plugin: the only comparable one
+// (org.kordamp.gradle.project-enforcer) last released 0.14.0 in August 2024, predating Gradle 9, and
+// this is twenty lines with no supply-chain surface.
 //
-// The pom's companion `requireUpperBoundDeps` rule has no equivalent here because it needs none:
-// Gradle's conflict resolution already selects the highest requested version by default.
+// No upper-bound rule is needed: Gradle's conflict resolution already selects the highest requested
+// version by default.
 ext.bannedDependencies = [
     // MSDK is a VENDORING SOURCE, never a dependency. Depending on any MSDK artifact
     // drags Guava back in via msdk-datamodel.
@@ -400,9 +400,12 @@ allprojects {
             }
             if (offenders) {
                 throw new GradleException(
-                        "docs/DEPENDENCY_POLICY.md violation in ${project.path}:\n  "
+                        "banned dependency in "
+                                + (project.path == ':' ? 'the root project' : project.path)
+                                + ":\n  "
                                 + offenders.unique().join('\n  ')
-                                + "\n\nSee docs/DEPENDENCY_POLICY.md before relaxing this.")
+                                + "\n\nEach entry in `bannedDependencies` in build.gradle states why it "
+                                + "is banned. Read that reason before relaxing this.")
             }
         }
     }
