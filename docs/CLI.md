@@ -1,7 +1,7 @@
 # massql-java-cli — the command-line tool
 
-A standalone batch filter: give it a spectra file and a query, get JSON on stdout. Distributed
-as an uber-jar, so it needs nothing on the classpath.
+A standalone massql query tool: run with jvm as a cli tool, give it a spectra file and a query, get JSON on output. Distributed
+as an uber-jar.
 
 ```sh
 java -jar massql-java-cli.jar spectra.mzML query.massql
@@ -16,7 +16,7 @@ The query can come from a **file**, from **stdin**, or **inline** — see [Examp
 Attach it from a GitHub release, or resolve it from the NRNB Nexus as
 `org.cytoscape:massql-java-cli`.
 
-To build it from this repository:
+Or build it locallyu from this repository:
 
 ```sh
 make build          # -> cli/build/libs/massql-java-cli.jar
@@ -61,8 +61,7 @@ Whitespace is stripped, so all three forms give identical output for the same qu
 Every command below runs against a fixture committed to this repository — paste them as written, no
 data of your own needed. Paths are relative to the repo root.
 
-**Prerequisites:** JDK 17, and `make build`. Most examples pipe through
-[`jq`](https://jqlang.github.io/jq/) to format or count; the tool never needs it.
+**Prerequisites:** JDK 17+. 
 
 ```sh
 JAR=cli/build/libs/massql-java-cli.jar
@@ -101,16 +100,14 @@ Twelve keys per row, `null` where a value does not exist. `rt` is in **minutes**
 **A query file.** *Same query, read from a file.* 6 rows from a 48-spectrum mzML:
 
 ```sh
-java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql | jq length
-# 6
+java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql
 ```
 
 **Inline with `-q`** — for a short query. *Fragment ion at m/z 200.5 ± 0.5.* 2 rows:
 
 ```sh
 java -jar $JAR $RES/fixtures/micro/micro.mzML \
-  -q 'QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.5:TOLERANCEMZ=0.5' | jq length
-# 2
+  -q 'QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.5:TOLERANCEMZ=0.5'
 ```
 
 **MS1 scans** — `MS1DATA` selects survey scans instead of fragmentation ones. *Survey scans with a
@@ -118,26 +115,14 @@ peak at m/z 810.79 ± 1.0.* 14 rows:
 
 ```sh
 java -jar $JAR $RES/data/small.mzML \
-  -q 'QUERY scaninfo(MS1DATA) WHERE MS1MZ=810.79:TOLERANCEMZ=1.0' | jq length
-# 14
+  -q 'QUERY scaninfo(MS1DATA) WHERE MS1MZ=810.79:TOLERANCEMZ=1.0'
 ```
 
 **Piped from stdin with `-`** — for a long query. *Three product-ion conditions ANDed, across a
 34,513-spectrum MGF.* 664 rows:
 
 ```sh
-cat $RES/goldens/queries/test.massql | java -jar $JAR $RES/data/PlusRise.mgf - | jq length
-# 664
-```
-
-**Heredoc on stdin** — no temp file, no shell quoting. *Precursor at m/z 810.79 ± 1.0.* 6 rows from
-the mzXML:
-
-```sh
-java -jar $JAR $RES/data/small.mzXML - <<'EOF' | jq length
-QUERY scaninfo(MS2DATA) WHERE MS2PREC=810.79:TOLERANCEMZ=1.0
-EOF
-# 6
+cat $RES/goldens/queries/test.massql | java -jar $JAR $RES/data/PlusRise.mgf -
 ```
 
 **Writing to a file** — `--output` keeps stdout empty, so nothing needs redirecting. 2 rows from the
@@ -147,21 +132,17 @@ MGF fixture:
 java -jar $JAR $RES/fixtures/micro/micro.mgf \
   -q 'QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.5:TOLERANCEMZ=0.5' \
   --output /tmp/hits.json
-jq length /tmp/hits.json
-# 2
 ```
 
 **Widening the precursor tolerance** — same file and query, differing only in the flag. At the default
 20 ppm four of the six rows have a null `ms1_i`; at 60 ppm all six are populated:
 
 ```sh
-java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql \
-  | jq '[.[] | select(.ms1_i == null)] | length'
-# 4   -- four of the six precursors fall outside a 20 ppm window
+java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql 
+```
 
-java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql --precursor-tol-ppm 60 \
-  | jq '[.[] | select(.ms1_i == null)] | length'
-# 0   -- at 60 ppm every one of the six matches
+```sh
+java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql --precursor-tol-ppm 60 
 ```
 
 Then point it at your own data. `.mgf`, `.mzML` and `.mzXML` all work, and the format is detected from
@@ -178,7 +159,7 @@ java -jar $JAR /path/to/your/run.mzML -q 'QUERY scaninfo(MS2DATA) WHERE MS2PROD=
 | **stdout** | the JSON array and nothing else, plus a trailing newline |
 | **stderr** | diagnostics, warnings, errors and usage |
 
-That split is what makes `| jq` safe. `--help` goes to stdout when requested, to stderr when it
+That split is what makes `| jq` usage safe. `--help` goes to stdout when requested, to stderr when it
 accompanies an error.
 
 ## Output modes

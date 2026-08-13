@@ -1,17 +1,13 @@
 # Result schema — the frozen 12-key `scaninfo` contract
 
 **This file is the single definition of the result contract.** Every other document links here rather than
-restating it. If you are about to write "the N-key shape" anywhere else in this repository, link instead.
-
-**Authority:** [cytoscape/cytoscape#26](https://github.com/cytoscape/cytoscape/issues/26). Where any other
-document disagrees with this one, this one wins — the analysis
-records the three places that had drifted.
+restating it. 
 
 ---
 
 ## One shape, always
 
-`ResultJson` emits a **JSON array** of objects. Every object carries **exactly these 12 keys, in this order**:
+`ResultJson` emits a **JSON array** of objects. Every object carries **these 12 keys, in this order**:
 
 ```
 scan, precmz, ms1scan, rt, charge, tic, mslevel, base_peak_i, base_peak_mz, ms1_i, ms1_precmz, ms1_base_peak_i
@@ -25,23 +21,23 @@ scan, precmz, ms1scan, rt, charge, tic, mslevel, base_peak_i, base_peak_mz, ms1_
 }
 ```
 
-> ### ⛔ `scaninfo(MS1DATA)` and `scaninfo(MS2DATA)` emit the SAME 12 keys
+> ### ⛔ `scaninfo(MS1DATA)` and `scaninfo(MS2DATA)` emit the SAME keys
 >
 > Issue #26 defines the schema as *"a union of all possible attributes from ms1 and ms2"*, with **`mslevel`**
 > as the discriminator: `2` for `MS2DATA`, `1` for `MS1DATA`. **There is no second, smaller shape, and no key
 > is ever absent.** A field that does not apply to a row is present with the value `null`.
 
 >
-> **Why uniform is the right contract, not merely the specified one.** A consumer may write this string into
+> A consumer may write this string into
 > a table column verbatim and read back later. One stable key set means that round-trip is
 > a fixed-arity loop with no branch on query type; a variable key set makes every consumer discriminate before
 > it can read a row. Absent-vs-null is a contract difference, not a formatting choice.
 
-An empty result is `[]` — never `null`, never an error, never an empty string.
+An empty result is `[]`.
 
 ## Field definitions
 
-Descriptions are from issue #26. The **MS1DATA** column states what each field means for a survey-scan row,
+The **MS1DATA** column states what each field means for a survey-scan row,
 which the issue's MS2-centric wording leaves implicit.
 
 | Key | Type | Description | Can be null? | MS1DATA (`mslevel` 1) |
@@ -97,48 +93,8 @@ A consumer must therefore treat every nullable column as genuinely optional and 
 | `ms1_precmz` | **null** | ✔ same condition — the *measured* centroid |
 | `ms1_base_peak_i` | **null** | ✔ whenever the linked MS1 scan exists — **a tolerance miss does not null it** |
 
-## Sentinel, NaN and null rules
 
-**`0` → `null` for `precmz`, `ms1scan`, `charge` — those three and no others.** MassQL uses `0` as a
-"not recorded" sentinel and none of the three can legitimately be `0`: an ion m/z is always > 0, scan ids are
-1-based, and a real charge is nonzero.
-
-**Never convert `rt`.** `0.0` is a genuine retention time — direct-infusion data, and every MGF row without
-`RTINSECONDS`. `plusrise_results.json` carries `rt: 0.0` on all **664** rows, so an over-eager conversion fails
-664 rows at once.
-
-**NaN and ±infinity → `null`**, so the output is always valid JSON (`allow_nan=False` on the reference side).
-
-**Order of operations is load-bearing:** compute → sentinel-convert → NaN-convert → serialize. The precursor
-lookup needs the **raw `0`** to detect "no linked MS1 scan", so converting sentinels earlier changes results.
-
-## Number formatting
-
-- **`Double.toString`** — shortest round-trip-exact form. Every emitted number must parse back to **identical
-  bits**; that is the actual requirement, and it is asserted by `ResultJsonRoundTripTest`.
-- **Compact** — no indentation, no spaces after separators. The string is stored in a node-table cell, where
-  size matters and layout does not.
-- **Never round, truncate or reformat** to make a diff pass. Any rounding here would destroy the bit-identity
-  the reader-parity and differential gates establish.
-- Java and Python differ in known ways on exponents (`1.0E-5` vs `1e-05`) and always emitting `.0` on integral
-  values. This is why the differential compares **parsed values, never text**.
-
-## Columns MassQL produces that this contract drops
-
-| Dropped | Why |
-|---|---|
-| `i_norm` | structurally always `1.0` — carries no information |
-| `i_norm_ms1` | only ever `null` or `1.0` |
-
-**`i` is renamed to `tic`**, and the rename is only valid because this SDK supports **`scaninfo` alone**. Other MassQL
-functions put a different quantity in `i` — `scanmaxint` puts the *base peak* there — which is why the
-reference guards the rename to `scaninfo` queries (`massql_query.py`'s `rename(columns={"i": "tic"})`). If another function is ever added,
-the rename must become conditional. Recorded here so it is not generalized incorrectly.
-
-## The 7 / 5 split — what the SDK must compute itself
-
-**Only 7 of the 12 keys come from MassQL.** The other 5 are computed on top, and missing that is the most
-easily-missed part of the whole contract.
+**Only 7 of the 12 keys come from MassQL.** The other 5 are computed.
 
 | Source | Keys |
 |---|---|
@@ -150,8 +106,4 @@ The precursor lookup's exact rules — **closest to `precmz`, not most intense**
 tolerance miss; ties → lower m/z; and the **inclusive** m/z window — live in `PrecursorLookup`, which is
 where they are implemented and tested.
 
-## Where the contract is enforced
 
-`ScanInfoResult.KEYS` is the definition of the key set and its order, and **`ResultJsonTest`** asserts
-that `ResultJson` emits exactly those keys in exactly that order, for both MS1 and MS2 rows. This
-document describes that contract; the code enforces it.

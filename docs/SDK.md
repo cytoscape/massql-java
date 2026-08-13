@@ -1,18 +1,16 @@
 # massql-java — the SDK
 
-A pure-Java MassQL engine, published as an ordinary jar with two dependencies. Parse a MassQL query,
-run it over an `.mgf` / `.mzML` / `.mzXML` file, get rows back.
+A pure-Java MassQL engine, published as SDK.
 
-> **Class-level documentation is not here — it is in the javadoc.** Every published version ships a
+> **Class-level documentation is in the javadoc.** Every published version ships a
 > `massql-java-<version>-javadoc.jar`, and that is the reference for entry points, parameters, return
-> types and behaviour. Prose duplicating javadoc drifts from it; this page covers only what javadoc
-> cannot: how to obtain the library, and how to build it.
+> types and behaviour. 
 
 ---
 
 ## Quick start
 
-Three files, no clone required. **JDK 17** is the only prerequisite.
+This is an example app demonstrating usage of the SDK. It is compreised of 4 files. **JDK 17** is the only prerequisite.
 
 ### 1. `build.gradle`
 
@@ -39,18 +37,15 @@ The Nexus repository is required — this artifact is not on Maven Central. Use 
 `cytoscape_snapshots` URL for a `-SNAPSHOT` version and `cytoscape_releases` for a released one; a
 version resolved against the wrong repository simply fails to resolve.
 
-The two runtime dependencies arrive transitively — you never name them.
-
-Beside it, `settings.gradle`:
+### 2.  `settings.gradle`:
 
 ```groovy
 rootProject.name = 'massql-hello'
 ```
 
-### 2. `sample.mgf`
+### 3. `sample.mgf`
 
-Three scans, so the query below has something to match and something to reject. Save it next to
-`build.gradle`:
+Three scans, so the query below has something to match and something to reject. Save it in same directory:
 
 ```
 BEGIN IONS
@@ -79,7 +74,7 @@ RTINSECONDS=120.0
 END IONS
 ```
 
-### 3. `src/main/java/Main.java`
+### 4. `src/main/java/Main.java`
 
 ```java
 import java.nio.file.Path;
@@ -127,7 +122,7 @@ scan=2  precursor=500.0000  rt=1.00 min  tic=2600.0
 The third scan has no peak near 200.5, so it does not match. Scans are numbered by **document
 order** — nothing is read from `TITLE`.
 
-Two details in that snippet are worth carrying into your own code:
+Two details in that snippet are worth highlighting:
 
 - **`precmz` is null-guarded.** Every column is a boxed type and several are genuinely nullable.
   [`RESULT_SCHEMA.md`](RESULT_SCHEMA.md) is the full 12-key contract and says exactly which.
@@ -136,7 +131,7 @@ Two details in that snippet are worth carrying into your own code:
 To point it at your own data, change the path: `.mgf`, `.mzML` and `.mzXML` all work, and the format
 is detected from content rather than the extension.
 
-### The three SDK  artifacts
+### The three SDK artifacts
 
 | Classifier | What it is |
 |---|---|
@@ -148,14 +143,7 @@ Snapshots live in `cytoscape_snapshots` on the https://nrnb-nexus.ucsd.edu/repos
 
 ---
 
-## Beyond the one-shot form
-
-`Massql.run(query, path, null)` — **see the javadoc
-on `Massql`**, which documents all four entry points and the resource rules in full.
-
-Results follow the contract in [`RESULT_SCHEMA.md`](RESULT_SCHEMA.md).
-
-### Supported massql query subset
+### Supported massql queries
 
 `QUERY scaninfo(MS1DATA|MS2DATA) WHERE … [FILTER …]`. Anything outside that subset is rejected.
 
@@ -163,11 +151,8 @@ Results follow the contract in [`RESULT_SCHEMA.md`](RESULT_SCHEMA.md).
 
 ## Known deviations
 
-Six differences. 
-
-1. **`ms1scan` is inferred by document order, not read from the file.** The py ignores
-   `spectrumRef` (mzML) and `precursorScanNum` (mzXML), and this sdk reproduces that to match its answers. On
-   interleaved acquisition, or where a precursor reference points further back than the immediately
+1. **`ms1scan` is inferred by document order, not read from the file.** ignores
+   `spectrumRef` (mzML) and `precursorScanNum` (mzXML) same as the py MassQL does, but when a precursor reference points further back than the immediately
    preceding MS1 scan, the java `ms1scan` will disagree with the file's declared linkage. For simple DDA
    they coincide.
 2. **`=` means `>=` for intensity comparisons.** 
@@ -175,7 +160,6 @@ Six differences.
    information.
 4. **`tic` is not bit-identical** The py intensity
    column is `float32` and `tic` is a pandas sum over it, while java sdk accumulate in float64. 
-
 
 
 ---
@@ -190,13 +174,5 @@ The `Makefile` is the entry point.
 make build             # jar, -sources.jar and -javadoc.jar -> build/libs/
 make test              # unit tests, seconds
 make integration-test  # unit + integration tests, coverage gate, lint, banned deps
-make publish-local     # install into ~/.m2, to try a coordinate before releasing it
-make publish-sdk       # publish to the nexus
+make publish-local     # install into your local m2 cache
 ```
-
-`make` with no argument lists every target. JDK 17 is required, and the build enforces it.
-
-`make build` produces all three artifacts and writes the browsable javadoc on the way — open
-`build/docs/javadoc/index.html` to read it locally without publishing.
-
-
