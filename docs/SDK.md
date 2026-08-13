@@ -10,7 +10,10 @@ A pure-Java MassQL engine, published as SDK.
 
 ## Quick start
 
-This is an example app demonstrating usage of the SDK. It is compreised of 4 files. **JDK 17** is the only prerequisite.
+This is an example app demonstrating usage of the SDK. It is compreised of 4 files.
+
+**Prerequisites: JDK 17+ and Gradle.** The example is a Gradle project, so `gradle` must be on your
+PATH — if you don't have it already, install it direct from pre-compiled binaries - https://gradle.org/releases/.
 
 ### 1. `build.gradle`
 
@@ -111,7 +114,10 @@ public class Main {
 }
 ```
 
-`gradle run` prints:
+
+Now run it with gradle. Qualify the path to the downloaded gradle bin if needed.
+
+`gradle run` - will print to console:
 
 ```
 2 matching scans
