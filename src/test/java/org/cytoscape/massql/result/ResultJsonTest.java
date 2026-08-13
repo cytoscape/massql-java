@@ -235,4 +235,85 @@ class ResultJsonTest {
                 List.of(ScanInfoResult.KEYS),
                 "ScanInfoResult.KEYS is the single key list; ResultJson emits in that order");
     }
+
+    // ------------------------------------------------------------------ writePretty
+
+    @Test
+    void prettyIndentsTwoSpacesWithOneKeyPerLine() {
+        String json = ResultJson.writePretty(List.of(ms2Row()));
+
+        // The exact shape the reference produces at indent=2: array bracket alone, row object at
+        // two
+        // spaces, keys at four, and a space after every colon.
+        assertTrue(json.startsWith("[\n  {\n"), json);
+        assertTrue(json.endsWith("\n  }\n]"), json);
+        assertTrue(json.contains("\n    \"scan\": 3,"), json);
+        assertEquals(
+                16,
+                json.lines().count(),
+                "one line each for '[', '{', the 12 keys, '}' and ']': " + json);
+    }
+
+    @Test
+    void prettyAndCompactCarryTheSameKeysInTheSameOrder() {
+        // The whole point: only whitespace differs. A caller comparing the two must parse, not
+        // diff.
+        for (ScanInfoResult row : List.of(ms2Row(), ms1Row())) {
+            assertEquals(
+                    keysInOrder(ResultJson.write(List.of(row))),
+                    keysInOrder(ResultJson.writePretty(List.of(row))),
+                    "compact and pretty must agree on keys and order");
+        }
+    }
+
+    @Test
+    void prettyKeepsNullsAsJsonNull() {
+        String json = ResultJson.writePretty(List.of(ms1Row()));
+        assertTrue(json.contains("\"charge\": null"), json);
+        assertFalse(json.contains("\"charge\": 0"), json);
+    }
+
+    @Test
+    void anEmptyResultIsBareBracketsInEveryMode() {
+        // Indentation buys nothing for an empty array, and colouring it would put escape codes in a
+        // payload that consumers compare against the literal "[]".
+        assertEquals("[]", ResultJson.write(List.of()));
+        assertEquals("[]", ResultJson.writePretty(List.of()));
+        assertEquals("[]", ResultJson.writePretty(List.of(), true));
+    }
+
+    // ------------------------------------------------------------------ colour
+
+    @Test
+    void colourWrapsKeysAndNullsAndNothingElse() {
+        String json = ResultJson.writePretty(List.of(ms1Row()), true);
+
+        assertTrue(
+                json.contains("\u001B[36m\"scan\"\u001B[0m:"), "keys are cyan: " + visible(json));
+        assertTrue(json.contains("\u001B[2mnull\u001B[0m"), "nulls are dim: " + visible(json));
+
+        // Structure stays uncolourised, which is what lets callers keep asserting startsWith("[").
+        assertTrue(json.startsWith("["), visible(json));
+        assertEquals(
+                keysInOrder(ResultJson.writePretty(List.of(ms1Row()))),
+                keysInOrder(json.replaceAll("\u001B\\[[0-9]+m", "")),
+                "stripping the escapes must give back exactly the uncoloured rendering");
+    }
+
+    @Test
+    void colourIsOffUnlessAskedFor() {
+        for (String json :
+                List.of(
+                        ResultJson.write(List.of(ms1Row())),
+                        ResultJson.writePretty(List.of(ms1Row())),
+                        ResultJson.writePretty(List.of(ms1Row()), false))) {
+            assertFalse(
+                    json.contains("\u001B"), "no escape codes unless requested: " + visible(json));
+        }
+    }
+
+    /** Escapes rendered visibly, so a failure message is readable in a terminal or a CI log. */
+    private static String visible(String json) {
+        return json.replace("\u001B", "<ESC>");
+    }
 }

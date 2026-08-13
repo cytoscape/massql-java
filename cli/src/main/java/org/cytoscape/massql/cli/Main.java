@@ -98,6 +98,8 @@ public final class Main {
               --precursor-tol-ppm <double>   tolerance for matching the precursor peak in MS1 \
             (default 20.0)
               --output <FILE|->              write JSON to FILE; '-' means stdout (the default)
+              --pretty <true|false>          indent 2 spaces, one key per line; colour on
+                                             stdout (default true)
               -h, --help                     this message
 
             Give the query exactly one way: a file, '-' for stdin, or --query.
@@ -191,14 +193,25 @@ public final class Main {
             err.println(d);
         }
 
-        // ONE render, TWO sinks. ResultJson.write returns a single String, so both destinations
-        // necessarily receive identical bytes -- there is no second render to drift. The trailing
-        // newline is appended HERE, at the single point where the string meets its sink, because it
-        // is a console convention rather than part of the JSON document, and because appending it
-        // per-sink is exactly how the two modes would come to differ.
-        String payload = ResultJson.write(result.rows()) + System.lineSeparator();
+        // ONE render per sink, chosen HERE, at the single point where the payload meets its
+        // destination -- including the trailing newline, which is a console convention rather than
+        // part
+        // of the JSON document, and which appending per-sink is exactly how the two modes would
+        // drift.
+        //
+        // ⛔ The two sinks no longer receive identical BYTES, and that is deliberate: colour goes to
+        // stdout only. They still carry identical VALUES -- same keys, same order, same number
+        // formatting -- so anything comparing the two must parse, not diff. A file must never
+        // receive
+        // escape codes; nothing downstream of --output could parse them.
+        boolean toStdout = parsed.output == null;
+        String json =
+                parsed.pretty
+                        ? ResultJson.writePretty(result.rows(), toStdout)
+                        : ResultJson.write(result.rows());
+        String payload = json + System.lineSeparator();
 
-        if (parsed.output == null) {
+        if (toStdout) {
             out.print(payload);
             out.flush();
             return OK;
@@ -297,6 +310,13 @@ public final class Main {
         private boolean queryFromStdin;
         private Path output;
         private double tolPpm = DEFAULT_TOL_PPM;
+
+        /**
+         * Human-readable by default: a person running a query in a terminal is the common case, and
+         * {@code --pretty false} is how a caller asks for the machine form.
+         */
+        private boolean pretty = true;
+
         private boolean help;
 
         /** Names the chosen source, so a failure message says which one was empty or unreadable. */
@@ -334,6 +354,7 @@ public final class Main {
                     case "-q", "--query" -> a.queryString = value(args, ++i, arg);
                     case "--precursor-tol-ppm" -> a.tolPpm =
                             positiveDouble(arg, value(args, ++i, arg));
+                    case "--pretty" -> a.pretty = bool(arg, value(args, ++i, arg));
                     case "--output" -> {
                         String v = value(args, ++i, arg);
                         // '-' is an explicit request for stdout, identical to omitting the flag.
@@ -398,6 +419,17 @@ public final class Main {
         private static String value(String[] args, int i, String flag) {
             if (i >= args.length) throw new UsageException(flag + " requires a value");
             return args[i];
+        }
+
+        /**
+         * Strictly {@code true} or {@code false}. {@code Boolean.parseBoolean} is deliberately NOT used:
+         * it maps every unrecognised string to {@code false}, so {@code --pretty ture} would silently
+         * disable formatting instead of telling the caller they mistyped.
+         */
+        private static boolean bool(String flag, String raw) {
+            if ("true".equals(raw)) return true;
+            if ("false".equals(raw)) return false;
+            throw new UsageException(flag + " expects true or false, got: " + raw);
         }
 
         private static double positiveDouble(String flag, String raw) {

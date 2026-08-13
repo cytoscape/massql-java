@@ -44,8 +44,11 @@ class MainOutputFileTest {
         String query = CliFixtures.standardQuery().toString();
         Path target = dir.resolve("result.json");
 
-        CliFixtures.Invocation piped = invoke(spectra, query);
-        CliFixtures.Invocation filed = invoke(spectra, query, "--output", target.toString());
+        // --pretty false on BOTH: the byte-identity below only holds for an uncolourised render,
+        // and colour goes to stdout only.
+        CliFixtures.Invocation piped = invoke(spectra, query, "--pretty", "false");
+        CliFixtures.Invocation filed =
+                invoke(spectra, query, "--pretty", "false", "--output", target.toString());
 
         assertEquals(0, piped.exitCode(), piped.stderr());
         assertEquals(0, filed.exitCode(), filed.stderr());

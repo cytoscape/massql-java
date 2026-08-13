@@ -58,14 +58,14 @@ class MainQuerySourceTest {
 
     @Test
     void aQueryFileRuns() {
-        CliFixtures.Invocation r = invoke(spectra(), queryFile());
+        CliFixtures.Invocation r = invoke(spectra(), queryFile(), "--pretty", "false");
         assertEquals(0, r.exitCode(), r.stderr());
         assertEquals(6, rows(r.stdout()), r.stdout());
     }
 
     @Test
     void aQueryOnStdinRuns() {
-        CliFixtures.Invocation r = invokeWithStdin(QUERY, spectra(), "-");
+        CliFixtures.Invocation r = invokeWithStdin(QUERY, spectra(), "-", "--pretty", "false");
         assertEquals(0, r.exitCode(), r.stderr());
         assertEquals(6, rows(r.stdout()), r.stdout());
     }
@@ -73,7 +73,7 @@ class MainQuerySourceTest {
     @Test
     void anInlineQueryRuns() {
         for (String flag : new String[] {"-q", "--query"}) {
-            CliFixtures.Invocation r = invoke(spectra(), flag, QUERY);
+            CliFixtures.Invocation r = invoke(spectra(), flag, QUERY, "--pretty", "false");
             assertEquals(0, r.exitCode(), flag + ": " + r.stderr());
             assertEquals(6, rows(r.stdout()), flag + ": " + r.stdout());
         }
@@ -82,7 +82,8 @@ class MainQuerySourceTest {
     /** A trailing newline, as a heredoc or `cat` supplies, is stripped like the file form's. */
     @Test
     void stdinIsStrippedSoAHeredocWorks() {
-        CliFixtures.Invocation r = invokeWithStdin("\n  " + QUERY + "  \n\n", spectra(), "-");
+        CliFixtures.Invocation r =
+                invokeWithStdin("\n  " + QUERY + "  \n\n", spectra(), "-", "--pretty", "false");
         assertEquals(0, r.exitCode(), r.stderr());
         assertEquals(6, rows(r.stdout()), r.stdout());
     }
@@ -116,11 +117,13 @@ class MainQuerySourceTest {
     void stdinIsIgnoredUnlessTheDashSelectsIt() {
         String decoy = "QUERY scaninfo(MS2DATA) WHERE MS2PROD=9999.0:TOLERANCEMZ=0.1";
 
-        CliFixtures.Invocation viaFile = invokeWithStdin(decoy, spectra(), queryFile());
+        CliFixtures.Invocation viaFile =
+                invokeWithStdin(decoy, spectra(), queryFile(), "--pretty", "false");
         assertEquals(0, viaFile.exitCode(), viaFile.stderr());
         assertEquals(6, rows(viaFile.stdout()), "the FILE query ran, not the one on stdin");
 
-        CliFixtures.Invocation viaFlag = invokeWithStdin(decoy, spectra(), "-q", QUERY);
+        CliFixtures.Invocation viaFlag =
+                invokeWithStdin(decoy, spectra(), "-q", QUERY, "--pretty", "false");
         assertEquals(6, rows(viaFlag.stdout()), "the INLINE query ran, not the one on stdin");
     }
 
@@ -239,18 +242,19 @@ class MainQuerySourceTest {
     void aRepeatedQueryFlagIsLastWins() {
         String decoy = "QUERY scaninfo(MS2DATA) WHERE MS2PROD=9999.0:TOLERANCEMZ=0.1";
 
-        CliFixtures.Invocation r = invoke(spectra(), "-q", decoy, "-q", QUERY);
+        CliFixtures.Invocation r = invoke(spectra(), "-q", decoy, "-q", QUERY, "--pretty", "false");
         assertEquals(0, r.exitCode(), r.stderr());
         assertEquals(6, rows(r.stdout()), "the LAST --query wins");
 
         // And the decoy really would have produced something different, or this proves nothing.
-        assertNotEquals(6, rows(invoke(spectra(), "-q", decoy).stdout()));
+        assertNotEquals(6, rows(invoke(spectra(), "-q", decoy, "--pretty", "false").stdout()));
     }
 
     /** The two dash meanings are independent: `-` selects stdin, `--output -` selects stdout. */
     @Test
     void theQueryDashAndTheOutputDashDoNotInterfere() {
-        CliFixtures.Invocation r = invokeWithStdin(QUERY, spectra(), "-", "--output", "-");
+        CliFixtures.Invocation r =
+                invokeWithStdin(QUERY, spectra(), "-", "--output", "-", "--pretty", "false");
 
         assertEquals(0, r.exitCode(), r.stderr());
         assertEquals(6, rows(r.stdout()), r.stdout());

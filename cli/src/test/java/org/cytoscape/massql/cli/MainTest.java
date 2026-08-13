@@ -183,6 +183,7 @@ class MainTest {
             assertTrue(r.stdout().contains("Usage:"), flag + " -> " + r.stdout());
             assertTrue(r.stdout().contains("--precursor-tol-ppm"), "every flag must be listed");
             assertTrue(r.stdout().contains("--output"), "every flag must be listed");
+            assertTrue(r.stdout().contains("--pretty"), "every flag must be listed");
             assertTrue(r.stderr().isEmpty(), "nothing belongs on stderr when help was requested");
         }
     }
@@ -207,5 +208,80 @@ class MainTest {
         assertEquals(2, r.exitCode());
         assertTrue(r.stdoutIsEmpty(), "stdout must stay clean on a usage error: " + r.stdout());
         assertTrue(r.stderr().contains("Usage:"), r.stderr());
+    }
+
+    // ------------------------------------------------------------------ --pretty
+
+    @Test
+    void prettyIsTheDefaultAndColoursStdout() {
+        // The human case is the default: someone exploring in a terminal should not have to
+        // discover a
+        // flag to get readable output.
+        for (String[] args :
+                new String[][] {
+                    {}, {"--pretty", "true"},
+                }) {
+            CliFixtures.Invocation r = run(args);
+            assertEquals(0, r.exitCode(), r.stderr());
+            assertTrue(
+                    r.stdout().lines().count() > 2,
+                    "indented output spans many lines: " + r.stdout());
+            assertTrue(
+                    r.stdout().contains("\u001B"), "stdout is a terminal sink, so it is coloured");
+            // Escapes stripped first: a colour code sits between the indent and the key, so the
+            // indentation is only visible in the uncolourised text.
+            assertTrue(
+                    r.stdout().replaceAll("\u001B\\[[0-9]+m", "").contains("\n    \"scan\": "),
+                    "two-space indent per level: " + r.stdout());
+        }
+    }
+
+    @Test
+    void prettyFalseIsTheMachineForm() {
+        // ⛔ This is the flag a caller piping into jq needs, since the default emits escape codes.
+        CliFixtures.Invocation r = run("--pretty", "false");
+        assertEquals(0, r.exitCode(), r.stderr());
+        assertEquals(
+                1,
+                r.stdout().stripTrailing().lines().count(),
+                "compact is one line: " + r.stdout());
+        assertFalse(r.stdout().contains("\u001B"), "no colour when the output is machine-readable");
+        assertTrue(r.stdout().contains("{\"scan\":"), r.stdout());
+    }
+
+    @Test
+    void aFileSinkIsIndentedButNeverColoured() throws Exception {
+        // Escape codes in a file would break every parser that later reads it, so --output is
+        // uncolourised even though --pretty is on.
+        Path out = dir.resolve("pretty.json");
+        CliFixtures.Invocation r = run("--pretty", "true", "--output", out.toString());
+        assertEquals(0, r.exitCode(), r.stderr());
+        assertTrue(r.stdoutIsEmpty(), "--output keeps stdout empty: " + r.stdout());
+
+        String json = java.nio.file.Files.readString(out);
+        assertTrue(json.contains("\n    \"scan\": "), "still indented: " + json);
+        assertFalse(json.contains("\u001B"), "a file is not a terminal: " + json);
+    }
+
+    @Test
+    void aNonBooleanPrettyValueIsRejectedRatherThanTreatedAsFalse() {
+        // Boolean.parseBoolean maps every unrecognised string to false, which would silently turn
+        // formatting off for a typo. Both of these must say so instead.
+        CliFixtures.Invocation typo = run("--pretty", "maybe");
+        assertEquals(2, typo.exitCode(), "stdout: " + typo.stdout());
+        assertTrue(typo.stderr().contains("--pretty"), typo.stderr());
+
+        CliFixtures.Invocation missing = run("--pretty");
+        assertEquals(2, missing.exitCode(), "stdout: " + missing.stdout());
+        assertTrue(missing.stdoutIsEmpty(), "no JSON on a usage error: " + missing.stdout());
+    }
+
+    /** The standard mzML + query pair, plus whatever flags a {@code --pretty} case is exercising. */
+    private static CliFixtures.Invocation run(String... flags) {
+        String[] args = new String[flags.length + 2];
+        args[0] = CliFixtures.smallMzml().toString();
+        args[1] = CliFixtures.standardQuery().toString();
+        System.arraycopy(flags, 0, args, 2, flags.length);
+        return invoke(args);
     }
 }

@@ -32,7 +32,11 @@ class MainStreamDisciplineTest {
     @Test
     void stdoutIsExactlyTheJsonArrayAndATrailingNewline() {
         CliFixtures.Invocation r =
-                invoke(CliFixtures.smallMzml().toString(), CliFixtures.standardQuery().toString());
+                invoke(
+                        CliFixtures.smallMzml().toString(),
+                        CliFixtures.standardQuery().toString(),
+                        "--pretty",
+                        "false");
 
         assertEquals(0, r.exitCode(), r.stderr());
         String out = r.stdout();

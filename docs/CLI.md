@@ -37,6 +37,8 @@ Options:
   -q, --query <STRING>           the query itself, inline
   --precursor-tol-ppm <double>   tolerance for matching the precursor peak in MS1 (default 20.0)
   --output <FILE|->              write JSON to FILE; '-' means stdout (the default)
+  --pretty <true|false>          indent 2 spaces, one key per line; colour on
+                                 stdout (default true)
   -h, --help                     this message
 ```
 
@@ -75,7 +77,7 @@ java -jar $JAR $RES/data/small.mzML \
   -q 'QUERY scaninfo(MS2DATA) WHERE MS2PREC=810.79:TOLERANCEMZ=1.0'
 ```
 
-Output is a compact JSON array, one object per matching scan. Formatted, the first element:
+Output is a JSON array, one object per matching scan. The first element:
 
 ```json
 {
@@ -96,6 +98,9 @@ Output is a compact JSON array, one object per matching scan. Formatted, the fir
 
 Twelve keys per row, `null` where a value does not exist. `rt` is in **minutes**.
 [`RESULT_SCHEMA.md`](RESULT_SCHEMA.md) defines each key. The remaining examples show only row counts.
+
+That is the default shape — indented two spaces per level, and colourised when it goes to your
+terminal. **Piping it onward wants `--pretty false`** — see [Output format](#output-format).
 
 **A query file.** *Same query, read from a file.* 6 rows from a 48-spectrum mzML:
 
@@ -159,12 +164,16 @@ java -jar $JAR /path/to/your/run.mzML -q 'QUERY scaninfo(MS2DATA) WHERE MS2PROD=
 | **stdout** | the JSON array and nothing else, plus a trailing newline |
 | **stderr** | diagnostics, warnings, errors and usage |
 
-That split is what makes `| jq` usage safe. `--help` goes to stdout when requested, to stderr when it
-accompanies an error.
+That split keeps diagnostics out of the payload, so nothing needs filtering out of stdout before a
+parser sees it. `--help` goes to stdout when requested, to stderr when it accompanies an error.
+
+⚠ Add **`--pretty false`** when piping, though: stdout carries ANSI colour by default, and escape codes
+are not valid JSON.
 
 ## Output modes
 
-`--output FILE` writes the JSON to `FILE` and leaves stdout empty. The bytes are identical either way.
+`--output FILE` writes the JSON to `FILE` and leaves stdout empty. Both sinks carry the same values;
+only stdout is ever colourised, so a file is always valid JSON.
 
 The write is atomic — a consumer polling the path never sees a partial file, and a failed run leaves
 nothing behind.
@@ -185,4 +194,23 @@ names the offending construct on stderr.
 One object per matching scan, ascending by scan id, following the 12-key contract in
 [`RESULT_SCHEMA.md`](RESULT_SCHEMA.md).
 
-The JSON is compact rather than indented — pipe through `jq` to format it.
+`--pretty` chooses between two renderings of those same rows:
+
+| | |
+|---|---|
+| **`--pretty true`** *(default)* | indented 2 spaces per level, one key per line. **Colourised when the sink is stdout** — keys cyan, `null` dim. A file written with `--output` is indented but never coloured. |
+| **`--pretty false`** | one compact line, no whitespace, no colour |
+
+⛔ **Piping stdout onward needs `--pretty false`.** The default is built for a human reading a terminal,
+so it emits ANSI escape codes, which no JSON parser accepts:
+
+```sh
+java -jar $JAR $RES/data/small.mzML $RES/goldens/queries/test_mzml.massql --pretty false | jq length
+```
+
+Only whitespace and escape codes differ between the two — the same keys, in the same order, with the
+same number formatting. `--output FILE` is unaffected either way, since a file sink is never coloured.
+
+The value must be spelled `true` or `false`; anything else is a usage error (exit 2) rather than a
+silent fallback. `--pretty=false` with an `=` is likewise rejected — the flag takes its value as the
+next argument, matching `--output` and `--precursor-tol-ppm`.

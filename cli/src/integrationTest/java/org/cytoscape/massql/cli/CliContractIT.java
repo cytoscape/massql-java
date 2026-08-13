@@ -287,10 +287,19 @@ class CliContractIT {
         String query = readString(CliFixtures.standardQuery());
         assertFalse(query.isBlank(), "the query fixture must have content, or this proves nothing");
 
+        // --pretty false throughout: the byte comparison below spans a file and stdout, and only
+        // the
+        // uncolourised render is identical across both sinks.
         Path viaFile = dir.resolve("file.json");
-        fork(CliFixtures.smallMzml(), CliFixtures.standardQuery(), "--output", viaFile);
+        fork(
+                CliFixtures.smallMzml(),
+                CliFixtures.standardQuery(),
+                "--pretty",
+                "false",
+                "--output",
+                viaFile);
 
-        Run piped = forkWithStdin(query, CliFixtures.smallMzml(), "-");
+        Run piped = forkWithStdin(query, CliFixtures.smallMzml(), "-", "--pretty", "false");
 
         assertEquals(0, piped.exit(), () -> "piped query failed: " + piped.err());
         assertEquals(6, parseArray(piped.out(), "the piped-query payload").size());
@@ -307,7 +316,9 @@ class CliContractIT {
                 fork(
                         CliFixtures.smallMzml(),
                         "-q",
-                        "QUERY scaninfo(MS2DATA) WHERE MS2PREC=810.79:TOLERANCEMZ=1.0");
+                        "QUERY scaninfo(MS2DATA) WHERE MS2PREC=810.79:TOLERANCEMZ=1.0",
+                        "--pretty",
+                        "false");
 
         assertEquals(0, r.exit(), () -> r.err());
         assertEquals(6, parseArray(r.out(), "the --query payload").size());
@@ -334,7 +345,7 @@ class CliContractIT {
      */
     @Test
     void stdoutIsJsonOnlyAndDiagnosticsGoToStderr() {
-        Run r = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery());
+        Run r = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery(), "--pretty", "false");
         assertEquals(0, r.exit(), () -> r.err());
 
         JsonArray rows = parseArray(r.out(), "piped stdout");
@@ -389,9 +400,16 @@ class CliContractIT {
      */
     @Test
     void thePipedAndFileModesAgreeByteForByte(@TempDir Path dir) {
+        // Both sinks uncolourised, so "one rendering, two destinations" is a byte claim again.
         Path file = dir.resolve("results.json");
-        fork(CliFixtures.smallMzml(), CliFixtures.standardQuery(), "--output", file);
-        Run piped = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery());
+        fork(
+                CliFixtures.smallMzml(),
+                CliFixtures.standardQuery(),
+                "--pretty",
+                "false",
+                "--output",
+                file);
+        Run piped = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery(), "--pretty", "false");
 
         assertArrayEquals(
                 readBytes(file),
@@ -459,6 +477,82 @@ class CliContractIT {
                 0,
                 r.stderr().length,
                 () -> "nothing on stderr for a deliberate --help: " + r.err());
+    }
+
+    // ------------------------------------------------------------------ --pretty
+
+    @Test
+    void prettyStdoutIsIndentedAndColourisedThroughTheRealJar() {
+        // The default path a human hits: no flags, output to the terminal. Exercised through the
+        // assembled jar because the escapes and the indentation both have to survive a real process
+        // boundary, not just an in-process StringWriter.
+        Run r = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery());
+        assertEquals(0, r.exit(), () -> r.err());
+
+        String out = r.out();
+        assertTrue(
+                out.lines().count() >= 2,
+                () -> "indented output is multi-line: " + abbreviate(out));
+        assertTrue(out.contains("\u001B[36m"), () -> "keys are cyan: " + visible(out));
+        assertTrue(out.contains("\u001B[2mnull\u001B[0m"), () -> "nulls are dim: " + visible(out));
+
+        String plain = strip(out);
+        assertTrue(
+                plain.startsWith("[\n  {\n"),
+                () -> "two-space indent per level: " + abbreviate(plain));
+        assertTrue(
+                plain.contains("\n    \"scan\": "), () -> "keys sit at four: " + abbreviate(plain));
+        assertEquals(6, parseArray(plain, "the de-colourised pretty payload").size());
+    }
+
+    @Test
+    void prettyToAFileIsIndentedWithNoEscapeCodes(@TempDir Path dir) {
+        // ⛔ Colour is decided by the SINK, not by --pretty: escape codes in a file would break
+        // every
+        // parser that later reads it, so the file stays valid JSON while still being readable.
+        Path out = dir.resolve("pretty.json");
+        Run r = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery(), "--output", out);
+        assertEquals(0, r.exit(), () -> r.err());
+        assertEquals(0, r.stdout().length, () -> "--output keeps stdout empty: " + r.out());
+
+        String json = readString(out);
+        assertFalse(json.contains("\u001B"), () -> "a file is not a terminal: " + visible(json));
+        assertTrue(json.startsWith("[\n  {\n"), () -> "still indented: " + abbreviate(json));
+        assertTrue(json.contains("\n    \"scan\": "), () -> abbreviate(json));
+        assertEquals(6, parseArray(json, "the pretty --output payload").size());
+    }
+
+    @Test
+    void prettyFalseIsASingleUncolouredLineWithTheSameRows() {
+        // The machine form, and the flag a caller piping into jq needs.
+        Run compact =
+                fork(CliFixtures.smallMzml(), CliFixtures.standardQuery(), "--pretty", "false");
+        assertEquals(0, compact.exit(), () -> compact.err());
+
+        String out = compact.out();
+        assertFalse(out.contains("\u001B"), () -> "no colour in machine output: " + visible(out));
+        assertEquals(
+                1,
+                out.stripTrailing().lines().count(),
+                () -> "compact is one line: " + abbreviate(out));
+
+        // Only whitespace and escapes ever differ between the two renderings, so once those are
+        // removed the payloads must carry the same VALUES -- not merely the same row count.
+        Run pretty = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery());
+        assertEquals(
+                parseArray(strip(pretty.out()), "the pretty payload"),
+                parseArray(out, "the compact payload"),
+                "the two renderings must parse to identical values");
+    }
+
+    /** ANSI SGR codes removed, leaving the JSON a parser would accept. */
+    private static String strip(String s) {
+        return s.replaceAll("\u001B\\[[0-9]+m", "");
+    }
+
+    /** Escapes rendered visibly, so a failure message stays readable in a terminal or a CI log. */
+    private static String visible(String s) {
+        return abbreviate(s.replace("\u001B", "<ESC>"));
     }
 
     // ------------------------------------------------------------------ file helpers
