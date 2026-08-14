@@ -1,16 +1,4 @@
-# Runs the full test suite on every push to master and every PR.
-#
-# Modelled on ../cy-ndex-2/.github/workflows/ci.yml, with four deliberate differences:
-#
-#   0. Every step calls `make`, never `./gradlew`. The Makefile is the only entry point, so what
-#      CI runs and what a developer runs cannot drift — and a guard like the coverage gate is
-#      reachable locally rather than only here.
-#   1. `make integration-test` runs `gradle check`, NOT just `gradle test`. The three verification gates
-#      live in *IT.java files run by the separate integrationTest suite (reader parity, the
-#      differential, the CLI contract), so a unit-test-only run would report green while
-#      skipping every gate.
-#   2. JDK 17, which is what the project targets.
-#   3. No `xvfb-run`: nothing here touches AWT, so no virtual display is needed.
+# Runs the build's test targets on every push to master and every PR.
 name: Continuous Integration
 
 on:
@@ -34,18 +22,10 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      # Unit + integration tests, Spotless, the banned-dependency rule and the 90% coverage gate --
-      # everything, in one target.
-      #
-      # `make integration-test` rather than `./gradlew check`: the Makefile is the ONLY entry point, so what
-      # CI runs and what a developer runs cannot drift.
-      #
-      # The coverage gate is what keeps a green build meaningful: fixtures once
-      # lived outside the repo and Fixtures.require() used assumeTrue, so every parity assertion
-      # SKIPPED while the test counter stayed healthy. CI was green for four steps while proving
-      # only that the code compiled. A test that stops running now shows up as lost coverage, with
-      # no hand-maintained count to rot.
-      - name: Test
+      - name: Unit tests
+        run: make test
+
+      - name: Full suite
         run: make integration-test
 
       - name: Upload reports on failure

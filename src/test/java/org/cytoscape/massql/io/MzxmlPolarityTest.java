@@ -2,6 +2,7 @@ package org.cytoscape.massql.io;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import org.cytoscape.massql.testsupport.Fixtures;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 

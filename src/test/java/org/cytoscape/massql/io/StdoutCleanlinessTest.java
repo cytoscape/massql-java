@@ -8,6 +8,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
+import org.cytoscape.massql.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
 /**

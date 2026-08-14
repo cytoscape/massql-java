@@ -17,6 +17,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.cytoscape.massql.spectra.SpectrumTable;
+import org.cytoscape.massql.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
 /**

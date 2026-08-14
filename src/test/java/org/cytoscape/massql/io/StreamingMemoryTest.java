@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Path;
 
 import org.cytoscape.massql.spectra.SpectrumTable;
+import org.cytoscape.massql.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
 /**

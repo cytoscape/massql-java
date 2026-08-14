@@ -70,9 +70,13 @@ The `Makefile` is preferred entry point.
 ```sh
 make                   # list every target
 make build             # both projects: jar, -sources.jar and -javadoc.jar each
-make test              # unit tests, seconds
-make integration-test  # everything: unit + integration suites and the coverage gate
+make test              # unit tier, seconds
+make integration-test  # both tiers and the coverage gate
 ```
+
+Tests live in one tree, `src/test/java`, split by filename: **`*IT.java` is the integration tier**,
+everything else the unit tier. Helpers both tiers use live in `…massql.testsupport`; `TierBoundaryTest`
+fails the build if an integration test reaches anywhere else in the test tree.
 
 ## Implementation basis
 

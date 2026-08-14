@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
-import org.cytoscape.massql.TestPaths;
+import org.cytoscape.massql.testsupport.TestPaths;
 import org.junit.jupiter.api.Test;
 
 /**

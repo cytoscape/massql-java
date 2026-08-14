@@ -67,7 +67,6 @@ jobs:
       - name: Stamp the version
         run: make set-version-${{ steps.rel.outputs.artifact }} V=${{ steps.rel.outputs.version }}
 
-      # Full suite: unit + integration + Spotless + banned deps + the coverage gate, in one target.
       - name: Test
         run: make integration-test
 

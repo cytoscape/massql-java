@@ -1,4 +1,4 @@
-package org.cytoscape.massql.io;
+package org.cytoscape.massql.testsupport;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 

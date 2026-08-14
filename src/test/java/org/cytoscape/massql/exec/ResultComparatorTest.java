@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 
 import org.cytoscape.massql.result.ScanInfoResult;
+import org.cytoscape.massql.testsupport.ResultComparator;
 import org.junit.jupiter.api.Test;
 
 /**

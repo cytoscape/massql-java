@@ -16,8 +16,9 @@ import java.util.TreeSet;
 
 import org.cytoscape.massql.Massql;
 import org.cytoscape.massql.MassqlOptions;
-import org.cytoscape.massql.exec.ResultComparator;
 import org.cytoscape.massql.result.ScanInfoResult;
+import org.cytoscape.massql.testsupport.Fixtures;
+import org.cytoscape.massql.testsupport.ResultComparator;
 import org.junit.jupiter.api.Test;
 
 /**

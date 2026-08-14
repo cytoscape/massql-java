@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.cytoscape.massql.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 import org.opentest4j.TestAbortedException;
 
@@ -16,8 +17,9 @@ import org.opentest4j.TestAbortedException;
  * skipped test still counts as one that ran, so a green build would prove only that the code compiled.
  *
  * <p>The fix is easy to undo by accident: one {@code assumeTrue} added to "make CI pass" restores the
- * silent hole. So the contract is asserted here rather than left to a comment. CI additionally asserts
- * the skipped-test count is 0, which catches the same regression from the other side.
+ * silent hole. So the contract is asserted here rather than left to a comment. The 90% coverage gate
+ * catches the same regression from the other side — a test that stops running shows up as lost
+ * coverage, with no hand-maintained count to rot.
  */
 class FixturesContractTest {
 

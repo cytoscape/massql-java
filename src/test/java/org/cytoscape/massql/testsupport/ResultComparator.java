@@ -1,4 +1,4 @@
-package org.cytoscape.massql.exec;
+package org.cytoscape.massql.testsupport;
 
 import java.util.ArrayList;
 import java.util.List;

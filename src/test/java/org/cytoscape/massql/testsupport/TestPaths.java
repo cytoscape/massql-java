@@ -1,4 +1,4 @@
-package org.cytoscape.massql;
+package org.cytoscape.massql.testsupport;
 
 import java.net.URISyntaxException;
 import java.nio.file.Files;

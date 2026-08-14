@@ -64,81 +64,47 @@ dependencies {
     // sourceSets.test.output: that would put the SDK's test CLASSES here too, and the CLI has no
     // business reaching into them.
     testRuntimeOnly files(rootProject.sourceSets.test.output.resourcesDir)
+
+    // Test-only: checkBannedDependencies inspects runtimeClasspath, which this cannot reach, and the
+    // uber-jar is built from `implementation`.
+    testImplementation "com.google.code.gson:gson:${rootProject.ext.gsonVersion}"
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+    exclude '**/*IT.class', '**/*IT$*.class'
+    systemProperty 'massql.tier', 'test'
     // The resources above are produced by that task, not by simply existing on disk.
     dependsOn rootProject.tasks.named('processTestResources')
 }
 
-// ---------------------------------------------------------------------------------------------
-// Integration tests -- the CLI contract, which only a real subprocess can establish
-// ---------------------------------------------------------------------------------------------
-//
-// Separate from the unit suite for the same reason the SDK's is: these fork a JVM per case and read
-// multi-megabyte fixtures, so they stay out of the edit loop.
-//
-// ⚠ The thing under test is the ASSEMBLED UBER-JAR, not Main.run. Step 11 already exercises
-// Main.run(String[], PrintStream, PrintStream) in-process and owns the payload-shape assertions;
-// what an in-process test cannot establish is that real file descriptors keep stdout and stderr
-// apart, which is the whole reason this suite exists.
-testing {
-    suites {
-        integrationTest(JvmTestSuite) {
-            useJUnitJupiter(rootProject.ext.junitVersion)
-            dependencies {
-                implementation project()
-            }
-            targets.configureEach {
-                testTask.configure {
-                    shouldRunAfter(test)
+tasks.register('integrationTest', Test) {
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform()
+    include '**/*IT.class', '**/*IT$*.class'
+    shouldRunAfter tasks.named('test')
+    systemProperty 'massql.tier', 'integrationTest'
 
-                    // The build hands the test the jar it must fork, resolved rather than guessed.
-                    //
-                    // ⛔ Do NOT reconstruct this path from a version string. `cliVersion` is a Gradle
-                    // property, not a JVM system property, so System.getProperty("cliVersion") is
-                    // null and the path becomes massql-java-cli-null.jar. Passing the resolved
-                    // file also means a version bump cannot break the test.
-                    dependsOn tasks.named('shadowJar')
-                    systemProperty 'cliJar',
-                            tasks.named('shadowJar').get().archiveFile.get().asFile.absolutePath
+    dependsOn tasks.named('shadowJar')
+    systemProperty 'cliJar',
+            tasks.named('shadowJar').get().archiveFile.get().asFile.absolutePath
+    dependsOn rootProject.tasks.named('processTestResources')
 
-                    // Same spectra fixtures and .massql queries the goldens were generated from.
-                    dependsOn rootProject.tasks.named('processTestResources')
-                }
-            }
+    // A test cannot detect its own non-execution: a broken filter runs zero tests and exits 0.
+    def ran = new java.util.concurrent.atomic.AtomicInteger()
+    afterTest { desc, result -> ran.incrementAndGet() }
+    doLast {
+        if (ran.get() == 0) {
+            throw new GradleException(
+                    "integrationTest matched no tests -- the *IT.class filter is broken")
         }
     }
 }
 
-// Mirrors the SDK's wiring (root build.gradle): without these the IT suite gets its own empty
-// configurations -- no JUnit, no CliFixtures, and none of the SDK's test resources, so every
-// fixture lookup would fail at runtime rather than at configuration time.
-configurations {
-    integrationTestImplementation.extendsFrom testImplementation
-    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
-}
-
-dependencies {
-    // CliFixtures lives in cli's unit suite and is package-private to ...massql.cli; the IT is in
-    // that same package, so it reuses the lookup rather than carrying a second copy.
-    integrationTestImplementation sourceSets.test.output
-
-    // The contract test must inspect the CLI's JSON payload -- row count and which columns are null.
-    // Hand-rolling that parse invites the classic failure (a regex that stops early and silently drops
-    // columns) applied to the artifact that proves the CLI contract. Test-only: checkBannedDependencies
-    // inspects runtimeClasspath, which this cannot reach, and the uber-jar is built from `implementation`.
-    integrationTestImplementation "com.google.code.gson:gson:${rootProject.ext.gsonVersion}"
-}
-
-configurations {
-    integrationTestImplementation.extendsFrom testImplementation
-    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
-}
-
 tasks.named('check') {
-    dependsOn testing.suites.integrationTest
+    dependsOn tasks.named('integrationTest')
 }
 
 // Same bar as the SDK. The root gate excluded this project only while it held a single

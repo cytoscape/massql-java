@@ -12,6 +12,9 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.util.List;
 import java.util.Map;
 
+import org.cytoscape.massql.testsupport.Fixtures;
+import org.cytoscape.massql.testsupport.ParityDump;
+import org.cytoscape.massql.testsupport.ParityFixtures;
 import org.junit.jupiter.api.Test;
 
 /**

@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Set;
 
 import org.cytoscape.massql.spectra.SpectrumTable;
+import org.cytoscape.massql.testsupport.ParityDump;
+import org.cytoscape.massql.testsupport.ParityFixtures;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 

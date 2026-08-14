@@ -56,7 +56,7 @@ class CliContractIT {
         String p = System.getProperty("cliJar");
         assertNotNull(
                 p,
-                "system property 'cliJar' is not set -- cli/build.gradle's integrationTest suite must"
+                "system property 'cliJar' is not set -- cli/build.gradle's integrationTest task must"
                         + " pass the resolved shadowJar path. Do NOT rebuild it from a version string:"
                         + " cliVersion is a Gradle property, not a JVM one, and yields"
                         + " massql-java-cli-null.jar.");
@@ -157,6 +157,31 @@ class CliContractIT {
         return n;
     }
 
+    /**
+     * Every row must satisfy the query that produced it — {@code scaninfo(MS2DATA)} with
+     * {@code MS2PREC=810.79:TOLERANCEMZ=1.0}. A row count alone accepts six wrong scans.
+     */
+    private static void assertRowsMatchStandardQuery(JsonArray rows) {
+        int previous = 0;
+        for (JsonElement e : rows) {
+            JsonObject o = e.getAsJsonObject();
+            assertEquals(
+                    2, o.get("mslevel").getAsInt(), () -> "MS2DATA selected a non-MS2 scan: " + o);
+
+            double precmz = o.get("precmz").getAsDouble();
+            assertTrue(
+                    Math.abs(precmz - 810.79) <= 1.0,
+                    () -> "precmz " + precmz + " lies outside TOLERANCEMZ=1.0 of 810.79: " + o);
+
+            // docs/CLI.md documents ascending scan order; nothing else enforces it.
+            int scan = o.get("scan").getAsInt();
+            int before = previous;
+            assertTrue(
+                    scan > before, () -> "scan ids must ascend: " + scan + " followed " + before);
+            previous = scan;
+        }
+    }
+
     // ============================================ (a) functional correctness, read from --output
 
     /**
@@ -185,6 +210,7 @@ class CliContractIT {
         assertEquals(0, r.exit(), () -> "exit " + r.exit() + ", stderr: " + r.err());
 
         JsonArray rows = parseArray(readString(out), "the --output payload at 0.001 ppm");
+        assertRowsMatchStandardQuery(rows);
         assertEquals(
                 6,
                 rows.size(),
@@ -218,6 +244,7 @@ class CliContractIT {
         assertEquals(0, atDefault.exit(), () -> atDefault.err());
 
         JsonArray rows20 = parseArray(readString(def), "the default-tolerance payload");
+        assertRowsMatchStandardQuery(rows20);
         assertEquals(6, rows20.size());
         assertEquals(
                 4, nullCount(rows20, "ms1_i"), "small_mzml_results.json: 4 of 6 miss at 20 ppm");
@@ -236,6 +263,7 @@ class CliContractIT {
         assertEquals(0, at60.exit(), () -> at60.err());
 
         JsonArray rows60 = parseArray(readString(wide), "the 60 ppm payload");
+        assertRowsMatchStandardQuery(rows60);
         assertEquals(6, rows60.size());
         assertEquals(
                 0,
@@ -302,7 +330,9 @@ class CliContractIT {
         Run piped = forkWithStdin(query, CliFixtures.smallMzml(), "-", "--pretty", "false");
 
         assertEquals(0, piped.exit(), () -> "piped query failed: " + piped.err());
-        assertEquals(6, parseArray(piped.out(), "the piped-query payload").size());
+        JsonArray pipedRows = parseArray(piped.out(), "the piped-query payload");
+        assertEquals(6, pipedRows.size());
+        assertRowsMatchStandardQuery(pipedRows);
         assertArrayEquals(
                 readBytes(viaFile),
                 piped.stdout(),
@@ -321,7 +351,9 @@ class CliContractIT {
                         "false");
 
         assertEquals(0, r.exit(), () -> r.err());
-        assertEquals(6, parseArray(r.out(), "the --query payload").size());
+        JsonArray inlineRows = parseArray(r.out(), "the --query payload");
+        assertEquals(6, inlineRows.size());
+        assertRowsMatchStandardQuery(inlineRows);
     }
 
     /** A query that matches nothing is an empty array and exit <b>0</b> — not a crash, not exit 1. */
@@ -349,6 +381,7 @@ class CliContractIT {
         assertEquals(0, r.exit(), () -> r.err());
 
         JsonArray rows = parseArray(r.out(), "piped stdout");
+        assertRowsMatchStandardQuery(rows);
         assertEquals(6, rows.size());
 
         String out = r.out();
@@ -388,7 +421,9 @@ class CliContractIT {
                                 + " byte(s): "
                                 + abbreviate(r.out()));
         assertTrue(Files.isRegularFile(out), "and the file must hold the array");
-        assertEquals(6, parseArray(readString(out), "the --output file").size());
+        JsonArray fileRows = parseArray(readString(out), "the --output file");
+        assertEquals(6, fileRows.size());
+        assertRowsMatchStandardQuery(fileRows);
     }
 
     /**
@@ -502,7 +537,9 @@ class CliContractIT {
                 () -> "two-space indent per level: " + abbreviate(plain));
         assertTrue(
                 plain.contains("\n    \"scan\": "), () -> "keys sit at four: " + abbreviate(plain));
-        assertEquals(6, parseArray(plain, "the de-colourised pretty payload").size());
+        JsonArray prettyRows = parseArray(plain, "the de-colourised pretty payload");
+        assertEquals(6, prettyRows.size());
+        assertRowsMatchStandardQuery(prettyRows);
     }
 
     @Test
@@ -519,7 +556,9 @@ class CliContractIT {
         assertFalse(json.contains("\u001B"), () -> "a file is not a terminal: " + visible(json));
         assertTrue(json.startsWith("[\n  {\n"), () -> "still indented: " + abbreviate(json));
         assertTrue(json.contains("\n    \"scan\": "), () -> abbreviate(json));
-        assertEquals(6, parseArray(json, "the pretty --output payload").size());
+        JsonArray prettyFileRows = parseArray(json, "the pretty --output payload");
+        assertEquals(6, prettyFileRows.size());
+        assertRowsMatchStandardQuery(prettyFileRows);
     }
 
     @Test

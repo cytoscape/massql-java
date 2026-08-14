@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.cytoscape.massql.spectra.SpectrumTable;
+import org.cytoscape.massql.testsupport.Fixtures;
+import org.cytoscape.massql.testsupport.ParityDump;
 import org.junit.jupiter.api.Test;
 
 /**

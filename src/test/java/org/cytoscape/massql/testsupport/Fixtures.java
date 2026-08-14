@@ -1,4 +1,4 @@
-package org.cytoscape.massql.io;
+package org.cytoscape.massql.testsupport;
 
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -22,7 +22,7 @@ import java.nio.file.Paths;
  * mzXML readers require and a jar-embedded resource could not satisfy.
  *
  */
-final class Fixtures {
+public final class Fixtures {
 
     private Fixtures() {}
 
@@ -32,7 +32,7 @@ final class Fixtures {
      * @param relative path under {@code src/test/resources}, e.g. {@code "data/small.mzML"}
      * @throws AssertionError if the fixture is missing — never a skip
      */
-    static Path require(String relative) {
+    public static Path require(String relative) {
         URL url = Fixtures.class.getClassLoader().getResource(relative);
         if (url == null) {
             throw new AssertionError(explainMissing(relative));
@@ -55,7 +55,7 @@ final class Fixtures {
      * <p>For genuinely optional data only. Do <b>not</b> use it to make a required assertion
      * conditional — that reintroduces the silent-skip failure this replaced.
      */
-    static boolean has(String relative) {
+    public static boolean has(String relative) {
         return Fixtures.class.getClassLoader().getResource(relative) != null;
     }
 

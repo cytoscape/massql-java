@@ -16,8 +16,9 @@ import java.util.List;
 
 import org.cytoscape.massql.Massql;
 import org.cytoscape.massql.MassqlOptions;
-import org.cytoscape.massql.io.GoldenResults;
 import org.cytoscape.massql.result.ScanInfoResult;
+import org.cytoscape.massql.testsupport.GoldenResults;
+import org.cytoscape.massql.testsupport.ResultComparator;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 

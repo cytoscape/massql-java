@@ -178,7 +178,7 @@ The `Makefile` is the entry point.
 
 ```sh
 make build             # jar, -sources.jar and -javadoc.jar -> build/libs/
-make test              # unit tests, seconds
-make integration-test  # unit + integration tests, coverage gate, lint, banned deps
+make test              # unit tier (*Test.java), seconds
+make integration-test  # both tiers, coverage gate, lint, banned deps
 make publish-local     # install into your local m2 cache
 ```

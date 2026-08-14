@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 
 import org.cytoscape.massql.MassqlException;
 import org.cytoscape.massql.spectra.SpectrumTable;
+import org.cytoscape.massql.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

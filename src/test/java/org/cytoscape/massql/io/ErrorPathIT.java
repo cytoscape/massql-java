@@ -16,6 +16,7 @@ import org.cytoscape.massql.Massql;
 import org.cytoscape.massql.MassqlException;
 import org.cytoscape.massql.MassqlParseException;
 import org.cytoscape.massql.result.ScanInfoResult;
+import org.cytoscape.massql.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;

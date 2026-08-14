@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import org.cytoscape.massql.result.ScanInfoResult;
+import org.cytoscape.massql.testsupport.GoldenResults;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

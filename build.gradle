@@ -244,45 +244,46 @@ tasks.named('generateGrammarSource') {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Tests: fast unit suite, separate integration suite
+// Tests: *IT is the integration tier, everything else is the unit tier
 // ---------------------------------------------------------------------------------------------
 
+// This block also supplies junit-jupiter and useJUnitPlatform() to the `test` task -- there is no
+// explicit JUnit dependency anywhere else.
 testing {
     suites {
         test {
             useJUnitJupiter(junitVersion)
         }
+    }
+}
 
-        // *IT.java, in src/integrationTest/java. These read real spectra fixtures and the
-        // committed goldens, so they are slow and kept out of the edit loop -- `make test` runs
-        // the unit suite, `make integration-test` runs everything.
-        integrationTest(JvmTestSuite) {
-            useJUnitJupiter(junitVersion)
-            dependencies {
-                implementation project()
-            }
-            targets.configureEach {
-                testTask.configure {
-                    shouldRunAfter(test)
-                }
-            }
+tasks.named('test') {
+    exclude '**/*IT.class', '**/*IT$*.class'
+    systemProperty 'massql.tier', 'test'
+}
+
+tasks.register('integrationTest', Test) {
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform()
+    include '**/*IT.class', '**/*IT$*.class'
+    shouldRunAfter tasks.named('test')
+    systemProperty 'massql.tier', 'integrationTest'
+
+    // A test cannot detect its own non-execution: a broken filter runs zero tests and exits 0.
+    def ran = new java.util.concurrent.atomic.AtomicInteger()
+    afterTest { desc, result -> ran.incrementAndGet() }
+    doLast {
+        if (ran.get() == 0) {
+            throw new GradleException(
+                    "integrationTest matched no tests -- the *IT.class filter is broken")
         }
     }
 }
 
-configurations {
-    integrationTestImplementation.extendsFrom testImplementation
-    integrationTestRuntimeOnly.extendsFrom testRuntimeOnly
-}
-
-dependencies {
-    // The ITs share the unit suite's helpers -- io/Fixtures (package-private, same package) and
-    // io/ParityDump -- and its resources, which is where the spectra fixtures live.
-    integrationTestImplementation sourceSets.test.output
-}
-
 tasks.named('check') {
-    dependsOn testing.suites.integrationTest
+    dependsOn tasks.named('integrationTest')
 }
 
 // ---------------------------------------------------------------------------------------------

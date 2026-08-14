@@ -1,4 +1,4 @@
-package org.cytoscape.massql.io;
+package org.cytoscape.massql.testsupport;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -19,7 +19,7 @@ import java.util.Map;
  * integration-test class. That direction is impossible anyway, since {@code integrationTest} depends on
  * {@code test}.
  */
-final class ParityFixtures {
+public final class ParityFixtures {
 
     private ParityFixtures() {}
 
@@ -37,7 +37,7 @@ final class ParityFixtures {
      * MzxmlEdgeCaseTest}. Also absent: {@code micro_multiprec.mzML}, whose peak parity the mzXML
      * twin already establishes.
      */
-    static final Map<String, Integer> FIXTURES_WITH_DUMPS = new LinkedHashMap<>();
+    public static final Map<String, Integer> FIXTURES_WITH_DUMPS = new LinkedHashMap<>();
 
     static {
         // Real fixtures.
@@ -69,12 +69,12 @@ final class ParityFixtures {
     }
 
     /** The inventory's fixture names, in declaration order — a JUnit {@code @MethodSource}. */
-    static List<String> fixtures() {
+    public static List<String> fixtures() {
         return List.copyOf(FIXTURES_WITH_DUMPS.keySet());
     }
 
     /** Where each fixture lives under {@code src/test/resources}. */
-    static Path fixturePath(String name) {
+    public static Path fixturePath(String name) {
         return Fixtures.require(
                 name.startsWith("micro") ? "fixtures/micro/" + name : "data/" + name);
     }

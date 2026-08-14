@@ -1,4 +1,4 @@
-package org.cytoscape.massql.io;
+package org.cytoscape.massql.testsupport;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -42,7 +42,7 @@ import java.util.zip.GZIPInputStream;
  * then all MS2 — 229 then 687 on the Ewing file. Never infer sequence from a dump; re-derive order from
  * the file.
  */
-final class ParityDump {
+public final class ParityDump {
 
     /**
      * One scan's worth of MassQL's loaded state. Hex fields are kept raw and parsed on demand.
@@ -52,7 +52,7 @@ final class ParityDump {
      * property of the reference's two-dataframe shape, not a gap: an MS1 survey scan has no
      * precursor to describe.
      */
-    record Scan(
+    public record Scan(
             int scan,
             int mslevel,
             int peakCount,
@@ -68,25 +68,25 @@ final class ParityDump {
             Integer charge) {
 
         /** MassQL's precursor m/z for this scan. MS2 only. */
-        double precmz() {
+        public double precmz() {
             return parseHex(precmzHex);
         }
 
         /** The composite key. See the class note: scan id alone is unsafe. */
-        Key key() {
+        public Key key() {
             return new Key(mslevel, scan);
         }
 
-        double rt() {
+        public double rt() {
             return parseHex(rtHex);
         }
 
-        double iSum() {
+        public double iSum() {
             return parseHex(iSumHex);
         }
     }
 
-    record Key(int mslevel, int scan) {
+    public record Key(int mslevel, int scan) {
         @Override
         public String toString() {
             return "MS" + mslevel + " scan " + scan;
@@ -111,24 +111,24 @@ final class ParityDump {
         return fixture;
     }
 
-    int ms1ScanCount() {
+    public int ms1ScanCount() {
         return ms1ScanCount;
     }
 
-    int ms2ScanCount() {
+    public int ms2ScanCount() {
         return ms2ScanCount;
     }
 
-    long peakRows() {
+    public long peakRows() {
         return peakRows;
     }
 
-    Map<Key, Scan> scans() {
+    public Map<Key, Scan> scans() {
         return scans;
     }
 
     /** Loads the dump for a fixture name, e.g. {@code "small.mzML"}. Fails if absent. */
-    static ParityDump of(String fixtureName) {
+    public static ParityDump of(String fixtureName) {
         Path gz = Fixtures.require("goldens/loader-parity/" + fixtureName + ".json.gz");
         String json;
         try (var in = new GZIPInputStream(Files.newInputStream(gz))) {
@@ -156,10 +156,6 @@ final class ParityDump {
                             m.group(12) == null ? null : Integer.valueOf(m.group(12)),
                             m.group(13) == null ? null : Integer.valueOf(m.group(13)));
             Scan clash = byKey.put(s.key(), s);
-            // A duplicate key would mean the dump itself is malformed, or that our key is too weak
-            // --
-            // that failure mode. Better to know here than to silently drop half the
-            // file.
             assertNull(clash, "duplicate key " + s.key() + " in dump " + fixtureName);
         }
 
@@ -187,7 +183,7 @@ final class ParityDump {
      * hexadecimal literal form ({@code 0x1.5c8f2ap+20}) and reproduces the exact bits; a decimal
      * round-trip can lose or fabricate low bits and turn a real decoder bug into a passing test.
      */
-    static double parseHex(String hex) {
+    public static double parseHex(String hex) {
         return Double.parseDouble(hex);
     }
 
@@ -198,7 +194,7 @@ final class ParityDump {
      * <b>order</b> as well as every bit. See {@code PeakOrderPreconditionTest} for the precondition that
      * makes order-sensitivity correct rather than brittle.
      */
-    static String sha256Of(double[] values) {
+    public static String sha256Of(double[] values) {
         ByteBuffer b = ByteBuffer.allocate(8 * values.length).order(ByteOrder.BIG_ENDIAN);
         for (double v : values) b.putDouble(v);
         try {

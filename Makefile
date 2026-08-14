@@ -43,15 +43,17 @@ build:
 	@echo "  -> cli/build/libs/massql-java-cli-javadoc.jar"
 	@echo "  -> build/docs/javadoc/index.html"
 
-## test: unit tests only (*Test.java in src/test). Seconds, for the edit loop.
+## test: unit tier only (*Test.java). Seconds, for the edit loop.
 test:
 	$(GRADLE) test
 
-## integration-test: everything -- unit + integration suites, coverage gate, lint, banned deps
+## integration-test: everything -- both tiers, coverage gate, lint, banned deps
 #
-# `check` rather than the suites by name: it pulls in both projects' integrationTest suites, the 90%
-# jacocoTestCoverageVerification and checkBannedDependencies. Naming `integrationTest` alone would
-# resolve to the ROOT project's task and silently skip the CLI contract suite.
+# Both tiers live in src/test/java and are selected by filename: *IT.java is the integration tier,
+# everything else the unit tier. Helpers both tiers use live in the testsupport package.
+#
+# `check` rather than the tasks by name: naming `integrationTest` alone would resolve to the ROOT
+# project's task and silently skip the CLI contract tests.
 integration-test:
 	$(GRADLE) check
 
