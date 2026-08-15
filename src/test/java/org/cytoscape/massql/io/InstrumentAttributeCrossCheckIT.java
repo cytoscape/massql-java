@@ -20,35 +20,7 @@ import org.cytoscape.massql.spectra.SpectrumTable;
 import org.cytoscape.massql.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
-/**
- * A free correctness check with <b>no reference implementation in the loop</b>: the instrument's own summary attributes.
- *
- * <p>Every {@code <scan>} in the Ewing file carries {@code totIonCurrent}, {@code basePeakIntensity} and
- * {@code basePeakMz} — values the acquisition software computed from the same peaks it then encoded. So
- * they are an independent statement of what our decode should sum and argmax to. Unlike every other parity
- * assertion in this project, this one depends on no external loader and no generated golden: if the
- * base64/big-endian/interleaved/32-bit decode were wrong, these would not reconcile.
- *
- * <p><b>Expect minor float drift, and only minor.</b> The attributes were written as decimal text from
- * float32 accumulations, so they do not round-trip exactly. Measured worst-case relative deltas across all
- * 916 scans, before this test was written:
- *
- * <pre>
- *   totIonCurrent      4.724e-06
- *   basePeakIntensity  4.895e-06
- *   basePeakMz         4.850e-06
- * </pre>
- *
- * <p>The tolerance below is 1e-5 — just above the measurement, so a real regression cannot hide inside it.
- * The important property is that the drift is <b>uniform across all three</b> and tiny: a
- * <b>systematic</b> mismatch (a constant factor, a consistent sign, or one column far worse than the
- * others) is a decoder bug, not drift. The per-column worst case is therefore reported, not just asserted.
- *
- * <p>the parity gate takes the fuller form of this check against bit-identical digests.
- */
 class InstrumentAttributeCrossCheckIT {
-
-    /** Relative tolerance. Measured worst case is 4.9e-6; this sits just above it. */
     private static final double TOL = 1e-5;
 
     private record Declared(int num, double tic, double basePeakI, double basePeakMz) {}
@@ -102,7 +74,7 @@ class InstrumentAttributeCrossCheckIT {
 
         double worstTic = 0, worstBpi = 0, worstBpm = 0;
         int worstTicScan = 0, worstBpiScan = 0, worstBpmScan = 0;
-        int signedTicHigh = 0, signedTicLow = 0; // for the systematic-bias check
+        int signedTicHigh = 0, signedTicLow = 0;
         int compared = 0;
 
         try (SpectraStream s = SpectraFile.open(mzxml)) {
@@ -168,11 +140,6 @@ class InstrumentAttributeCrossCheckIT {
                         + worstBpmScan
                         + " -- a wrong argmax picks a different peak entirely, so this would be large, not small");
 
-        // The drift must be NOISE, not BIAS. Rounded decimal text should land either side of our
-        // sum
-        // roughly evenly; an overwhelmingly one-sided result would mean we are systematically
-        // dropping
-        // or double-counting a peak, which a small worst-case delta alone would not reveal.
         int minSide = Math.min(signedTicHigh, signedTicLow);
         assertTrue(
                 minSide > compared / 20,
@@ -185,9 +152,6 @@ class InstrumentAttributeCrossCheckIT {
 
     @Test
     void aWrongArgmaxWouldBeCaughtLoudly() {
-        // Establishes that basePeakMz is a SHARP check rather than a soft one: within each scan the
-        // second-highest peak's m/z is far from the highest's, so picking the wrong peak produces a
-        // relative error orders of magnitude above the 1e-5 tolerance -- not a near-miss.
         Path mzxml = Fixtures.require("data/DP00570_F02.mzxml");
         int checked = 0;
         double smallestGap = Double.POSITIVE_INFINITY;

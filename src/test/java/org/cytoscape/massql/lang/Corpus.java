@@ -12,16 +12,12 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Loads the checked-in reference-parse corpus and its disposition manifest. */
 final class Corpus {
-
-    /** Measured at the pinned SHA. */
     static final int EXPECTED_SIZE = 46;
 
     static final int EXPECTED_PARSE = 15;
     static final int EXPECTED_REJECT = 31;
 
-    /** @param candidates every out-of-scope construct the query contains; empty when it should parse. */
     record Entry(String file, String query, boolean shouldParse, java.util.Set<String> candidates) {
         @Override
         public String toString() {
@@ -43,7 +39,6 @@ final class Corpus {
         }
     }
 
-    /** The `query` field, unescaped. Read with a regex to avoid a JSON dependency. */
     private static final Pattern QUERY =
             Pattern.compile("\"query\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
 

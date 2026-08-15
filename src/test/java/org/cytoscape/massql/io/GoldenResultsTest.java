@@ -18,18 +18,7 @@ import org.cytoscape.massql.testsupport.GoldenResults;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * ⛔ <b>Tests the test.</b> A golden reader that silently returns fewer rows turns the differential
- * differential into a green light that proves nothing.
- *
- * <p>This is not a hypothetical failure mode in this repository. {@code ParityDump}'s hand-rolled
- * regex stopped at {@code polarity} and silently dropped {@code charge}, {@code ms1scan} and
- * {@code precmz}; three columns went uncompared, and an MGF charge bug survived a <b>green</b>
- * the parity gate gate for five steps before surfacing at the CLI. Every rejection below
- * is one that regex-shaped parsing would have let through.
- */
 class GoldenResultsTest {
-
     @TempDir Path dir;
 
     private static Path write(Path dir, String name, String content) {
@@ -42,7 +31,6 @@ class GoldenResultsTest {
         }
     }
 
-    /** One well-formed row, as the generator emits it. */
     private static String wrap(String rows) {
         return "{\"results\": [" + rows + "]}";
     }
@@ -55,8 +43,6 @@ class GoldenResultsTest {
                 + " \"base_peak_mz\": 200.5, \"ms1_i\": 42.0, \"ms1_precmz\": 810.7,"
                 + " \"ms1_base_peak_i\": 99.0}";
     }
-
-    // ------------------------------------------------------------------ it reads real goldens
 
     @Test
     void readsACommittedGoldenFaithfully() {
@@ -74,18 +60,12 @@ class GoldenResultsTest {
 
     @Test
     void anEmptyGoldenIsARealResultNotAFailure() {
-        // Two goldens are deliberately `[]` -- the strict-window evidence and the empty-result
-        // case. Reading them must succeed and yield zero rows, because the differential asserts
-        // against
-        // them.
         assertTrue(GoldenResults.of("micro_mzml_edge_results").isEmpty());
         assertTrue(GoldenResults.of("dp00570_mzxml_empty_results").isEmpty());
     }
 
     @Test
     void everyCommittedGoldenParses() {
-        // If a golden is ever regenerated into a shape this reader cannot handle, that must surface
-        // here rather than as a confusing mismatch inside the differential.
         for (String name :
                 List.of(
                         "small_mzml_results",
@@ -111,8 +91,6 @@ class GoldenResultsTest {
 
     @Test
     void theMs1dataGoldenCarriesTheSameTwelveKeys() {
-        // one union schema discriminated by mslevel, no key ever absent. The precursor columns
-        // are PRESENT and null on an MS1 row, while base_peak_* carry real values.
         List<ScanInfoResult> rows = GoldenResults.of("small_mzml_ms1_results");
         assertEquals(14, rows.size());
         ScanInfoResult r = rows.get(0);
@@ -124,12 +102,8 @@ class GoldenResultsTest {
         assertNotNull(r.basePeakMz());
     }
 
-    // ------------------------------------------------------------------ it rejects damage
-
     @Test
     void aTruncatedGoldenFails() {
-        // The ParityDump failure mode, exactly: a lenient parser reads what it can and reports
-        // success on a partial document.
         Path p =
                 write(
                         dir,
@@ -141,8 +115,6 @@ class GoldenResultsTest {
 
     @Test
     void aGoldenMissingAKeyFails() {
-        // Silently reading a dropped key as null would compare "null vs null" against a genuinely
-        // null column and pass -- which is how three columns went unchecked for five steps.
         String missing = row(3).replace(", \"charge\": null", "");
         Path p = write(dir, "missing-key.json", wrap(missing));
         AssertionError e = assertThrows(AssertionError.class, () -> GoldenResults.read(p));
@@ -159,8 +131,6 @@ class GoldenResultsTest {
 
     @Test
     void aNonNumericValueFails() {
-        // Guards the null-vs-value policy: "null" as a STRING is not null, and must not be read as
-        // one.
         Path p =
                 write(
                         dir,
@@ -179,9 +149,6 @@ class GoldenResultsTest {
 
     @Test
     void aDroppedRowChangesTheCount() {
-        // The reader cannot know a row is missing -- that is the differential's job -- but it must
-        // report the count faithfully so the differential can. This asserts it does not, say,
-        // deduplicate or skip.
         Path two = write(dir, "two.json", wrap(row(3) + "," + row(10)));
         Path one = write(dir, "one.json", wrap(row(3)));
         assertEquals(2, GoldenResults.read(two).size());
@@ -190,8 +157,6 @@ class GoldenResultsTest {
 
     @Test
     void aNonIntegralScanIdFails() {
-        // scan/ms1scan/charge/mslevel are compared EXACTLY, so reading 3.5 as 3 would make an exact
-        // comparison silently approximate.
         Path p =
                 write(dir, "fractional.json", wrap(row(3).replace("\"scan\": 3", "\"scan\": 3.5")));
         AssertionError e = assertThrows(AssertionError.class, () -> GoldenResults.read(p));

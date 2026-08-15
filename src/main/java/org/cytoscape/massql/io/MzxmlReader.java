@@ -24,34 +24,7 @@ import javolution.xml.internal.stream.XMLStreamReaderImpl;
 import javolution.xml.stream.XMLStreamConstants;
 import javolution.xml.stream.XMLStreamException;
 
-/**
- * Streaming mzXML reader — hand-written, vendoring nothing new.
- *
- * <p><b>Hand-written because MSDK's `MzXMLFileParser` cannot be vendored:</b> it carries 13 msdk imports
- * including 7 `datamodel` types, and Guava arrives through `SimpleMsScan`, which imports `Preconditions`
- * and `Range`. Vendoring it would mean writing our own scan holder — the surgery that killed the same
- * plan for mzML one spec earlier. mzXML is the simpler format anyway: zlib-or-none rather than zlib
- * plus six Numpress variants, one `precision` attribute rather than per-array cvParams, one interleaved
- * array rather than two.
- *
- * <p>Shape mirrors {@link MzmlReader}: memory-map, walk with {@link XMLStreamReaderImpl} instantiated
- * directly (the JDK's {@code XMLInputFactory} uses {@code ServiceLoader}, banned by
- * which this project does not use), capture each {@code <peaks>} element's base64 <b>text</b> and
- * decode it lazily in {@link ScanView#materialize()}.
- *
- * <p><b>Nothing is shared with the mzML decode path, deliberately</b>. mzML is
- * little-endian with separate arrays and Numpress; mzXML is <b>big-endian with interleaved pairs and no
- * Numpress</b>. A shared helper would need a flag for every one of those, and reusing a buffer configured
- * for mzML produces plausible-looking garbage rather than an error.
- *
- * <p><b>{@code </scan>} does not end a spectrum.</b> mzXML 2.0 nests MS2 inside its parent MS1, and the
- * Ewing fixture does exactly that ({@code <scan>} depth 2) while {@code small.mzXML} is flat (depth 1).
- * So this walk emits a scan when it reaches that scan's {@code <peaks>} element — which per the schema
- * precedes any nested child — and never consults {@code </scan>} at all. Flat and nested files then take
- * an identical path, which is why both produce the same {@code ms1scan} links.
- */
 final class MzxmlReader extends AbstractSpectraStream {
-
     private final ByteBufferInputStream mapped;
     private final XMLStreamReaderImpl xml;
     private final List<String> diagnostics = new ArrayList<>();
@@ -61,10 +34,8 @@ final class MzxmlReader extends AbstractSpectraStream {
     private int skippedNotASpectrum = 0;
     private boolean sawRootEnd = false;
 
-    /** Document-order tracking: the id of the most recent MS1 spectrum WITH PEAKS. */
     private int previousMs1Scan = 0;
 
-    /** True once {@code <scan>} attributes are read, until its {@code <peaks>} is reached. */
     private boolean scanStarted = false;
 
     private final Scan scan = new Scan();
@@ -72,8 +43,7 @@ final class MzxmlReader extends AbstractSpectraStream {
 
     MzxmlReader(Path path) {
         super(path);
-        // Must precede `new XMLStreamReaderImpl()` below: javolution logs buffer growth to STDOUT,
-        // which would corrupt the CLI's JSON payload. See that class.
+
         JavolutionQuiet.ensure();
         try {
             this.mapped = FileMemoryMapper.mapToMemory(path.toFile());
@@ -99,10 +69,6 @@ final class MzxmlReader extends AbstractSpectraStream {
                             + " scans with ms level > 2 (out of scope for scaninfo)");
         }
         if (skippedNoMsLevel > 0) {
-            // The reference drops these too: a missing msLevel matches neither the ==1 nor the ==2
-            // branch. Reported rather than silent, because "48 scans became 40" needs an
-            // explanation
-            // at the point of use.
             out.add(
                     "skipped "
                             + skippedNoMsLevel
@@ -137,20 +103,20 @@ final class MzxmlReader extends AbstractSpectraStream {
                 if (ev == XMLStreamConstants.END_ELEMENT) {
                     CharArray n = xml.getLocalName();
                     if (eq(n, "msRun") || eq(n, "mzXML")) sawRootEnd = true;
-                    continue; // </scan> is deliberately NOT a boundary
+                    continue;
                 }
                 if (ev != XMLStreamConstants.START_ELEMENT) continue;
 
                 CharArray name = xml.getLocalName();
                 if (eq(name, "scan")) {
-                    dropUnfinishedScan(); // a <scan> with no <peaks> of its own
+                    dropUnfinishedScan();
                     startScan();
                 } else if (eq(name, "precursorMz") && scanStarted) {
                     readPrecursorMz();
                 } else if (eq(name, "peaks") && scanStarted) {
                     readPeaks();
                     scanStarted = false;
-                    if (admit()) { // false = dropped (bad/absent/high ms level)
+                    if (admit()) {
                         return true;
                     }
                 }
@@ -162,14 +128,8 @@ final class MzxmlReader extends AbstractSpectraStream {
         }
     }
 
-    /**
-     * Applies the ms-level rules and the document-order chain. False if the scan is dropped.
-     *
-     * <p>⛔ Ordering matters: the zero-peak guard comes <b>before</b> {@code msLevel} is consulted, and
-     * the chain is updated only for a level-1 scan that survived it.
-     */
     private boolean admit() {
-        if (scan.msLevel == 0) { // absent or empty msLevel
+        if (scan.msLevel == 0) {
             skippedNoMsLevel++;
             return false;
         }
@@ -177,14 +137,7 @@ final class MzxmlReader extends AbstractSpectraStream {
             skippedHighMsLevel++;
             return false;
         }
-        // A ZERO-PEAK scan never becomes an ms1scan link. MassQL `continue`s on
-        // len(intensity array)==0 (:421) BEFORE previous_ms1_scan is assigned, so an empty MS1 is
-        // invisible to the chain and the next MS2 links to the MS1 *before* it. Verified against
-        // MassQL's own loader: micro.mzXML gives {1:0, 3:2, 5:2} -- scan 5 links to 2, not to the
-        // empty MS1 at 4 -- and the nested variant gives the identical map.
-        //
-        // The scan is still YIELDED; only the linkage skips it. Same split as MGF, where all 34,513
-        // blocks including the 12,571 empty ones are yielded and the engine filters.
+
         if (scan.msLevel == 1) {
             if (scan.peakCount > 0) previousMs1Scan = scan.scanId;
         } else {
@@ -194,7 +147,6 @@ final class MzxmlReader extends AbstractSpectraStream {
         return true;
     }
 
-    /** A {@code <scan>} whose {@code <peaks>} never arrived is "not a mass spectrum" (`:424`). */
     private void dropUnfinishedScan() {
         if (scanStarted) {
             skippedNotASpectrum++;
@@ -203,10 +155,6 @@ final class MzxmlReader extends AbstractSpectraStream {
     }
 
     private void endOfDocument() {
-        // Distinguish a truncated file from a legitimately peak-less trailing scan: a well-formed
-        // document closes </msRun> (or </mzXML>). Without that, the file was cut short, and a
-        // partial result is worse than an error -- the shortfall would surface later as an
-        // inexplicable filtering bug.
         if (!sawRootEnd) {
             throw new MassqlException(
                     "truncated mzXML: "
@@ -219,7 +167,7 @@ final class MzxmlReader extends AbstractSpectraStream {
     private void startScan() {
         scan.reset();
         scan.scanId = scanNum(attr("num"));
-        scan.msLevel = parseInt(attr("msLevel"), 0); // absent/empty -> 0 -> dropped in admit()
+        scan.msLevel = parseInt(attr("msLevel"), 0);
         scan.declaredPeaks = parseInt(attr("peaksCount"), -1);
         scan.rt = retentionTimeMinutes(attr("retentionTime"));
         scan.polarity = polarityOf(attr("polarity"));
@@ -227,21 +175,11 @@ final class MzxmlReader extends AbstractSpectraStream {
     }
 
     private void readPrecursorMz() throws XMLStreamException {
-        // precursorCharge is optional; absent -> 0. NOTE this is mzXML's default, unlike MGF where
-        // an
-        // absent CHARGE is 1. Three formats, three charge defaults.
         int charge = parseInt(attr("precursorCharge"), 0);
-        // getElementText() consumes through </precursorMz>. The VALUE is element text, not an
-        // attribute -- which is why a bare <precursorMz> with no attributes, which crashes the
-        // reference, costs this reader nothing.
+
         CharArray text = xml.getElementText();
         double mz = parseDouble(text == null ? null : text.toString(), 0.0);
 
-        // FIRST wins. The reference hard-indexes the first precursor, and a scan may legitimately
-        // carry several -- multiplexed (MSX)
-        // acquisition co-fragments more than one precursor. Overwriting on each occurrence would
-        // take
-        // the LAST, and no single-precursor fixture can tell the difference.
         if (scan.precursorSeen) return;
         scan.precursorSeen = true;
         scan.precmz = mz;
@@ -251,8 +189,7 @@ final class MzxmlReader extends AbstractSpectraStream {
     private void readPeaks() throws XMLStreamException {
         scan.precision = parseInt(attr("precision"), 32);
         String order = attr("byteOrder");
-        // "network" is big-endian, and it is the only value real mzXML uses. Anything else is
-        // reported rather than silently mis-decoded: a wrong byte order yields plausible garbage.
+
         scan.bigEndian = order == null || "network".equalsIgnoreCase(order.trim());
         if (!scan.bigEndian) {
             diagnostics.add(
@@ -263,8 +200,7 @@ final class MzxmlReader extends AbstractSpectraStream {
                             + "\" is not \"network\"; decoding as little-endian");
         }
         String comp = attr("compressionType");
-        // Upstream's check is `!= null && != "none"`, so an ABSENT attribute means uncompressed --
-        // which is what all three primary fixtures rely on. Verified, not assumed.
+
         scan.zlib = comp != null && !comp.trim().isEmpty() && !"none".equalsIgnoreCase(comp.trim());
 
         CharArray text = xml.getElementText();
@@ -272,15 +208,6 @@ final class MzxmlReader extends AbstractSpectraStream {
         scan.peakCount = scan.resolvePeakCount();
     }
 
-    // ------------------------------------------------------------------ rules
-
-    /**
-     * mzXML {@code num} attribute -> scan id.
-     *
-     * <p>⛔ <b>Must be parsed to an int here.</b> Carrying the raw attribute as a string would let it
-     * propagate into {@code ms1scan}, and every downstream {@code ms1_*} lookup would then miss on a
-     * string-vs-int comparison — silently, with no error.
-     */
     static int scanNum(String num) {
         if (num == null) throw new MassqlException("mzXML <scan> has no num attribute");
         try {
@@ -290,14 +217,7 @@ final class MzxmlReader extends AbstractSpectraStream {
         }
     }
 
-    /** {@code "+"} -> 1, {@code "-"} -> 2, present-but-other -> 0. Absent -> 0 is NON-PARITY. */
     static int polarityOf(String polarity) {
-        // The reference initialises 0 and tests "+" then "-", so present-but-other -> 0 IS parity.
-        // But it reads the attribute UNGUARDED, so an ABSENT one raises and produces no output at
-        // all
-        // -- no golden can exist for that case. The 0 here is this SDK's own contract;
-        // micro_nopolarity.mzXML pins it, and MzxmlPolarityTest keeps the two cases apart so a pass
-        // cannot imply parity that does not exist.
         if (polarity == null) return 0;
         String p = polarity.trim();
         if (p.equals("+")) return 1;
@@ -305,46 +225,12 @@ final class MzxmlReader extends AbstractSpectraStream {
         return 0;
     }
 
-    /**
-     * ISO-8601 duration parser, reproducing the reference's behaviour including its quirks.
-     *
-     * <p><b>mzXML retention time is ALWAYS converted to minutes</b> — unlike mzML, whose conversion is
-     * conditional on the declared unit ({@link MzmlReader}). Three formats, three RT rules, and a silent
-     * 60x error here passes every MGF-only and mzML-only test. That is why this lives in its own method
-     * with its own test rather than sharing code with the mzML path.
-     *
-     * <p>The arithmetic, in this order:
-     * <pre>
-     *   minutes  = M
-     *   minutes += H * 60.
-     *   minutes += S / 60.
-     * </pre>
-     * Reproduced literally: the order is what makes {@code PT1.38S} come back as exactly the double
-     * {@code 0.023}, and {@code PT1H30M45S} as {@code 90.75}.
-     *
-     * <p><b>Three quirks, all verified by execution rather than inferred. None may be "simplified":</b>
-     * <ul>
-     *   <li><b>Years, months and days are parsed and then IGNORED.</b> {@code P1DT1H} -> {@code 60.0},
-     *       not 1500. Only H/M/S after the {@code T} contribute.</li>
-     *   <li><b>{@code M} before {@code T} is months, after it is minutes.</b> {@code P1M} -> {@code 0.0}
-     *       while {@code PT1M} -> {@code 1.0}.</li>
-     *   <li><b>The sign is captured and ignored</b> — but a leading {@code -} means the string does not
-     *       start with {@code P}, so the reference falls through to a numeric parse, fails, and returns
-     *       the <i>string</i>, carrying a non-numeric {@code rt}. This throws instead: see below.</li>
-     * </ul>
-     */
     static double retentionTimeMinutes(String rt) {
         if (rt == null) return 0.0;
         String s = rt.trim();
         if (s.isEmpty()) return 0.0;
 
         if (!s.startsWith("P")) {
-            // A bare number is used as-is. Anything else would become a STRING in the reference and
-            // be
-            // carried as rt (verified: "-PT90S" comes back as the literal string). This refuses
-            // rather
-            // than inventing a number -- a deliberate deviation, and a clean error beats a silently
-            // wrong retention time.
             try {
                 return Double.parseDouble(s);
             } catch (NumberFormatException e) {
@@ -359,22 +245,16 @@ final class MzxmlReader extends AbstractSpectraStream {
         }
 
         Matcher m = DURATION.matcher(s);
-        if (!m.find()) return 0.0; // unreachable: the P-prefix check above already returned
+        if (!m.find()) return 0.0;
         double hours = group(m, 5);
         double minutes = group(m, 6);
         double seconds = group(m, 7);
-        // Groups 2/3/4 are years/months/days: matched so that P1M is read as MONTHS, then
-        // discarded.
+
         minutes += hours * 60.0;
         minutes += (seconds / 60.0);
         return minutes;
     }
 
-    /**
-     * ⛔ The unused sign/Y/M/D groups are <b>deliberate</b> and must not be removed: they make
-     * {@code M} before {@code T} parse as months rather than minutes, which is what the quirks above
-     * depend on.
-     */
     private static final Pattern DURATION =
             Pattern.compile(
                     "(-?)P(?:(\\d+\\.?\\d*)Y)?(?:(\\d+\\.?\\d*)M)?(?:(\\d+\\.?\\d*)D)?"
@@ -384,8 +264,6 @@ final class MzxmlReader extends AbstractSpectraStream {
         String g = m.group(i);
         return (g == null || g.isEmpty()) ? 0.0 : Double.parseDouble(g);
     }
-
-    // ------------------------------------------------------------------ helpers
 
     private String attr(String name) {
         return str(xml.getAttributeValue(null, name));
@@ -433,8 +311,6 @@ final class MzxmlReader extends AbstractSpectraStream {
         closeQuietly();
     }
 
-    /** Mutable, reused across scans — retained memory stays bounded by one scan. */
-    /** Accumulates one scan as it is parsed, then builds the immutable view. */
     private final class Scan {
         int scanId;
         int msLevel;
@@ -444,22 +320,22 @@ final class MzxmlReader extends AbstractSpectraStream {
         int ms1scan;
         int charge;
         int peakCount;
-        int declaredPeaks; // the peaksCount attribute, or -1
+        int declaredPeaks;
         int precision = 32;
         boolean bigEndian = true;
         boolean zlib = false;
         String base64 = "";
-        boolean precursorSeen; // only the FIRST <precursorMz> counts
+        boolean precursorSeen;
 
         void reset() {
             scanId = 0;
             msLevel = 0;
             rt = 0.0;
             polarity = 0;
-            precmz = 0.0; // 0 sentinel -- collation converts it, not this reader
-            // for an MS2 with no <precursorMz> at all.
-            ms1scan = 0; // 0 = no preceding MS1; the origin of the sentinel
-            charge = 0; // mzXML default -- NOT MGF's 1
+            precmz = 0.0;
+
+            ms1scan = 0;
+            charge = 0;
             peakCount = 0;
             declaredPeaks = -1;
             precision = 32;
@@ -469,20 +345,12 @@ final class MzxmlReader extends AbstractSpectraStream {
             precursorSeen = false;
         }
 
-        /**
-         * Peak count without decoding, for the capacity hint and the zero-peak chain guard.
-         *
-         * <p>{@code peaksCount} is schema-required and is what we trust. When it is absent we derive
-         * the count from the base64 length, which is exact for the uncompressed case — worth doing
-         * because a wrongly-zero count here would silently break the {@code ms1scan} chain rather
-         * than merely mis-size an array.
-         */
         int resolvePeakCount() {
             if (declaredPeaks >= 0) return declaredPeaks;
             if (base64.isEmpty()) return 0;
-            if (zlib) return 0; // cannot know without inflating; capacity hint only
+            if (zlib) return 0;
             int bytes = base64Bytes(base64);
-            int width = 2 * (precision == 64 ? 8 : 4); // an interleaved m/z-intensity PAIR
+            int width = 2 * (precision == 64 ? 8 : 4);
             return width == 0 ? 0 : bytes / width;
         }
 
@@ -504,23 +372,12 @@ final class MzxmlReader extends AbstractSpectraStream {
                     b.build());
         }
 
-        /**
-         * base64 -> (optional inflate) -> de-interleave, returning {@code {mz[], intensity[]}}.
-         *
-         * <p><b>The 32-bit widening rule.</b> The reference decodes at the declared precision and then
-         * widens to double, so the golden values are {@code (double)(float)raw} — <b>not</b>
-         * full-precision doubles.
-         * {@link ByteBuffer#getFloat()} assigned into a {@code double[]} is exactly that. Reading 8
-         * bytes, or reinterpreting the bits as a double, gives values that are <i>nearly</i> right and
-         * turns the parity gate into a confusing near-miss. Observable: the Ewing file and {@code micro.mzXML}
-         * give {@code 123.456787109375} where {@code micro_p64.mzXML} gives {@code 123.456789012345}.
-         */
         private double[][] decode() {
             if (base64.isEmpty()) return new double[][] {new double[0], new double[0]};
 
             byte[] raw;
             try {
-                raw = Base64.getMimeDecoder().decode(base64); // MIME: tolerates embedded newlines
+                raw = Base64.getMimeDecoder().decode(base64);
             } catch (IllegalArgumentException e) {
                 throw new MassqlException(
                         "scan "
@@ -550,9 +407,6 @@ final class MzxmlReader extends AbstractSpectraStream {
 
             int pairs = raw.length / (2 * width);
             if (raw.length % (2 * width) != 0) {
-                // An odd tail means the array is not whole m/z-intensity pairs. Report it rather
-                // than
-                // dropping a value silently, which would change tic and base_peak.
                 diagnostics.add(
                         "scan "
                                 + scanId
@@ -570,7 +424,6 @@ final class MzxmlReader extends AbstractSpectraStream {
                     in[i] = buf.getDouble();
                 }
             } else {
-                // getFloat() into a double[] IS the (double)(float) widening. Do not "fix" this.
                 for (int i = 0; i < pairs; i++) {
                     mz[i] = buf.getFloat();
                     in[i] = buf.getFloat();
@@ -580,7 +433,6 @@ final class MzxmlReader extends AbstractSpectraStream {
         }
 
         private byte[] inflate(byte[] compressed) {
-            // No Numpress, ever -- mzXML has none. zlib or nothing.
             Inflater inf = new Inflater();
             inf.setInput(compressed);
             java.io.ByteArrayOutputStream out =
@@ -610,7 +462,6 @@ final class MzxmlReader extends AbstractSpectraStream {
         }
     }
 
-    /** Decoded byte length of a base64 string, without decoding it. */
     private static int base64Bytes(String b64) {
         int chars = 0, pad = 0;
         for (int i = 0; i < b64.length(); i++) {

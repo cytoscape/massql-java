@@ -14,28 +14,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * 200+ open/close cycles per format, without leaking a descriptor or a mapping.
- *
- * <h2>Why this is a gate item rather than a nicety</h2>
- *
- * <p>The mzML and mzXML readers <b>memory-map</b> their input (the readers), so a leak costs a file
- * descriptor <i>and</i> address space. Neither shows up in a single-file test: the symptom is "too many
- * open files" much later, in unrelated code, after a user has opened a few hundred files in one
- * session. A long-lived host process is the exact environment where a slow leak is worst, and it is
- * also the one least able to recover from it.
- *
- * <p>The cycle count is deliberately above the common 256-descriptor soft limit, so a reader that never
- * released would fail here rather than surviving on headroom.
- */
 class ResourceLeakIT {
-
-    /** Above a 256 soft limit, so a total leak cannot hide behind spare descriptors. */
     private static final int CYCLES = 250;
 
     private static final List<String> FORMATS = List.of("micro.mgf", "micro.mzML", "micro.mzXML");
 
-    /** Drains a stream and returns the number of spectra, so the mapping is genuinely exercised. */
     private static int drain(Path p) {
         int n = 0;
         try (SpectraStream s = SpectraFile.open(p)) {
@@ -47,20 +30,12 @@ class ResourceLeakIT {
         return n;
     }
 
-    /** Opens, reads a single spectrum, and closes — enough to establish the mapping on a large file. */
     private static void openReadOneClose(Path p) {
         try (SpectraStream s = SpectraFile.open(p)) {
             if (s.hasNext()) s.next();
         }
     }
 
-    /**
-     * Open and close one fixture {@value #CYCLES} times, reading every spectrum each cycle.
-     *
-     * <p>The scan count is asserted to be <b>stable</b> across cycles, not merely non-zero: a reader
-     * that held state between opens would drift, and a count that changed would be a correctness bug
-     * surfacing as a resource one.
-     */
     @ParameterizedTest(name = "{0}")
     @ValueSource(strings = {"micro.mgf", "micro.mzML", "micro.mzXML"})
     void repeatedOpenAndCloseLeaksNothing(String name) {
@@ -77,12 +52,9 @@ class ResourceLeakIT {
 
         assertNoDescriptorGrowth(name, before, CYCLES);
 
-        // Platform-independent, so this test always asserts something substantive: the reader still
-        // works after the cycles.
         assertEquals(first, drain(p), name + ": still readable after " + CYCLES + " cycles");
     }
 
-    /** All three formats interleaved — a per-format pool or cache shows up here and not above. */
     @Test
     void interleavedFormatsAlsoRelease() {
         long before = openDescriptors();
@@ -96,14 +68,6 @@ class ResourceLeakIT {
         assertNoDescriptorGrowth("interleaved", before, CYCLES * FORMATS.size());
     }
 
-    /**
-     * A large real file, opened and closed repeatedly.
-     *
-     * <p>{@code micro.*} is a few kilobytes, so its mappings are too cheap for address-space exhaustion
-     * to appear. {@code PlusRise.mgf} — 34,513 spectra — is where a leaked mapping has weight. Only the
-     * first spectrum is read per cycle: the point is the open/close pair, and draining it 250 times
-     * would measure throughput instead.
-     */
     @Test
     void aLargeFileReleasesItsMappingToo() {
         Path big = Fixtures.require("data/PlusRise.mgf");
@@ -118,12 +82,6 @@ class ResourceLeakIT {
                 () -> openReadOneClose(big), "still openable after " + CYCLES + " cycles");
     }
 
-    /**
-     * {@code close()} is idempotent — the readers requires it, and {@link SpectraStream#close()} documents it.
-     *
-     * <p>try-with-resources plus an explicit {@code close()} is ordinary caller code; a second close
-     * that threw, or that released a mapping twice, would break it.
-     */
     @ParameterizedTest(name = "{0}")
     @ValueSource(strings = {"micro.mgf", "micro.mzML", "micro.mzXML"})
     void closeIsIdempotent(String name) {
@@ -135,7 +93,6 @@ class ResourceLeakIT {
         assertDoesNotThrow(s::close, name + ": and so must a third");
     }
 
-    /** Closing without reading anything must release just as cleanly as closing a drained stream. */
     @ParameterizedTest(name = "{0}")
     @ValueSource(strings = {"micro.mgf", "micro.mzML", "micro.mzXML"})
     void openingWithoutReadingStillReleases(String name) {
@@ -150,15 +107,6 @@ class ResourceLeakIT {
         assertTrue(drain(p) > 0, name + ": readable afterwards");
     }
 
-    // ------------------------------------------------------------------ descriptor accounting
-
-    /**
-     * ⚠ An <b>additional</b> assertion, never a test's only one.
-     *
-     * <p>Every test above also asserts a platform-independent property, because a conditional assertion
-     * that was the sole content of a test would be a skip wearing a disguise. On a
-     * JVM that does not expose descriptor counts this check is inert and the rest still runs.
-     */
     private static void assertNoDescriptorGrowth(String what, long before, int opens) {
         long after = openDescriptors();
         if (before < 0 || after < 0) return;

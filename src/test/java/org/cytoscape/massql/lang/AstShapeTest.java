@@ -19,16 +19,13 @@ import org.cytoscape.massql.lang.ast.Polarity;
 import org.cytoscape.massql.lang.ast.QualifierType;
 import org.junit.jupiter.api.Test;
 
-/** Pins the AST decisions the condition filters depends on. */
 class AstShapeTest {
-
     private static Condition.Value firstValue(String q) {
         return (Condition.Value) Massql.parse(q).where().get(0);
     }
 
     @Test
     void ms2mzIsCollapsedToMs2prod() {
-        // One ConditionType, not two spellings, so the engine has a single code path.
         assertEquals(
                 ConditionType.MS2PROD,
                 firstValue("QUERY scaninfo(MS2DATA) WHERE MS2MZ=100").type());
@@ -42,8 +39,6 @@ class AstShapeTest {
 
     @Test
     void arithmeticStaysUnfolded() {
-        // 157.0857+10 must NOT become 167.0857 here. Folding is the job, because
-        // that is where the numeric semantics live.
         Expr e = firstValue("QUERY scaninfo(MS2DATA) WHERE MS2PROD=157.0857+10").values().get(0);
         assertInstanceOf(Expr.Binary.class, e, "expected an unfolded Binary, got " + e);
         Expr.Binary b = (Expr.Binary) e;
@@ -54,8 +49,6 @@ class AstShapeTest {
 
     @Test
     void multiplyBindsTighterThanAdd() {
-        // Precedence comes from alternative ORDER in the grammar; this is what would break
-        // if someone reordered those alternatives while tidying.
         Expr e = firstValue("QUERY scaninfo(MS2DATA) WHERE MS2PROD=2+3*4").values().get(0);
         Expr.Binary top = assertInstanceOf(Expr.Binary.class, e);
         assertEquals(Op.ADD, top.op(), "the root must be the ADD, i.e. 2 + (3*4)");
@@ -73,9 +66,6 @@ class AstShapeTest {
 
     @Test
     void unaryMinusIsAnExpressionNotPartOfTheLiteral() {
-        // FLOAT is unsigned in this grammar, unlike Lark's floating: /[-+]?(...)/, because
-        // maximal munch would otherwise swallow the '+' in "X+2". So a leading sign is a
-        // Unary node. The corpus's "157.0857+10" is the case that would break.
         Expr e = firstValue("QUERY scaninfo(MS1DATA) WHERE RTMIN=-5").values().get(0);
         Expr.Unary u = assertInstanceOf(Expr.Unary.class, e);
         assertEquals(Op.SUB, u.op());
@@ -84,7 +74,6 @@ class AstShapeTest {
 
     @Test
     void leadingDotFloatsParse() {
-        // The source regex allows [0-9]*\.[0-9]+, so ".000002" is a valid literal.
         Expr e = firstValue("QUERY scaninfo(MS2DATA) WHERE MS2PROD=.000002").values().get(0);
         assertEquals(new Expr.Literal(0.000002), e);
     }
@@ -101,7 +90,6 @@ class AstShapeTest {
 
     @Test
     void aPlainValueConditionIsASingleElementList() {
-        // One code path for the engine: a scalar is a one-element list, not a special case.
         assertEquals(1, firstValue("QUERY scaninfo(MS2DATA) WHERE MS2PROD=226.18").values().size());
     }
 
@@ -186,12 +174,6 @@ class AstShapeTest {
 
     @Test
     void comparatorHasExactlyThreeConstantsAndNoNONE() {
-        // There is no Comparator.NONE. An omitted comparator is not a comparator constant --
-        // it is an absent qualifier, handled at
-        // the engine. Asserting the enum's arity directly is what makes reintroducing NONE fail
-        // HERE,
-        // rather
-        // than in whatever downstream switch forgets to handle it.
         assertEquals(
                 3,
                 Comparator.values().length,

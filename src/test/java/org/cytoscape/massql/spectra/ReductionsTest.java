@@ -6,8 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 class ReductionsTest {
-
-    /** scan 1: four peaks; scan 2: empty; scan 3: one peak. */
     private static SpectrumTable table() {
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
         b.startScan(1, 0.5, 1);
@@ -33,8 +31,6 @@ class ReductionsTest {
 
     @Test
     void argmaxReturnsARowIndexSoTheCallerCanReadAnotherColumn() {
-        // This is exactly what base_peak_mz needs (the collation): argmax over intensity,
-        // then read m/z at that row. A value-returning max() could not express it.
         SpectrumTable t = table();
         int row = Reductions.argmax(t, 0, Column.I);
         assertEquals(1, row);
@@ -44,9 +40,6 @@ class ReductionsTest {
 
     @Test
     void argmaxTiesResolveToTheLOWESTRowIndex() {
-        // The reference returns the FIRST occurrence on a tie. A last-wins implementation would
-        // disagree with the
-        // goldens on any spectrum with two equal-intensity peaks.
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
         b.startScan(1, 0.0, 1);
         b.addPeak(100.0, 500.0).addPeak(200.0, 999.0).addPeak(300.0, 999.0).addPeak(400.0, 100.0);
@@ -60,8 +53,7 @@ class ReductionsTest {
     @Test
     void emptyScanBehaviourIsDeliberate() {
         SpectrumTable t = table();
-        // sum is 0.0 because the TIC of an empty spectrum really is zero; the others have no
-        // value to report. Nothing throws: scaninfo(MS1DATA) can report a peakless scan.
+
         assertEquals(0.0, Reductions.sum(t, 1, Column.I));
         assertTrue(Double.isNaN(Reductions.max(t, 1, Column.I)));
         assertTrue(Double.isNaN(Reductions.min(t, 1, Column.I)));
@@ -86,7 +78,7 @@ class ReductionsTest {
     @Test
     void maskedReductionsOnlySeeSelectedRows() {
         SpectrumTable t = table();
-        // Select only the 200.0 and 300.0 peaks of scan 1.
+
         RowMask m = RowMask.none(t.rowCount()).withRange(new IntRange(1, 3));
         assertEquals(2250.0, Reductions.sum(t, 0, Column.I, m));
         assertEquals(1500.0, Reductions.max(t, 0, Column.I, m));
@@ -111,7 +103,7 @@ class ReductionsTest {
         SpectrumTable t = table();
         assertEquals(1000.0, Reductions.sum(t, 0, Column.MZ));
         assertEquals(400.0, Reductions.max(t, 0, Column.MZ));
-        // iNorm/iTicNorm are pre-computed columns, so reductions apply to them too.
+
         assertEquals(1.0, Reductions.max(t, 0, Column.I_NORM));
         assertEquals(1.0, Reductions.sum(t, 0, Column.I_TIC_NORM), 1e-12);
     }

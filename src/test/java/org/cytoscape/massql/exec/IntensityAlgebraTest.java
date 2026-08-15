@@ -16,31 +16,7 @@ import org.cytoscape.massql.io.SpectraFile;
 import org.cytoscape.massql.io.SpectraStream;
 import org.junit.jupiter.api.Test;
 
-/**
- * The intensity-algebra properties ported from MassQL's own test suite.
- *
- * <p>the condition filters called these *"pure profit — they need no reference data"*. Half right: the properties are
- * self-referential, but <b>the tests as written need two fixtures we do not have</b>
- * ({@code featurelist_pos.mgf}, {@code GNPS00002_A3_p.mzML} — MassQL's own test data, verified absent). So
- * they are reconstructed here on our fixtures rather than copied.
- *
- * <p><b>Two of the three properties have preconditions the spec did not mention</b> (h):
- *
- * <ul>
- *   <li><b>Disjointness of {@code >} and {@code <} is NOT general.</b> Under scan-level semantics a scan may
- *       hold one peak above the threshold and another below it, putting it in <i>both</i> sets — correctly.
- *       The reference test avoids this with {@code TOLERANCEMZ=0.01}, narrow enough that at most one peak per
- *       scan falls in the window. That precondition is constructed explicitly below.</li>
- *   <li><b>There is no "tripartite partition".</b> the condition filters described {@code <} ∪ {@code =} ∪ {@code >} as
- *       "covering everything exactly once". That is impossible: {@code =} means {@code >=}, which contains
- *       {@code >} by construction. The reference test asserts the real relationship — {@code >} ⊆ {@code =} —
- *       and that is what is asserted here.</li>
- * </ul>
- *
- * <p>Monotonicity is general and needs no precondition.
- */
 class IntensityAlgebraTest {
-
     private static Path resource(String relative) {
         var url = IntensityAlgebraTest.class.getClassLoader().getResource(relative);
         if (url == null) throw new AssertionError("fixture missing: " + relative);
@@ -51,7 +27,6 @@ class IntensityAlgebraTest {
         }
     }
 
-    /** Scan ids qualifying for a query over a fixture. */
     private static Set<Integer> scans(String queryText, String fixture) {
         Set<Integer> out = new LinkedHashSet<>();
         try (SpectraStream s = SpectraFile.open(resource(fixture))) {
@@ -61,10 +36,6 @@ class IntensityAlgebraTest {
         return out;
     }
 
-    /**
-     * The narrow-window base query. {@code TOLERANCEMZ=0.01} around 200.5 admits <b>exactly one</b> peak in
-     * any micro scan that has one — which is the precondition disjointness needs.
-     */
     private static String narrow(String qualifier) {
         return "QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.5:TOLERANCEMZ=0.01" + qualifier;
     }
@@ -73,11 +44,6 @@ class IntensityAlgebraTest {
 
     @Test
     void thePreconditionForDisjointnessActuallyHolds() {
-        // Assert the precondition rather than assuming it -- otherwise the disjointness test below
-        // could
-        // pass or fail for reasons unrelated to the algebra. micro scans 1 and 3 each have exactly
-        // one peak
-        // at 200.5, and the 0.01 window admits nothing else.
         try (SpectraStream s = SpectraFile.open(resource(FIXTURE))) {
             while (s.hasNext()) {
                 ScanView v = s.next();
@@ -112,8 +78,6 @@ class IntensityAlgebraTest {
 
     @Test
     void equalsIsASupersetOfGreaterThanBecauseEqualsMeansGreaterOrEqual() {
-        // THE property that directly encodes "= means >=", and it is general -- no precondition.
-        // If "=" were true equality, this would fail for any threshold no peak hits exactly.
         for (double threshold : new double[] {100, 1000, 1500, 4096}) {
             Set<Integer> gt = scans(narrow(":INTENSITYVALUE>" + threshold), FIXTURE);
             Set<Integer> eq = scans(narrow(":INTENSITYVALUE=" + threshold), FIXTURE);
@@ -131,9 +95,6 @@ class IntensityAlgebraTest {
 
     @Test
     void raisingAGreaterThanThresholdNeverAddsScans() {
-        // Monotonicity, general. A wrong comparator direction shows up here even when the absolute
-        // counts
-        // look plausible.
         Set<Integer> prev = null;
         for (double threshold : new double[] {0, 100, 1000, 1400, 100_000}) {
             Set<Integer> cur = scans(narrow(":INTENSITYVALUE>" + threshold), FIXTURE);
@@ -177,17 +138,6 @@ class IntensityAlgebraTest {
 
     @Test
     void noPercentThresholdCanBeMadeImpossibleByRaisingIt() {
-        // An instructive consequence of the 0.99 cap, and one I got wrong when first writing this
-        // test:
-        // ANY ">" threshold on a percent column is clamped to 0.99, so raising it cannot make the
-        // query
-        // unsatisfiable. INTENSITYPERCENT>100000 still matches, because the threshold becomes 0.99
-        // and
-        // iNorm's maximum is exactly 1.0.
-        //
-        // That is the cap's whole purpose (the source's comment: "if people set it to 100, then
-        // they won't
-        // get anything"), and it means monotonicity FLATTENS above 99 rather than continuing.
         assertEquals(
                 Set.of(1, 3),
                 scans(narrow(":INTENSITYPERCENT>100000"), FIXTURE),
@@ -201,19 +151,11 @@ class IntensityAlgebraTest {
 
     @Test
     void anAbsoluteThresholdCanBeMadeImpossible() {
-        // INTENSITYVALUE has scale 1.0 and is never capped, so raising it DOES eventually match
-        // nothing --
-        // the contrast with the percent columns above.
         assertEquals(Set.of(), scans(narrow(":INTENSITYVALUE>1000000000"), FIXTURE));
     }
 
     @Test
     void aWindowThatContainsNoPeakIsEmptyAndDiagnosed() {
-        // A tight tolerance around an EXACT peak still matches -- the peak sits at the window's
-        // CENTRE, not
-        // its bound. To match nothing the TARGET must miss every peak, which is what this does:
-        // 200.6 is
-        // 0.1 away from the nearest peak and the window is ~2e-7 wide.
         String q = "QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.6:TOLERANCEPPM=0.001";
         try (SpectraStream s = SpectraFile.open(resource(FIXTURE))) {
             ExecutionSummary sum =
@@ -226,9 +168,6 @@ class IntensityAlgebraTest {
 
     @Test
     void aTightToleranceAroundAnExactPeakStillMatches() {
-        // The complement, so the test above cannot pass for the wrong reason: strict bounds exclude
-        // the
-        // EDGES, not the centre, so an exact hit matches however tight the window.
         String q = "QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.5:TOLERANCEPPM=0.0000001";
         try (SpectraStream s = SpectraFile.open(resource(FIXTURE))) {
             ExecutionSummary sum =

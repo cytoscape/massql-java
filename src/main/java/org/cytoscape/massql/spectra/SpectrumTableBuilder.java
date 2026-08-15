@@ -4,31 +4,9 @@ import java.util.Arrays;
 
 import org.cytoscape.massql.MassqlException;
 
-/**
- * Append-then-freeze construction of a {@link SpectrumTable}.
- *
- * <p>Usage: {@link #startScan} once per spectrum, then {@link #addPeak} per peak, then
- * {@link #build}. Readers stream files in document order, which is exactly the order this
- * expects, so nothing needs buffering or sorting at the reader level.
- *
- * <p>The derived columns ({@code iNorm}, {@code iTicNorm}) and the scan index are computed in
- * {@link #build}, in a single pass per scan.
- *
- * <p><b>Invariants are checked, not assumed</b>, and violations throw {@link MassqlException}
- * rather than {@code AssertionError} — they indicate a reader bug and must be visible in a
- * release build, not only when assertions happen to be enabled.
- */
+/** Append-then-freeze construction of a {@link SpectrumTable}. */
 public final class SpectrumTableBuilder {
-
-    /**
-     * Default peak capacity.
-     *
-     * <p>Deliberately small. Under the streaming design this builder runs once
-     * <b>per scan</b>, not once per file, so an over-large default is pure allocation churn:
-     * at 1024 it cost 16 KB of arrays for a 22-peak MGF spectrum, which measured as ~190 MB of
-     * garbage across PlusRise.mgf's 34,513 scans. Readers that know the peak count up front should
-     * use {@link #SpectrumTableBuilder(int, int)} and avoid growth entirely.
-     */
+    /** Default peak capacity. */
     private static final int DEFAULT_PEAK_CAPACITY = 32;
 
     private final byte msLevel;
@@ -38,8 +16,6 @@ public final class SpectrumTableBuilder {
     private int[] scan;
     private int rows = 0;
 
-    // Scan-level metadata, one entry per startScan() call.
-    // Sized for the streaming case: usually exactly one scan per builder. Grows for bulk use.
     private int[] sIds = new int[4];
     private int[] sStart = new int[4];
     private double[] sRt = new double[4];
@@ -55,12 +31,6 @@ public final class SpectrumTableBuilder {
         this(msLevel, DEFAULT_PEAK_CAPACITY);
     }
 
-    /**
-     * @param expectedPeaks capacity hint. Sizing it exactly — mzML's {@code defaultArrayLength}, or
-     *                      MGF's counted peaks — means one allocation per array and no copy on
-     *                      {@code build()}. A wrong hint is only a performance matter; the builder
-     *                      still grows as needed.
-     */
     public SpectrumTableBuilder(int msLevel, int expectedPeaks) {
         if (msLevel != 1 && msLevel != 2) {
             throw new MassqlException("msLevel must be 1 or 2, got " + msLevel);
@@ -77,19 +47,11 @@ public final class SpectrumTableBuilder {
         return startScan(scanId, rtMinutes, polarity, 0.0, 0, 0);
     }
 
-    /**
-     * Begin a scan.
-     *
-     * @param rtMinutes exact retention time in minutes; stored as a double on the scan index
-     * @param precmz    precursor m/z, or {@code 0} for MassQL's "not recorded" sentinel
-     * @param ms1scan   linked MS1 scan id by document order, or {@code 0} for none
-     * @param charge    precursor charge, or {@code 0} for "not recorded"
-     */
+    /** Begin a scan. */
     public SpectrumTableBuilder startScan(
             int scanId, double rtMinutes, int polarity, double precmz, int ms1scan, int charge) {
         ensureNotBuilt();
-        // Non-decreasing scan ids are what let the index be a range lookup instead of a hash
-        // of lists. Readers stream in document order, so this costs nothing to require.
+
         if (scans > 0 && scanId < sIds[scans - 1]) {
             throw new MassqlException(
                     "scan ids must be non-decreasing; got " + scanId + " after " + sIds[scans - 1]);
@@ -138,7 +100,7 @@ public final class SpectrumTableBuilder {
         return this;
     }
 
-    /** Number of scans started so far. Lets a reader report progress without building. */
+    /** Number of scans started so far. */
     public int scanCount() {
         return scans;
     }
@@ -147,7 +109,7 @@ public final class SpectrumTableBuilder {
         return rows;
     }
 
-    /** True if any scan's peaks needed sorting during {@link #build}. Diagnostic only. */
+    /** True if any scan's peaks needed sorting during {@link #build}. */
     private boolean sortedAnyScan = false;
 
     public boolean sortedAnyScan() {
@@ -176,9 +138,6 @@ public final class SpectrumTableBuilder {
         for (int s = 0; s < scans; s++) {
             int from = rowStart[s], to = rowEnd[s];
 
-            // Sort by ascending m/z within the scan if needed. Required for the binary-search
-            // windows; do not assume sortedness, verify it -- a reader for a nonconforming
-            // file would otherwise produce silently wrong window results.
             if (!isSorted(mzOut, from, to)) {
                 sortByMz(mzOut, iOut, from, to);
                 sortedAnyScan = true;
@@ -192,9 +151,6 @@ public final class SpectrumTableBuilder {
                 sum += v;
             }
             for (int r = from; r < to; r++) {
-                // An all-zero scan divides by zero and yields NaN. That is deliberate: NaN is
-                // the correct in-band "undefined", and the collation maps NaN to JSON null.
-                // Substituting 0 here would report a real value where there is none.
                 iNorm[r] = iOut[r] / max;
                 iTicNorm[r] = iOut[r] / sum;
                 rtOut[r] = (float) sRt[s];
@@ -225,7 +181,7 @@ public final class SpectrumTableBuilder {
         return true;
     }
 
-    /** Insertion sort on the (mz, intensity) pair. Scans are small and near-sorted already. */
+    /** Insertion sort on the (mz, intensity) pair. */
     private static void sortByMz(double[] mz, double[] in, int from, int to) {
         for (int r = from + 1; r < to; r++) {
             double m = mz[r], v = in[r];

@@ -1,6 +1,6 @@
 package org.cytoscape.massql.lang.ast;
 
-/** Scan polarity. The engine encodes these as 1 = positive, 2 = negative. */
+/** Scan polarity. */
 public enum Polarity {
     POSITIVE,
     NEGATIVE

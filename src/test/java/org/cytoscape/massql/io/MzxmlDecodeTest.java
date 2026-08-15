@@ -14,19 +14,7 @@ import org.cytoscape.massql.spectra.SpectrumTable;
 import org.cytoscape.massql.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
 
-/**
- * The mzXML binary decode path: big-endian, <b>interleaved pairs</b>, one {@code precision} attribute,
- * zlib or nothing — every one of them different from mzML.
- *
- * <p><b> exists partly because this test was unsatisfiable as specified.</b> the mzXML reader
- * required assertions on {@code precision="64"} and zlib, but {@code micro.mzXML}, {@code small.mzXML}
- * and the Ewing file are <i>all</i> {@code precision="32"} / uncompressed / {@code network} — the same
- * configuration — while the spec claimed the fixtures "cover every decode path". The variants used here
- * (`micro_p64`, `micro_zlib`, `micro_p64_zlib`) were generated to close that gap, one variable each.
- */
 class MzxmlDecodeTest {
-
-    /** Every (mz, intensity) pair in document order, so de-interleaving errors surface immediately. */
     private static List<double[]> peaksOf(String fixture) {
         List<double[]> out = new ArrayList<>();
         Path p = Fixtures.require("fixtures/micro/" + fixture);
@@ -58,8 +46,6 @@ class MzxmlDecodeTest {
 
     @Test
     void zlibDecodesBitIdenticallyToUncompressed() {
-        // Same values, same precision, only compressionType differs. Verified against MassQL's own
-        // loader before being asserted here: its mz and intensity arrays compare equal.
         assertSamePeaks(
                 "micro.mzXML",
                 "micro_zlib.mzXML",
@@ -68,9 +54,6 @@ class MzxmlDecodeTest {
 
     @Test
     void absentCompressionTypeMeansUncompressed() {
-        // Upstream's check is `!= null && != "none"`, so an ABSENT attribute is uncompressed --
-        // which
-        // all three primary fixtures rely on. micro.mzXML omits it entirely and must still decode.
         assertFalse(
                 peaksOf("micro.mzXML").isEmpty(),
                 "micro.mzXML has no compressionType and must decode");
@@ -78,13 +61,6 @@ class MzxmlDecodeTest {
 
     @Test
     void thirtyTwoBitIsWidenedNotReinterpreted() {
-        // THE bit-identity trap. The reference decodes at 32-bit and widens to double, so
-        // the
-        // golden value is (double)(float)raw -- NOT the full-precision double. The micro table's
-        // last
-        // peak carries an m/z chosen to be inexact in float32 for exactly this assertion.
-        //
-        // Asserted on RAW BITS: a near-miss here is what makes the parity gate confusing.
         double mz32 = lastMz("micro.mzXML");
         double mz64 = lastMz("micro_p64.mzXML");
 
@@ -97,15 +73,11 @@ class MzxmlDecodeTest {
                 Double.doubleToLongBits(mz64),
                 "precision=\"64\" must give the full-precision double");
 
-        // The companion assertion, so neither of the above can pass vacuously: the two decodes must
-        // genuinely differ. If a future change made both paths read 8 bytes, this is what catches
-        // it.
         assertNotEquals(
                 Double.doubleToLongBits(mz32),
                 Double.doubleToLongBits(mz64),
                 "32-bit and 64-bit decodes are identical -- one of the two paths is wrong");
 
-        // And state the rule directly rather than only via the literal.
         assertEquals(
                 Double.doubleToLongBits((double) (float) 123.456789012345d),
                 Double.doubleToLongBits(mz32),
@@ -114,8 +86,6 @@ class MzxmlDecodeTest {
 
     @Test
     void sixtyFourBitWithZlibWorksToo() {
-        // Both variables at once, so a bug in their interaction cannot hide behind either alone --
-        // e.g. inflating correctly but then reading the inflated buffer at the wrong width.
         assertSamePeaks(
                 "micro_p64.mzXML",
                 "micro_p64_zlib.mzXML",
@@ -124,21 +94,13 @@ class MzxmlDecodeTest {
 
     @Test
     void pairsAreDeInterleavedNotSplitInHalf() {
-        // mzXML stores ONE array of m/z,intensity,m/z,intensity... A reader that split the array
-        // down
-        // the middle (the mzML layout) would produce ascending-then-huge nonsense rather than
-        // pairs.
-        // Scan 2 of the micro table is the discriminating case: 3 peaks whose m/z are ~500-600 and
-        // whose intensities are 1000/5000/9000, so a halved split is unmistakable.
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mzXML"))) {
             while (s.hasNext()) {
                 ScanView v = s.next();
                 if (v.scanId() != 2) continue;
                 SpectrumTable t = v.peaks();
                 assertEquals(3, t.rowCount());
-                // m/z all in the 400-700 band, intensities all >= 1000: only correct
-                // de-interleaving
-                // gives that shape.
+
                 for (int i = 0; i < 3; i++) {
                     assertTrue(
                             t.mz(i) > 400 && t.mz(i) < 700,
@@ -161,9 +123,6 @@ class MzxmlDecodeTest {
 
     @Test
     void bigEndianIsTheDefaultAndLittleEndianWouldBeObvious() {
-        // byteOrder="network" is big-endian. Rather than build a little-endian fixture nothing
-        // produces, assert positively that the big-endian read gives sane values -- a byte-swapped
-        // 32-bit float of 500.0 is ~1.1e-38, so "in a plausible m/z range" is a real discriminator.
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mzXML"))) {
             while (s.hasNext()) {
                 ScanView v = s.next();
@@ -179,10 +138,6 @@ class MzxmlDecodeTest {
 
     @Test
     void theRealFixtureIsThirtyTwoBit() {
-        // Guards the premise of the widening assertion above: if small.mzXML were ever regenerated
-        // at
-        // 64-bit, the parity comparison's 1e-7 mzXML tolerance (the differential) would stop being
-        // justified.
         String head = readHead(Fixtures.require("data/small.mzXML"));
         assertTrue(
                 head.contains("precision=\"32\""),

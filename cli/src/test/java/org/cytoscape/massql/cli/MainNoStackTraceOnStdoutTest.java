@@ -11,27 +11,9 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * No failure mode prints a Java stack trace to stdout.
- *
- * <p>Separate from {@code MainStreamDisciplineTest} because the failure is different in kind. That
- * class asserts stdout is <b>empty</b> on error paths; this one asserts that <i>if</i> anything ever
- * does reach stdout, it is not a stack trace — which is the specific shape that silently corrupts a
- * JSON payload while looking, in a terminal, like the tool merely complained.
- *
- * <p>It is also the harder failure to notice: the happy path is unaffected, so a stack trace on
- * stdout survives every test that only exercises success, and only shows up when a downstream
- * consumer fails to parse something it was told was JSON.
- *
- * <p>Stack traces on <b>stderr</b> are a separate question and are not asserted against here — but
- * the messages this CLI produces are deliberately plain text, so the check applies to both streams
- * and would catch a stray {@code printStackTrace()} wherever it landed.
- */
 class MainNoStackTraceOnStdoutTest {
-
     @TempDir Path dir;
 
-    /** Every distinct route to a non-zero exit, named so a failure says which one broke. */
     private Map<String, CliFixtures.Invocation> everyFailureMode() {
         Path junk = CliFixtures.write(dir, "junk.mzML", "<notSpectra><a/></notSpectra>\n");
         Path truncated =
@@ -79,17 +61,11 @@ class MainNoStackTraceOnStdoutTest {
 
     @Test
     void noFailureModePutsAStackTraceOnStderrEither() {
-        // An unhandled exception reaching the top would print here. The CLI's job is to explain
-        // what
-        // went wrong in a sentence -- a 40-frame trace is not an explanation, and it buries the one
-        // line that was.
         everyFailureMode().forEach((name, r) -> assertNoStackTrace(name + " (stderr)", r.stderr()));
     }
 
     @Test
     void everyFailureStillExplainsItself() {
-        // The complement to the above: suppressing traces must not mean saying nothing. A silent
-        // non-zero exit is its own kind of unhelpful.
         everyFailureMode()
                 .forEach(
                         (name, r) ->

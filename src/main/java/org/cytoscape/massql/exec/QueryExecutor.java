@@ -13,47 +13,15 @@ import org.cytoscape.massql.lang.ast.MassqlQuery;
 import org.cytoscape.massql.spectra.SpectrumTable;
 
 /**
- * Streams a file once, evaluates every condition per scan, and hands each qualifying scan to a consumer.
- *
- * <h2>Why per-scan rather than whole-file</h2>
- *
- * <p>There is no whole-file table. A 500 MB input projects to 1.0–1.9 GB of heap if
- * materialised, which OOMs the host. The executor advances a {@link SpectraStream} cursor and retains
- * exactly <b>one</b> MS1 scan — which the document-order {@code ms1scan} rule makes sufficient, since the
- * linked MS1 is always the most recent preceding one.
- *
- * <p>An earlier design declared {@code execute(MassqlQuery, SpectrumTable ms1, SpectrumTable ms2)}
- * returning "ordinals", eight lines below the note saying those tables do not exist. Under
- * streaming there is no whole-file ordinal space at all: a single-scan table's only ordinal is {@code 0}.
- *
- * <h2>Evaluation order, and why it is not arbitrary</h2>
- *
- * <ol>
- *   <li><b>Zero-peak scans are skipped first.</b> MassQL's loaders {@code continue} on an empty intensity
- *       array, so its dataframes hold no rows for them. Without this guard a <i>scan-level-only</i> query
- *       would return 34,513 scans on {@code PlusRise.mgf} where MassQL returns <b>21,942</b> — peak-based
- *       conditions fail an empty scan by themselves, but a scan-level condition never looks at peaks.</li>
- *   <li><b>The MS1 retention comes after that guard</b>, because an empty MS1 must not become an
- *       {@code ms1scan} link either — the same rule one layer up.</li>
- *   <li><b>Scan-level conditions before {@code materialize()}.</b> A scan rejected on {@code RTMIN},
- *       {@code SCANMIN}, {@code POLARITY}, {@code CHARGE} or {@code MS2PREC} never pays base64-decode,
- *       inflate or the {@code double[]} allocation. That is the entire payoff of deferred decoding.</li>
- *   <li><b>Peak-level conditions last</b>, on the materialised single-scan table.</li>
- * </ol>
- *
- * <p>Conditions combine as a per-scan AND over "did this condition find any peak" — never a row-level AND.
- * Condition order is provably irrelevant for the in-scope set (C37g), so evaluating cheap ones first is a
- * pure optimisation with no semantic effect.
+ * Streams a file once, evaluates every condition per scan, and hands each qualifying scan to a
+ * consumer. <h2>Why per-scan rather than whole-file</h2> There is no whole-file table.
  */
 public final class QueryExecutor {
-
     private QueryExecutor() {}
 
     /**
-     * Runs {@code q} over {@code stream}, invoking {@code out} for each qualifying scan in document order.
-     *
-     * @param opts may be null, meaning {@link MassqlOptions#defaults()}
-     * @throws MassqlException if the query names a function or source this step cannot execute
+     * Runs {@code q} over {@code stream}, invoking {@code out} for each qualifying scan in
+     * document order.
      */
     public static ExecutionSummary execute(
             MassqlQuery q, SpectraStream stream, MassqlOptions opts, QualifyingScanConsumer out) {
@@ -62,7 +30,6 @@ public final class QueryExecutor {
         if (out == null) throw new MassqlException("consumer is required");
         if (opts == null) opts = MassqlOptions.defaults();
 
-        // MS1DATA selects MS1 scans, MS2DATA selects MS2 scans.
         int wantedLevel = q.source() == DataSource.MS1DATA ? 1 : 2;
 
         List<Condition> conditions = q.allConditions();
@@ -84,20 +51,15 @@ public final class QueryExecutor {
             ScanView v = stream.next();
             examined++;
 
-            // (1) Zero-peak scans are invisible to MassQL -- see the class note. Before the MS1
-            // retention, so an empty MS1 cannot become an ms1scan link either.
             if (v.peaks().isEmpty()) {
                 skippedEmpty++;
                 continue;
             }
 
-            // (2) Retain the most recent non-empty MS1, for MS1MZ here and the precursor lookup in
-            // collation.
             if (v.msLevel() == 1) retainedMs1 = v.peaks();
 
             if (v.msLevel() != wantedLevel) continue;
 
-            // (3) Metadata-only conditions, before paying for peaks.
             boolean rejected = false;
             for (Condition c : scanLevel) {
                 if (!ConditionFilters.scanLevelHolds(c, v)) {
@@ -107,16 +69,11 @@ public final class QueryExecutor {
             }
             if (rejected) continue;
 
-            // An MS1MZ condition needs the linked MS1. If none precedes this scan, it cannot hold
-            // --
-            // worth counting, because "0 results" on an MS1MZ query over an MGF has this exact
-            // cause.
             if (retainedMs1 == null && hasMs1Condition(peakLevel)) {
                 missingMs1++;
                 continue;
             }
 
-            // (4) Peak-level conditions on the materialised scan.
             SpectrumTable scan =
                     (wantedLevel == 1 && retainedMs1 != null && v.msLevel() == 1)
                             ? retainedMs1
@@ -134,8 +91,6 @@ public final class QueryExecutor {
             out.accept(v, scan, retainedMs1);
         }
 
-        // Diagnostics: an empty result is a valid answer, but a SILENT empty result is a poor one
-        // (§5).
         diagnostics.addAll(stream.diagnostics());
         if (skippedEmpty > 0) {
             diagnostics.add(

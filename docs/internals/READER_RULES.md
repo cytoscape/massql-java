@@ -2,10 +2,8 @@
 
 The per-format rule table for the MGF, mzML and mzXML readers.
 
-**`massql/msql_fileloading.py` is the authority**, not the format specifications and not pyteomics' API
-docs — field names and units are undocumented there, so the source settles them. Every value these
-readers produce must match what that file produces, because the parity gate asserts bit-identity and the goldens
-are whatever MassQL computed. Where a format spec and MassQL disagree, **MassQL wins**.
+**`massql/msql_fileloading.py` is the authority**, not the format specifications. Where a format spec
+and MassQL disagree, **MassQL wins**.
 
 ---
 
@@ -22,8 +20,8 @@ are whatever MassQL computed. Where a format spec and MassQL disagree, **MassQL 
 | `ms1scan` | hardcoded **0** | document order | document order |
 | Reader | hand-written | hand-written walk + vendored decoder | hand-written  |
 
-**Three different RT rules is the trap.** A silent 60× error in any one of them passes every test for the
-other two formats. `MzmlRtUnitTest` pins both mzML directions with a fixture each.
+**Three different RT rules is the trap.** A silent 60× error in any one passes every test for the
+other two formats.
 
 ---
 
@@ -39,20 +37,12 @@ for each spectrum in document order:
     else:               ms1scan = previous_ms1_scan
 ```
 
-> ⚠ **The `peak_count == 0` guard is the easiest line here to omit, and omitting it is silent.**
-> Both loaders open with `if len(spectrum["intensity array"]) == 0: continue`
-> (`msql_fileloading.py:559` mzML, `:421` mzXML) and that `continue` runs **before**
-> `previous_ms1_scan` is assigned — so an empty MS1 is invisible to the chain and the next MS2 links
-> to the MS1 *before* it. Verified against MassQL's own loader on `micro.mzML`: scan 5 →
-> `ms1scan` **2**, not the empty MS1 at scan 4.
+> The `peak_count == 0` guard is easy to omit and omitting it is silent. Both loaders `continue`
+> **before** `previous_ms1_scan` is assigned (`msql_fileloading.py:559` mzML, `:421` mzXML), so an
+> empty MS1 is invisible to the chain and the next MS2 links to the MS1 *before* it — on
+> `micro.mzML`, scan 5 → `ms1scan` 2, not the empty MS1 at scan 4.
 >
-> Neither real mzXML fixture contains a single zero-peak scan, and the micro golden covers only scans
-> 1 and 3, so **nothing caught this before**. `ZeroPeakMs1ChainTest` now does — with the guard
-> removed it reports "Got 4 — expected 2". Take `peak_count` from `defaultArrayLength` (mzML) or
-> `peaksCount` (mzXML) so the guard costs no decode.
->
-> **The scan is still yielded.** Only the linkage skips it — same split as MGF, where all 34,513
-> blocks including the 12,571 empty ones are yielded and the engine filters.
+> The scan is still yielded; only the linkage skips it.
 
 MassQL reads neither mzML's `spectrumRef` nor mzXML's `precursorScanNum` — the two attribute names appear
 **zero times** in all 892 lines of `msql_fileloading.py`. Consequences:
@@ -64,9 +54,9 @@ MassQL reads neither mzML's `spectrumRef` nor mzXML's `precursorScanNum` — the
 - This rule is also what makes streaming possible: the linked MS1 scan is always the most recent one, so
   the engine retains exactly one.
 
-**The `0` sentinels stay raw in the readers.** `precmz`, `ms1scan` and `charge` carry MassQL's 0 for "not
-recorded". Collation converts 0 → null for those three only, and **never for `rt`** — `0.0` is a real
-retention time. Converting early would destroy the distinction between "absent" and "already converted".
+**`precmz`, `ms1scan` and `charge` are null when not recorded; `rt` never is** — `0.0` is a real
+retention time. The readers convert MassQL's raw `0` at the `ScanView` boundary. The columnar store
+below that still carries the raw sentinel — see `STORE_DESIGN.md`.
 
 **Multiple precursors per MS2 scan → the FIRST one wins**. MassQL hard-indexes `[0]` at
 every level:
@@ -76,19 +66,14 @@ every level:
 | mzML | `precursorList.precursor[0].selectedIonList.selectedIon[0]` (`:603`) |
 | mzXML | `spectrum["precursorMz"][0]` (`:450`) — `precursorCharge` comes from the same element |
 
-Not a pathological case: **multiplexed (MSX) acquisition co-fragments several precursors into one MS2
-scan**, and DIA/SWATH uses wide isolation windows with no single selected ion. A reader that overwrites on
-each occurrence takes the *last* and disagrees, and no committed fixture could tell — all of
-`small.mzML`, `small.mzXML` and the Ewing file are single-precursor (`max=1`).
-`micro_multiprec.{mzML,mzXML}` now pin it; the mzML one carries a second `<selectedIon>` **and** a second
-`<precursor>`, so honouring only one nesting level still fails.
+Not pathological: multiplexed (MSX) acquisition co-fragments several precursors into one MS2 scan, and
+DIA/SWATH uses wide isolation windows. A reader that overwrites on each occurrence takes the *last* and
+disagrees. `micro_multiprec.mzML` carries a second `<selectedIon>` **and** a second `<precursor>`, so
+honouring only one nesting level still fails.
 
-**Zero-intensity peaks are dropped by MGF and kept by mzML/mzXML**. MassQL's MGF loader
-opens its peak loop with `if intensity == 0: continue`, so such a peak never becomes a row and cannot be
-matched, counted or summed. The other two loaders have **no such guard** — `small.mzML`'s parity dump records
-`i_hex_first8` as eight `0x0.0p+0` entries, retained on both sides and compared bit-for-bit by the parity gate.
-**Generalising the MGF skip would break every mzML fixture in that gate**; `ZeroIntensityPeakTest` asserts both
-directions in one class so the asymmetry cannot be tidied away.
+**Zero-intensity peaks are dropped by MGF and kept by mzML/mzXML**. MassQL's MGF loader opens its peak
+loop with `if intensity == 0: continue`, so such a peak never becomes a row. The other two loaders have
+**no such guard**. Generalising the MGF skip would break every mzML fixture.
 
 A block whose peaks are *all* zero-intensity therefore reduces to a **zero-peak scan** — MassQL emits no rows
 for it at all, and the engine's zero-peak guard is what makes the two agree.
@@ -116,15 +101,14 @@ Specification: `_load_data_mgf_pyteomics` (`msql_fileloading.py:155-244`).
 | **`scan`** | `SCANS=` when present, else the **1-based block index** |
 | `ms1scan` | Hardcoded **0** (`:394`) |
 | **zero-intensity peaks** | ⛔ **DROPPED** — `if intensity == 0: continue` opens the peak loop. MGF **only**: mzML/mzXML retain them |
-| **`polarity`** | Not read from any header — but **hardcoded `1`** (positive), not 0. Measured `{1: all}` across 866k MGF rows. Reading a rule off the *parse* path missed a default set elsewhere in the function |
+| **`polarity`** | Not read from any header — **hardcoded `1`** (positive), not 0. Measured `{1: all}` across 866k MGF rows |
 
-> **⚠ MGF `charge` is never null.** The loader uses
-> `params.get('charge', [1])` with `except: charge = 1`. Since only `0` is null-converted, an absent
-> `CHARGE=` is indistinguishable from a genuine 1+. The golden agrees: `{1: 653, 2: 10, 3: 1}`, zero nulls.
+> **MGF `charge` is never null.** The loader uses `params.get('charge', [1])` with `except: charge = 1`,
+> so an absent `CHARGE=` is indistinguishable from a genuine 1+. The golden agrees: `{1: 653, 2: 10,
+> 3: 1}`, zero nulls.
 
-**Zero-peak blocks are real spectra and must be yielded.** 12,571 of `PlusRise.mgf`'s 34,513 blocks have no
-peak lines. MassQL's dataframe simply has no *rows* for them, which is why it reports **21,942** unique
-scans — this explains the "12,571 dropped spectra". Nothing is dropped.
+**Zero-peak blocks are real spectra and must be yielded.** 12,571 of `PlusRise.mgf`'s 34,513 blocks have
+no peak lines; MassQL's dataframe has no *rows* for them, hence its 21,942 unique scans.
 
 **MassQL fabricates a 1-row MS1 table for MGF, and it takes one of TWO forms**. The pyteomics loader ends with
 `ms1_df = pd.DataFrame([peak_dict])` where `peak_dict` **leaks from the MS2 peak loop**, so the row is a

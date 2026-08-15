@@ -20,16 +20,7 @@ import org.cytoscape.massql.io.SpectraStream;
 import org.cytoscape.massql.result.ScanInfoResult;
 import org.junit.jupiter.api.Test;
 
-/**
- * The four public entry points, and the resource rules a caller will otherwise get wrong.
- *
- * <p>Two of these assertions are about <b>ownership</b> rather than results, and they matter more
- * than they look: {@code execute} closing the caller's stream would break the multi-query-per-file
- * pattern a long-lived host needs, and {@code run} leaking on the exception path would exhaust file
- * handles in a long-running session — which surfaces nowhere near the cause.
- */
 class MassqlApiTest {
-
     private static final String Q = "QUERY scaninfo(MS2DATA) WHERE MS2PREC=810.79:TOLERANCEMZ=1.0";
 
     private static Path fixture(String relative) {
@@ -46,7 +37,6 @@ class MassqlApiTest {
         return fixture("data/small.mzML");
     }
 
-    /** Records whether {@code close} ran, so ownership can be asserted rather than assumed. */
     private static final class CloseSpy implements SpectraStream {
         private final SpectraStream delegate;
         private int closes;
@@ -77,12 +67,8 @@ class MassqlApiTest {
         }
     }
 
-    // ------------------------------------------------------------------ ownership
-
     @Test
     void executeDoesNotCloseTheCallersStream() {
-        // The multi-query-per-file pattern depends on this: the caller opened it, the caller closes
-        // it. A library that closes what it did not open makes try-with-resources a lie.
         try (CloseSpy spy = new CloseSpy(SpectraFile.open(smallMzml()))) {
             List<ScanInfoResult> rows = Massql.execute(Massql.parse(Q), spy, null);
             assertEquals(6, rows.size(), "sanity: this query matches 6 scans in small.mzML");
@@ -103,8 +89,6 @@ class MassqlApiTest {
 
     @Test
     void runClosesWhatItOpenedEvenWhenExecutionThrows() {
-        // The path that actually leaks in practice. try-with-resources gives this for free -- which
-        // is the point: this test fails the moment someone "simplifies" it to an explicit close.
         CloseSpy[] opened = new CloseSpy[1];
 
         assertThrows(
@@ -123,7 +107,6 @@ class MassqlApiTest {
         assertEquals(1, opened[0].closes, "run must close on the exception path too");
     }
 
-    /** Fails partway through iteration, standing in for a reader that hits corrupt content. */
     private static final class ThrowingStream implements SpectraStream {
         private final SpectraStream delegate;
         private int served;
@@ -154,13 +137,8 @@ class MassqlApiTest {
         }
     }
 
-    // ------------------------------------------------------------------ contract
-
     @Test
     void nullOptionsMeanDefaults() {
-        // 20.0 ppm is the documented default and what the reference uses, so passing null must
-        // not
-        // silently produce a zero tolerance -- which would match nothing and look like a data bug.
         List<ScanInfoResult> withNull = Massql.run(Q, smallMzml(), null);
         List<ScanInfoResult> withDefaults = Massql.run(Q, smallMzml(), MassqlOptions.defaults());
         assertEquals(withDefaults.size(), withNull.size());
@@ -169,8 +147,6 @@ class MassqlApiTest {
 
     @Test
     void anEmptyResultIsAnEmptyImmutableListNeverNull() {
-        // the strict-window evidence: this query's window excludes a peak sitting exactly on the
-        // bound, so it legitimately matches nothing. An empty answer is a valid answer.
         Path micro = fixture("fixtures/micro/micro.mzML");
         List<ScanInfoResult> rows =
                 Massql.run(
@@ -186,9 +162,6 @@ class MassqlApiTest {
 
     @Test
     void rowsAreAscendingByScanId() {
-        // the differential compares position by position, so ordering is part of the contract
-        // rather
-        // than an accident of iteration.
         List<ScanInfoResult> rows = Massql.run(Q, smallMzml(), null);
         for (int i = 1; i < rows.size(); i++) {
             assertTrue(
@@ -207,16 +180,12 @@ class MassqlApiTest {
             assertEquals(6, r.rows().size());
             assertNotNull(r.diagnostics(), "diagnostics are empty, never null");
         }
-        // execute is the same call with the notes dropped -- not a second implementation.
+
         assertEquals(6, Massql.run(Q, smallMzml(), null).size());
     }
 
     @Test
     void aSpentStreamFailsLoudlyRatherThanReturningNothing() {
-        // the reshape made single-pass a property of the TYPE. Before it, a second execute
-        // returned an empty list that read as "matched nothing" -- a wrong answer that looked like
-        // a
-        // right one. Several queries over one file means reopening the file.
         try (SpectraStream s = SpectraFile.open(smallMzml())) {
             assertEquals(6, Massql.execute(Massql.parse(Q), s, null).size());
             assertFalse(s.hasNext(), "the stream is drained after one execute");
@@ -229,8 +198,6 @@ class MassqlApiTest {
 
     @Test
     void parseFailurePropagatesOutOfRunWithTheConstructNamed() {
-        // run() does not swallow it: only the CLI maps this to an exit code, and it needs the
-        // construct name to tell the user what to change.
         MassqlParseException e =
                 assertThrows(
                         MassqlParseException.class,
@@ -244,7 +211,6 @@ class MassqlApiTest {
 
     @Test
     void theOneShotFormAgreesWithTheExplicitOne() {
-        // run is a convenience over parse + open + execute, so it must not drift from them.
         List<ScanInfoResult> viaRun = Massql.run(Q, smallMzml(), null);
         List<ScanInfoResult> viaExecute;
         try (SpectraStream s = SpectraFile.open(smallMzml())) {

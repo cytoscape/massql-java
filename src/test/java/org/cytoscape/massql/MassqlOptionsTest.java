@@ -7,10 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.Test;
 
 class MassqlOptionsTest {
-
     @Test
     void defaultPrecursorToleranceIs20Ppm() {
-        // The documented default, matching the reference.
         assertEquals(20.0, MassqlOptions.defaults().precursorTolPpm());
     }
 

@@ -1,16 +1,14 @@
 # massql-java — the SDK
 
-A pure-Java MassQL engine, published as SDK.
+A pure-Java MassQL engine, published as an SDK.
 
-> **Class-level documentation is in the javadoc.** Every published version ships a
-> `massql-java-<version>-javadoc.jar`, and that is the reference for entry points, parameters, return
-> types and behaviour. 
+> Every published version ships a `massql-java-<version>-javadoc.jar`, the API reference.
 
 ---
 
 ## Quick start
 
-This is an example app demonstrating usage of the SDK. It is compreised of 4 files.
+An example app demonstrating the SDK, in four files.
 
 **Prerequisites: JDK 17+ and Gradle.** The example is a Gradle project, so `gradle` must be on your
 PATH — if you don't have it already, install it direct from pre-compiled binaries - https://gradle.org/releases/.
@@ -40,7 +38,7 @@ The Nexus repository is required — this artifact is not on Maven Central. Use 
 `cytoscape_snapshots` URL for a `-SNAPSHOT` version and `cytoscape_releases` for a released one; a
 version resolved against the wrong repository simply fails to resolve.
 
-### 2.  `settings.gradle`:
+### 2. `settings.gradle`
 
 ```groovy
 rootProject.name = 'massql-hello'
@@ -48,7 +46,7 @@ rootProject.name = 'massql-hello'
 
 ### 3. `sample.mgf`
 
-Three scans, so the query below has something to match and something to reject. Save it in same directory:
+Three scans, so the query below has something to match and something to reject. Save it in the same directory:
 
 ```
 BEGIN IONS
@@ -117,7 +115,7 @@ public class Main {
 
 Now run it with gradle. Qualify the path to the downloaded gradle bin if needed.
 
-`gradle run` - will print to console:
+`gradle run` prints:
 
 ```
 2 matching scans
@@ -157,15 +155,15 @@ Snapshots live in `cytoscape_snapshots` on the https://nrnb-nexus.ucsd.edu/repos
 
 ## Known deviations
 
-1. **`ms1scan` is inferred by document order, not read from the file.** ignores
-   `spectrumRef` (mzML) and `precursorScanNum` (mzXML) same as the py MassQL does, but when a precursor reference points further back than the immediately
-   preceding MS1 scan, the java `ms1scan` will disagree with the file's declared linkage. For simple DDA
-   they coincide.
-2. **`=` means `>=` for intensity comparisons.** 
+1. **`ms1scan` is inferred by document order, not read from the file.** Like the Python MassQL, this
+   ignores `spectrumRef` (mzML) and `precursorScanNum` (mzXML). When a precursor reference points
+   further back than the immediately preceding MS1 scan, `ms1scan` disagrees with the file's declared
+   linkage. For simple DDA they coincide.
+2. **`=` means `>=` for intensity comparisons.**
 3. **`i_norm` and `i_norm_ms1` are not emitted.** Both are structurally constant, so they carry no
    information.
-4. **`tic` is not bit-identical** The py intensity
-   column is `float32` and `tic` is a pandas sum over it, while java sdk accumulate in float64. 
+4. **`tic` is not bit-identical.** The Python intensity column is `float32` and `tic` is a pandas sum
+   over it; this SDK accumulates in float64.
 
 
 ---
@@ -179,6 +177,6 @@ The `Makefile` is the entry point.
 ```sh
 make build             # jar, -sources.jar and -javadoc.jar -> build/libs/
 make test              # unit tier (*Test.java), seconds
-make integration-test  # both tiers, coverage gate, lint, banned deps
+make integration-test  # both tiers, coverage gate, lint
 make publish-local     # install into your local m2 cache
 ```

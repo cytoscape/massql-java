@@ -17,19 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-/**
- * The parser conformance suite: every reference parse either builds an AST or rejects with
- * a named construct.
- *
- * <p>⚠ an earlier draft of the parser said "every {@code scaninfo} golden
- * must parse to a canonical-equal AST". That is wrong — 20 of the 35 {@code scaninfo}
- * goldens contain out-of-scope constructs (variables, {@code MOBILITY}, {@code formula()},
- * the intensity-match family) and must reject. The real split is 15 parse / 31 reject, and
- * it is stated in the checked-in {@code corpus-manifest.tsv} so the scope decisions are
- * reviewable in one place rather than buried here.
- */
 class ParseConformanceTest {
-
     static List<Corpus.Entry> corpus() {
         return Corpus.load();
     }
@@ -37,7 +25,7 @@ class ParseConformanceTest {
     @Test
     void corpusIsPresentAndTheExpectedSize() {
         List<Corpus.Entry> all = Corpus.load();
-        // A missing or truncated corpus must FAIL, not vacuously pass with zero cases.
+
         assertEquals(
                 Corpus.EXPECTED_SIZE,
                 all.size(),
@@ -61,9 +49,7 @@ class ParseConformanceTest {
                             MassqlParseException.class,
                             () -> Massql.parse(e.query()),
                             () -> "expected rejection of " + e.candidates() + " in: " + e.query());
-            // The parser names the FIRST out-of-scope construct in source order. Asserting a
-            // specific one would pin traversal order, which has no user-visible meaning --
-            // what matters is that the construct named is genuinely present and unsupported.
+
             assertTrue(
                     e.candidates().contains(ex.construct()),
                     () ->
@@ -87,8 +73,7 @@ class ParseConformanceTest {
     @MethodSource("corpus")
     void parsingIsDeterministicAndCanonicalFormIsStable(Corpus.Entry e) {
         if (!e.shouldParse()) return;
-        // Two parses of the same text must agree, and canonical() must be a pure function
-        // of the AST -- that is what makes it usable as the comparison key.
+
         MassqlQuery a = Massql.parse(e.query());
         MassqlQuery b = Massql.parse(e.query());
         assertEquals(a.canonical(), b.canonical());
@@ -98,13 +83,10 @@ class ParseConformanceTest {
 
     @Test
     void noGoldenCausesAnUnexpectedExceptionType() {
-        // "Never a crash" is a the parser requirement: every failure must be a
-        // MassqlParseException, never an NPE, ISE or ArrayIndexOutOfBounds.
         for (Corpus.Entry e : Corpus.load()) {
             try {
                 Massql.parse(e.query());
             } catch (MassqlParseException ok) {
-                // expected for the reject set
             } catch (RuntimeException bad) {
                 fail(
                         "non-MassqlParseException "

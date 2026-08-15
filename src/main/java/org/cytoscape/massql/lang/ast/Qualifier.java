@@ -1,11 +1,6 @@
 package org.cytoscape.massql.lang.ast;
 
-/**
- * One qualifier on a condition, e.g. {@code TOLERANCEPPM=5} or {@code INTENSITYPERCENT>30}.
- *
- * <p>The value stays an unfolded {@link Expr} for the same reason as everywhere else in
- * this AST — the engine owns the arithmetic.
- */
+/** One qualifier on a condition, e.g. {@code TOLERANCEPPM=5} or {@code INTENSITYPERCENT>30}. */
 public record Qualifier(QualifierType type, Comparator comparator, Expr value) {
     public Qualifier {
         if (type == null || comparator == null || value == null) {

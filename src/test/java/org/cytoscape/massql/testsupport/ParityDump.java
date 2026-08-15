@@ -21,37 +21,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
-/**
- * Reads a loader-parity dump: MassQL's own loaded tables, per scan, with floats as hex.
- *
- * <p>A shared helper because three tests need the <b>full</b> per-scan record.
- *
- * <p><b>Regex rather than a JSON library, deliberately.</b> Jackson discovers modules via
- * {@code ServiceLoader}, which this project does not use, and a test-scoped dependency would still be
- * one more thing that can drift from the runtime closure. The dumps are machine-generated with a fixed
- * field order, so a regex is sufficient and adds nothing to the build.
- *
- * <h2>Two properties of these dumps that are easy to get wrong</h2>
- *
- * <p><b>1. Keys are {@code (mslevel, scan)}, never {@code scan} alone</b>. MassQL
- * synthesises an all-zero MS1 placeholder for MGF, and its scan id <b>collides with a real MS2 id</b> in
- * {@code micro.mgf} (id 3) and {@code DP00570_F02.mgf} (id 625). Keying by scan id silently compares a real
- * spectrum against a row of zeros.
- *
- * <p><b>2. Entries are grouped by ms level, NOT document order</b>. A dump lists all MS1 entries and
- * then all MS2 — 229 then 687 on the Ewing file. Never infer sequence from a dump; re-derive order from
- * the file.
- */
 public final class ParityDump {
-
-    /**
-     * One scan's worth of MassQL's loaded state. Hex fields are kept raw and parsed on demand.
-     *
-     * <p>The last three are <b>MS2 only</b> and are null on an MS1 record — the generator emits them
-     * for MS2 records only, because the reference's MS1 table has no such columns. That is a real
-     * property of the reference's two-dataframe shape, not a gap: an MS1 survey scan has no
-     * precursor to describe.
-     */
     public record Scan(
             int scan,
             int mslevel,
@@ -66,13 +36,10 @@ public final class ParityDump {
             String precmzHex,
             Integer ms1scan,
             Integer charge) {
-
-        /** MassQL's precursor m/z for this scan. MS2 only. */
         public double precmz() {
             return parseHex(precmzHex);
         }
 
-        /** The composite key. See the class note: scan id alone is unsafe. */
         public Key key() {
             return new Key(mslevel, scan);
         }
@@ -127,7 +94,6 @@ public final class ParityDump {
         return scans;
     }
 
-    /** Loads the dump for a fixture name, e.g. {@code "small.mzML"}. Fails if absent. */
     public static ParityDump of(String fixtureName) {
         Path gz = Fixtures.require("goldens/loader-parity/" + fixtureName + ".json.gz");
         String json;
@@ -159,8 +125,6 @@ public final class ParityDump {
             assertNull(clash, "duplicate key " + s.key() + " in dump " + fixtureName);
         }
 
-        // A dump that failed to parse must FAIL, not yield an empty map that every later assertion
-        // vacuously satisfies. This is the "vacuous pass" trap in the Known traps.
         assertFalse(
                 byKey.isEmpty(),
                 "no scans parsed from "
@@ -176,24 +140,10 @@ public final class ParityDump {
                 byKey);
     }
 
-    /**
-     * Parses one of the dump's hex floats.
-     *
-     * <p><b>Never route these through a decimal string.</b> {@code Double.parseDouble} accepts Java's
-     * hexadecimal literal form ({@code 0x1.5c8f2ap+20}) and reproduces the exact bits; a decimal
-     * round-trip can lose or fabricate low bits and turn a real decoder bug into a passing test.
-     */
     public static double parseHex(String hex) {
         return Double.parseDouble(hex);
     }
 
-    /**
-     * The SHA-256 the dump records: every value packed as big-endian IEEE754 double, then hashed.
-     *
-     * <p>This is what makes the comparison <b>stronger than a multiset</b> — it pins the array's
-     * <b>order</b> as well as every bit. See {@code PeakOrderPreconditionTest} for the precondition that
-     * makes order-sensitivity correct rather than brittle.
-     */
     public static String sha256Of(double[] values) {
         ByteBuffer b = ByteBuffer.allocate(8 * values.length).order(ByteOrder.BIG_ENDIAN);
         for (double v : values) b.putDouble(v);
@@ -209,9 +159,6 @@ public final class ParityDump {
         }
     }
 
-    // ------------------------------------------------------------------ parsing
-
-    /** Field order is fixed by the generator, so one regex covers the whole record. */
     private static final Pattern SCAN =
             Pattern.compile(
                     "\"scan\":\\s*\"?(-?\\d+)\"?,\\s*"
@@ -224,7 +171,6 @@ public final class ParityDump {
                             + "\"mz_hex_first8\":\\s*\\[([^\\]]*)\\],\\s*"
                             + "\"rt_hex\":\\s*\"([^\"]*)\",\\s*"
                             + "\"polarity\":\\s*(-?\\d+)"
-                            // MS2 only -- absent on an MS1 record, hence the optional group.
                             + "(?:,\\s*\"precmz\":\\s*\"([^\"]*)\",\\s*"
                             + "\"ms1scan\":\\s*\"?(-?\\d+)\"?,\\s*"
                             + "\"charge\":\\s*\"?(-?\\d+)\"?)?");

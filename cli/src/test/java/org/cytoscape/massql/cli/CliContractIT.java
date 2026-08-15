@@ -25,31 +25,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-/**
- * Layer 4 — the CLI contract, established by forking the <b>assembled uber-jar</b> as a real process.
- *
- * <h2>Why a subprocess, when the CLI already tests {@code Main.run} in-process</h2>
- *
- * <p>{@code Main.run(String[], PrintStream, PrintStream)} takes both streams as parameters, which is
- * what lets the CLI's {@code MainStreamDisciplineTest} capture them without {@code System.setOut}.
- * That design is also the reason an in-process test <b>cannot</b> prove the thing this class exists
- * for: passing two {@code ByteArrayOutputStream}s proves the code writes to the right
- * <i>parameter</i>, not that a real process keeps two real file descriptors apart. Only a fork can
- * establish that — and only against the shadow jar can it establish that the assembled artifact runs
- * at all.
- *
- * <p>⚠ <b>The two properties are tested separately</b>. An earlier design asserted
- * correctness by reading the payload off the pipe, which made a stream-hygiene regression present as a
- * data mismatch and vice versa. Here: correctness reads {@code --output FILE}, hygiene inspects the
- * pipes, and one test bridges them by proving the two modes emit identical bytes.
- *
- * <p>The jar path arrives as the {@code cliJar} system property, resolved by {@code cli/build.gradle}
- * from {@code shadowJar} itself. It is never reconstructed from a version string — {@code cliVersion}
- * is a Gradle property, and {@code System.getProperty("cliVersion")} is {@code null}.
- */
 class CliContractIT {
-
-    /** Resolved by the build from the shadowJar task, and {@code dependsOn} guarantees it exists. */
     private static final Path CLI_JAR = resolveCliJar();
 
     private static Path resolveCliJar() {
@@ -70,11 +46,7 @@ class CliContractIT {
         return jar;
     }
 
-    // ------------------------------------------------------------------ forking
-
-    /** One completed subprocess run. */
     private record Run(int exit, byte[] stdout, byte[] stderr) {
-
         String out() {
             return new String(stdout, StandardCharsets.UTF_8);
         }
@@ -84,20 +56,10 @@ class CliContractIT {
         }
     }
 
-    /**
-     * Forks the uber-jar with {@code java.home}'s JVM — the one running this test, not whatever a bare
-     * {@code java} would resolve to on {@code PATH}.
-     */
     private static Run fork(Object... args) {
         return forkWithStdin(null, args);
     }
 
-    /**
-     * Forks with {@code stdin} written to the child's standard input, then closed.
-     *
-     * <p>Written before the pipes are drained, which is safe only because a query is small enough to
-     * fit the pipe buffer; the payload coming back is the large direction and is read below.
-     */
     private static Run forkWithStdin(String stdin, Object... args) {
         List<String> cmd = new ArrayList<>();
         cmd.add(Paths.get(System.getProperty("java.home"), "bin", "java").toString());
@@ -108,14 +70,10 @@ class CliContractIT {
         try {
             Process p = new ProcessBuilder(cmd).start();
 
-            // Always close the child's stdin. Left open, an invocation that reads stdin would wait
-            // for EOF forever -- which is correct CLI behaviour and a hung test.
             try (java.io.OutputStream childIn = p.getOutputStream()) {
                 if (stdin != null) childIn.write(stdin.getBytes(StandardCharsets.UTF_8));
             }
 
-            // Read both pipes fully BEFORE waitFor: a process that fills a pipe buffer blocks
-            // forever otherwise, and this CLI can emit a multi-megabyte array.
             byte[] out = p.getInputStream().readAllBytes();
             byte[] err = p.getErrorStream().readAllBytes();
             if (!p.waitFor(5, TimeUnit.MINUTES)) {
@@ -149,7 +107,6 @@ class CliContractIT {
         return s.length() <= 400 ? s : s.substring(0, 400) + "… (" + s.length() + " chars)";
     }
 
-    /** Counts rows whose {@code column} is JSON null. */
     private static int nullCount(JsonArray rows, String column) {
         int n = 0;
         for (JsonElement e : rows) {
@@ -160,10 +117,6 @@ class CliContractIT {
         return n;
     }
 
-    /**
-     * Every row must satisfy the query that produced it — {@code scaninfo(MS2DATA)} with
-     * {@code MS2PREC=810.79:TOLERANCEMZ=1.0}. A row count alone accepts six wrong scans.
-     */
     private static void assertRowsMatchStandardQuery(JsonArray rows) {
         int previous = 0;
         for (JsonElement e : rows) {
@@ -176,7 +129,6 @@ class CliContractIT {
                     Math.abs(precmz - 810.79) <= 1.0,
                     () -> "precmz " + precmz + " lies outside TOLERANCEMZ=1.0 of 810.79: " + o);
 
-            // docs/CLI.md documents ascending scan order; nothing else enforces it.
             int scan = o.get("scan").getAsInt();
             int before = previous;
             assertTrue(
@@ -185,19 +137,6 @@ class CliContractIT {
         }
     }
 
-    // ============================================ (a) functional correctness, read from --output
-
-    /**
-     * ⛔ The tightest tolerance case, and the one to read first.
-     *
-     * <p>At 0.001 ppm no MS1 peak can match, so every {@code ms1_i}/{@code ms1_precmz} is null — while
-     * every {@code ms1_base_peak_i} <b>survives</b>, because the scan-level base peak is not a lookup
-     * and does not depend on the tolerance at all (collation).
-     *
-     * <p>This is the only place that rule is observable from <i>outside</i> the SDK, which is why the
-     * spec asks for it explicitly. A CLI that silently ignored {@code --precursor-tol-ppm} would still
-     * produce 6 rows here; only the null pattern reveals it.
-     */
     @Test
     void anAbsurdlyTightToleranceNullsEveryLookupButNotTheBasePeak(@TempDir Path dir) {
         Path out = dir.resolve("tight.json");
@@ -230,16 +169,6 @@ class CliContractIT {
                         + " scan-level base peak have been conflated.");
     }
 
-    /**
-     * The flag is honoured in both directions, against the two real goldens.
-     *
-     * <p>Same file, same query, differing only in {@code --precursor-tol-ppm}: at the default 20 ppm
-     * <b>4 of 6</b> rows miss, at 60 ppm <b>none</b> do. Asserting both directions is what makes this a
-     * test of the flag rather than of one arbitrary number.
-     *
-     * <p>Row <i>values</i> are {@code DifferentialIT}'s job; what the CLI layer owns is that the flag
-     * reaches the engine at all.
-     */
     @Test
     void thePrecursorToleranceFlagIsHonouredInBothDirections(@TempDir Path dir) {
         Path def = dir.resolve("default.json");
@@ -275,12 +204,6 @@ class CliContractIT {
         assertEquals(0, nullCount(rows60, "ms1_precmz"));
     }
 
-    /**
-     * Omitting the flag is <b>exactly</b> {@code --precursor-tol-ppm 20}, proven byte-for-byte.
-     *
-     * <p>Comparing the two runs' bytes is a stronger statement than checking either against a golden:
-     * it cannot pass because both drifted the same way.
-     */
     @Test
     void theDefaultToleranceIsTwentyPpm(@TempDir Path dir) {
         Path implicit = dir.resolve("implicit.json");
@@ -302,25 +225,11 @@ class CliContractIT {
                         + " promises '(default 20.0)'");
     }
 
-    /**
-     * ⛔ A query arriving over a <b>real pipe</b>, which is the one thing only a fork can establish.
-     *
-     * <p>{@code MainQuerySourceTest} drives the {@code InputStream} parameter directly and covers every
-     * rule about the three sources. What it cannot prove is that {@code main} actually hands
-     * {@code System.in} to {@code run} — a one-line wiring mistake that would leave every in-process
-     * test green while `cat q.massql | massql-java-cli …` hung or read nothing.
-     *
-     * <p>The result is compared byte-for-byte against the same query supplied as a file, so this asserts
-     * the pipe is genuinely equivalent rather than merely non-empty.
-     */
     @Test
     void aQueryPipedIntoStdinIsEquivalentToTheFileForm(@TempDir Path dir) {
         String query = readString(CliFixtures.standardQuery());
         assertFalse(query.isBlank(), "the query fixture must have content, or this proves nothing");
 
-        // --pretty false throughout: the byte comparison below spans a file and stdout, and only
-        // the
-        // uncolourised render is identical across both sinks.
         Path viaFile = dir.resolve("file.json");
         fork(
                 CliFixtures.smallMzml(),
@@ -342,7 +251,6 @@ class CliContractIT {
                 "a query on stdin must produce exactly what the same query in a file produces");
     }
 
-    /** An inline {@code --query} survives the jar boundary too — quoting is the only risk here. */
     @Test
     void anInlineQueryWorksThroughTheAssembledJar() {
         Run r =
@@ -359,7 +267,6 @@ class CliContractIT {
         assertRowsMatchStandardQuery(inlineRows);
     }
 
-    /** A query that matches nothing is an empty array and exit <b>0</b> — not a crash, not exit 1. */
     @Test
     void aQueryMatchingNothingIsAnEmptyArrayAndExitZero(@TempDir Path dir) {
         Path out = dir.resolve("empty.json");
@@ -369,15 +276,6 @@ class CliContractIT {
         assertEquals(0, parseArray(readString(out), "the empty-result payload").size());
     }
 
-    // =========================================== (b) stream hygiene, which only a fork can prove
-
-    /**
-     * stdout carries the JSON array and <b>nothing else</b>; diagnostics go to stderr.
-     *
-     * <p>The payload is parsed rather than pattern-matched: a diagnostic line mixed into stdout makes
-     * the document invalid JSON, which is a sharper failure than any substring check. The explicit
-     * checks below then rule out the subtler case of text that happens to parse.
-     */
     @Test
     void stdoutIsJsonOnlyAndDiagnosticsGoToStderr() {
         Run r = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery(), "--pretty", "false");
@@ -395,7 +293,6 @@ class CliContractIT {
                 () -> "usage text reached stdout on a SUCCESSFUL run:\n" + out);
     }
 
-    /** Matches the reference tool's trailing newline on stdout. */
     @Test
     void thePipedPayloadEndsWithExactlyOneTrailingNewline() {
         Run r = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery());
@@ -408,7 +305,6 @@ class CliContractIT {
                 "one trailing newline, not two -- a blank line is a diff against the reference");
     }
 
-    /** With {@code --output}, stdout is <b>empty</b>: the file is the payload's only destination. */
     @Test
     void outputToFileLeavesStdoutCompletelyEmpty(@TempDir Path dir) {
         Path out = dir.resolve("results.json");
@@ -429,13 +325,6 @@ class CliContractIT {
         assertRowsMatchStandardQuery(fileRows);
     }
 
-    /**
-     * ⛔ The bridge between (a) and (b): both modes emit <b>identical bytes</b>.
-     *
-     * <p>This is what makes every file-based assertion above a valid statement about the piped payload
-     * too. Without it, the CLI could render one thing to a file and another to the pipe and every other
-     * test here would still pass.
-     */
     @Test
     void thePipedAndFileModesAgreeByteForByte(@TempDir Path dir) {
         Path file = dir.resolve("results.json");
@@ -455,7 +344,6 @@ class CliContractIT {
                         + " they are two destinations for one rendering, not two renderings");
     }
 
-    /** {@code --output -} is documented as meaning stdout, so it must behave exactly like omitting it. */
     @Test
     void outputDashMeansStdout() {
         Run dash = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery(), "--output", "-");
@@ -466,15 +354,6 @@ class CliContractIT {
                 omitted.stdout(), dash.stdout(), "--output - is stdout, per the usage text");
     }
 
-    // =================================================== exit codes, through a real process
-
-    /**
-     * A missing file is a <b>usage</b> error: exit 2, message names the path, stdout untouched.
-     *
-     * <p>the CLI's {@code MainExitCodeTest} owns the code mapping in-process. What is added here is that
-     * the failing path writes <b>nothing</b> to a real stdout — a partial array followed by an error is
-     * the failure mode that would corrupt a consumer pipeline.
-     */
     @Test
     void aMissingSpectraFileExitsTwoAndSaysSoOnStderrOnly(@TempDir Path dir) {
         Path missing = dir.resolve("nope.mzML");
@@ -487,7 +366,6 @@ class CliContractIT {
                 () -> "the error must name the path it could not read:\n" + r.err());
     }
 
-    /** An unsupported query names the offending construct, exits 2, and leaves stdout empty. */
     @Test
     void anUnsupportedQueryNamesTheConstruct(@TempDir Path dir) {
         Path q = CliFixtures.write(dir, "scansum.massql", "QUERY scansum(MS2DATA)");
@@ -501,7 +379,6 @@ class CliContractIT {
                 () -> "the message must name the construct it rejected:\n" + r.err());
     }
 
-    /** {@code --help} is asked for, so it is the program's output: stdout, exit 0. */
     @Test
     void helpGoesToStdoutAndExitsZero() {
         Run r = fork("--help");
@@ -515,8 +392,6 @@ class CliContractIT {
                 r.stderr().length,
                 () -> "nothing on stderr for a deliberate --help: " + r.err());
     }
-
-    // ------------------------------------------------------------------ --pretty
 
     @Test
     void prettyStdoutIsIndentedThroughTheRealJar() {
@@ -562,8 +437,6 @@ class CliContractIT {
                 parseArray(compact.out(), "the compact payload"),
                 "the two renderings must parse to identical values");
     }
-
-    // ------------------------------------------------------------------ file helpers
 
     private static String readString(Path p) {
         return new String(readBytes(p), StandardCharsets.UTF_8);

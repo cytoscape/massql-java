@@ -17,19 +17,14 @@ queries, 11 are not.
 
 ## Translation philosophy: permissive grammar, strict builder
 
-The grammar admits the **whole** MassQL language, including everything out of scope for v1.
-Scope is enforced in `AstBuilder`, not in the grammar.
+The grammar admits the **whole** MassQL language, including everything out of scope for v1; scope is
+enforced in `AstBuilder`, not in the grammar.
 
-This is the single most important design decision here, and it is not the obvious one. A
-grammar that simply omitted `formula(...)`, `MOBILITY`, variables and the rest would be
-shorter — but a user typing `MS2PROD=formula(C10)` would get *"mismatched input 'formula'"*
-instead of *"`formula()` requires monoisotopic mass tables and is not supported in this
-version"*. **31 of the 46 reference parses need a named rejection**, and
-`MassqlParseException.construct()` is asserted by the test suite and surfaced by the CLI, so
-the name is part of the contract rather than a nicety.
+A grammar that omitted `formula(...)`, `MOBILITY` and the rest would be shorter, but
+`MS2PROD=formula(C10)` would then give *"mismatched input 'formula'"* instead of a named rejection.
+31 of the 46 reference parses need one, and `MassqlParseException.construct()` carries the name.
 
-Consequence to be aware of when reading the grammar: rules exist for constructs that can
-never reach the AST. That is intentional. `UnsupportedConstructs` is the list of what they
+So rules exist for constructs that can never reach the AST. `UnsupportedConstructs` lists what they
 do instead.
 
 ---

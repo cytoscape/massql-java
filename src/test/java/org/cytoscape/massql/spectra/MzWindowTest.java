@@ -5,28 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * The m/z window is the performance-critical primitive and the one whose edge behaviour the
- * tolerance semantics rest on. No epsilon, ever.
- *
- * <p><b>There are TWO windows, deliberately</b>, because MassQL genuinely differs by caller
- * — both verified by execution, not inference:
- *
- * <ul>
- *   <li>{@code mzWindow} — <b>inclusive</b>. The precursor lookup uses {@code >=}/{@code <=}:
- *       at {@code --precursor-tol-ppm 7.8125} a peak exactly on the bound
- *       <b>does</b> populate {@code ms1_i}.</li>
- *   <li>{@code mzWindowExclusive} — <b>strict</b>. The condition windows
- *       (all four condition functions use {@code >}/{@code <}): {@code micro.mzML} scan 3 has
- *       a peak at exactly {@code 201.0}, and {@code MS2PROD=201.5:TOLERANCEMZ=0.5} returns <b>0 rows</b>.</li>
- * </ul>
- *
- * <p>⛔ Collapsing the two rules into one would silently change {@code ms1_i}/{@code ms1_precmz}, which
- * the differential compares at 1e-9.
- */
 class MzWindowTest {
-
-    /** Peaks at 100, 200, 300, 400 in one scan. */
     private static SpectrumTable simple() {
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
         b.startScan(1, 0.5, 1);
@@ -34,12 +13,10 @@ class MzWindowTest {
         return b.build();
     }
 
-    // ---------------------------------------------------------------- the EXCLUSIVE variant
-
     @Test
     void exclusiveWindowRejectsPeaksExactlyOnEitherBound() {
         SpectrumTable t = simple();
-        // THE assertion that distinguishes the two methods. Rows are 100, 200, 300, 400.
+
         assertEquals(
                 new IntRange(2, 3),
                 t.mzWindowExclusive(0, 200.0, 400.0),
@@ -75,10 +52,6 @@ class MzWindowTest {
 
     @Test
     void exclusiveWindowHandlesDuplicateMzOnABound() {
-        // Duplicate m/z occur in real centroided data. If lo equals a duplicated value, EVERY copy
-        // must be
-        // excluded -- which is why this uses upperBound/lowerBound rather than shifting an index by
-        // one.
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
         b.startScan(1, 0.5, 1);
         b.addPeak(100.0, 1).addPeak(200.0, 2).addPeak(200.0, 3).addPeak(200.0, 4).addPeak(300.0, 5);
@@ -101,16 +74,7 @@ class MzWindowTest {
     @Test
     void bothBoundsAreInclusive() {
         SpectrumTable t = simple();
-        // A peak exactly ON either bound is IN the window.
-        //
-        // ⚠ the justification here USED to read "the condition filters computes the bounds
-        // from a
-        // tolerance, so an exclusive bound here would silently narrow every tolerance." That
-        // reasoning is
-        // backwards -- the condition windows are STRICT in MassQL, verified by execution.
-        // This
-        // inclusive method exists for the PRECURSOR LOOKUP, which really is inclusive
-        // (the lookup uses >=/<=, also verified). Conditions use mzWindowExclusive.
+
         assertEquals(new IntRange(1, 3), t.mzWindow(0, 200.0, 300.0));
         assertEquals(new IntRange(0, 4), t.mzWindow(0, 100.0, 400.0));
         assertEquals(
@@ -124,16 +88,13 @@ class MzWindowTest {
         SpectrumTable t = simple();
         double justAbove200 = Math.nextUp(200.0);
         double justBelow300 = Math.nextDown(300.0);
-        // This is the assertion that proves no epsilon is being applied.
+
         assertEquals(new IntRange(2, 3), t.mzWindow(0, justAbove200, 300.0));
         assertEquals(new IntRange(1, 2), t.mzWindow(0, 200.0, justBelow300));
     }
 
     @Test
     void duplicateMzValuesAtABoundaryAreAllIncluded() {
-        // Arrays.binarySearch's choice among equal elements is UNSPECIFIED, so a window that
-        // used its return value directly would include an arbitrary subset of a duplicate run.
-        // Duplicate m/z does occur in real centroided data.
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
         b.startScan(1, 0.0, 1);
         b.addPeak(100.0, 1).addPeak(200.0, 2).addPeak(200.0, 3).addPeak(200.0, 4).addPeak(300.0, 5);
@@ -156,7 +117,6 @@ class MzWindowTest {
 
     @Test
     void windowIsScopedToItsOwnScan() {
-        // The same m/z in a neighbouring scan must not leak in.
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
         b.startScan(1, 0.0, 1).addPeak(100.0, 1).addPeak(200.0, 2);
         b.startScan(2, 0.1, 1).addPeak(100.0, 3).addPeak(200.0, 4);
@@ -171,8 +131,8 @@ class MzWindowTest {
     @Test
     void emptyAndSinglePeakScans() {
         SpectrumTableBuilder b = new SpectrumTableBuilder(1);
-        b.startScan(1, 0.0, 1); // empty
-        b.startScan(2, 0.1, 1).addPeak(150.0, 5); // single peak
+        b.startScan(1, 0.0, 1);
+        b.startScan(2, 0.1, 1).addPeak(150.0, 5);
         SpectrumTable t = b.build();
 
         assertTrue(t.mzWindow(0, 0.0, 1000.0).isEmpty());
@@ -182,8 +142,6 @@ class MzWindowTest {
 
     @Test
     void unsortedInputIsSortedAtFreezeSoWindowsStayCorrect() {
-        // Do not assume sortedness -- verify it. A reader for a nonconforming file would
-        // otherwise produce silently wrong window results.
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
         b.startScan(1, 0.0, 1);
         b.addPeak(300.0, 30).addPeak(100.0, 10).addPeak(200.0, 20);
@@ -193,7 +151,7 @@ class MzWindowTest {
         assertEquals(100.0, t.mz(0));
         assertEquals(200.0, t.mz(1));
         assertEquals(300.0, t.mz(2));
-        // Intensities must travel with their m/z through the sort.
+
         assertEquals(10.0, t.intensity(0));
         assertEquals(20.0, t.intensity(1));
         assertEquals(30.0, t.intensity(2));

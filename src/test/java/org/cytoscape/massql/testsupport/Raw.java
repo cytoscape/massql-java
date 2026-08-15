@@ -2,12 +2,7 @@ package org.cytoscape.massql.testsupport;
 
 import org.cytoscape.massql.lang.ast.Polarity;
 
-/**
- * Maps a {@link org.cytoscape.massql.io.ScanView}'s typed values back to the reference's raw
- * encoding, which is what the loader-parity dumps and goldens record.
- */
 public final class Raw {
-
     private Raw() {}
 
     public static int polarity(Polarity p) {

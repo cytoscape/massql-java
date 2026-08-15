@@ -8,13 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.cytoscape.massql.MassqlException;
 import org.junit.jupiter.api.Test;
 
-/** Invariants are enforced with MassqlException, not assert, so they fail in release builds too. */
 class SpectrumTableBuilderTest {
-
     @Test
     void scanIdsMustBeNonDecreasing() {
-        // Non-decreasing ids are what let the index be a range lookup rather than a hash of
-        // lists. Readers stream in document order, so this costs nothing to require.
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
         b.startScan(10, 0.0, 1).addPeak(100, 1);
         MassqlException e = assertThrows(MassqlException.class, () -> b.startScan(5, 0.1, 1));
@@ -55,8 +51,6 @@ class SpectrumTableBuilderTest {
 
     @Test
     void anEmptyTableIsValidAndUsable() {
-        // MGF's MS1 side is an empty table rather than null, which keeps the collation free of
-        // null checks.
         SpectrumTable t = SpectrumTable.empty(1);
         assertTrue(t.isEmpty());
         assertEquals(0, t.rowCount());
@@ -68,7 +62,6 @@ class SpectrumTableBuilderTest {
 
     @Test
     void growthBeyondTheInitialCapacityPreservesEverything() {
-        // The builder starts at 1024 peaks / 64 scans; exercise both resize paths.
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
         for (int s = 1; s <= 200; s++) {
             b.startScan(s, s * 0.01, 1);

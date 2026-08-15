@@ -19,9 +19,7 @@ import org.cytoscape.massql.testsupport.Raw;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** mzXML edge cases, each derived from the reference loader rather than invented. */
 class MzxmlEdgeCaseTest {
-
     private static List<Integer> scanIdsOf(Path p) {
         List<Integer> out = new ArrayList<>();
         try (SpectraStream s = SpectraFile.open(p)) {
@@ -35,15 +33,6 @@ class MzxmlEdgeCaseTest {
 
     @Test
     void emptyMsLevelScansAreDropped() {
-        // -- the resolution of the long-standing open item, derived from
-        // source and then verified by execution rather than guessed at.
-        //
-        // The reference reads msLevel="" as absent and tests `mslevel == 1` and `mslevel == 2`
-        // (:434, :450), so None matches neither branch and the scan contributes ZERO rows. Not a
-        // default of 1, not a diagnostic-and-keep, not a failure.
-        //
-        // empty_msLevel_tag.mzXML (an MSDK test resource) has 10 scans: 8 with msLevel="" and two
-        // real ones -- scan 4 (MS2) and scan 8 (MS1).
         Path p = Fixtures.require("fixtures/edge/empty_msLevel_tag.mzXML");
         List<Integer> ids = scanIdsOf(p);
         assertEquals(
@@ -54,12 +43,10 @@ class MzxmlEdgeCaseTest {
 
     @Test
     void droppedScansAreReportedNotSilent() {
-        // "10 scans became 2" needs an explanation at the point of use, so the count goes through
-        // diagnostics() rather than being swallowed. The SDK returns diagnostics; it never logs.
         Path p = Fixtures.require("fixtures/edge/empty_msLevel_tag.mzXML");
         try (SpectraStream s = SpectraFile.open(p)) {
             while (s.hasNext()) {
-                s.next(); /* drain */
+                s.next();
             }
             String all = String.join("\n", s.diagnostics());
             assertTrue(
@@ -71,9 +58,6 @@ class MzxmlEdgeCaseTest {
 
     @Test
     void theEdgeFixtureIsAlsoOurOnlySixtyFourBitZlibRealFile() {
-        // Recorded because it is easy to lose: this fixture is precision="64" AND compressionType=
-        // "zlib", unlike every other mzXML we have. Its two surviving scans therefore exercise the
-        // 64-bit inflate path against a file we did not generate ourselves.
         Path p = Fixtures.require("fixtures/edge/empty_msLevel_tag.mzXML");
         String head = read(p);
         assertTrue(head.contains("precision=\"64\""), "expected a 64-bit fixture");
@@ -92,12 +76,6 @@ class MzxmlEdgeCaseTest {
 
     @Test
     void anMs2WithNoPrecursorMzGivesZeroRatherThanThrowing() {
-        // and NOT parity: MassQL raises KeyError: 'precursorMz' here (verified
-        // on
-        // micro_noprecursor.mzXML), so no golden can exist. We give the 0 "not recorded" sentinel,
-        // matching mzML's absent-MS:1000744 rule, which collation converts to null. Throwing would
-        // make
-        // mzXML stricter than mzML for the very same missing field.
         Path p = Fixtures.require("fixtures/micro/micro_noprecursor.mzXML");
         int ms2 = 0;
         try (SpectraStream s = SpectraFile.open(p)) {
@@ -117,11 +95,6 @@ class MzxmlEdgeCaseTest {
 
     @Test
     void aBarePrecursorMzWithNoAttributesIsFine() {
-        // The reference returns a bare STRING instead of a dict when <precursorMz>
-        // carries no attributes, and MassQL then dies at :450 with "string indices must be
-        // integers".
-        // We read the element TEXT, so the attributes are irrelevant -- but the reader must not
-        // require them either, which is what this asserts.
         Path p =
                 writeMinimal(
                         "bare.mzXML",
@@ -154,11 +127,6 @@ class MzxmlEdgeCaseTest {
 
     @Test
     void aScanWithNoPeaksElementIsNotAMassSpectrum() {
-        // The reference skips a scan with no m/z array -- "This is not a
-        // mass
-        // spectrum". So a <scan> carrying no <peaks> child at all is skipped, not an error.
-        // Distinct
-        // from peaksCount="0", which IS a spectrum that happens to be empty.
         Path p =
                 writeMinimal(
                         "no-peaks.mzXML",
@@ -198,8 +166,6 @@ class MzxmlEdgeCaseTest {
 
     @Test
     void aTruncatedFileThrowsWithNoPartialResult() {
-        // A reader that returns 1 of 3 scans is worse than one that fails: the shortfall surfaces
-        // later as an inexplicable filtering bug. The signal is a missing </msRun>.
         Path p =
                 writeRaw(
                         "truncated.mzXML",
@@ -214,7 +180,7 @@ class MzxmlEdgeCaseTest {
                         () -> {
                             try (SpectraStream s = SpectraFile.open(p)) {
                                 while (s.hasNext()) {
-                                    s.next(); /* drain until it fails */
+                                    s.next();
                                 }
                             }
                         });
@@ -226,13 +192,6 @@ class MzxmlEdgeCaseTest {
 
     @Test
     void aScanWithNoPeaksCountDerivesItFromTheBase64Length() {
-        // peaksCount is schema-required, so no real fixture omits it -- but MzxmlReader carries a
-        // documented fallback for when it is absent, and the reason it exists is specific: a
-        // wrongly-zero count would not merely mis-size an array, it would break the ms1scan chain,
-        // which surfaces much later as a precursor-linkage bug.
-        //
-        // Two peaks: 4 big-endian float32s = 16 bytes, so the count is derivable exactly
-        // (16 bytes / (2 values x 4 bytes) = 2).
         Path p =
                 writeMinimal(
                         "no-peakscount.mzXML",
@@ -273,8 +232,6 @@ class MzxmlEdgeCaseTest {
                 e.getMessage().contains("abc"),
                 "the message should quote the bad value: " + e.getMessage());
     }
-
-    // ------------------------------------------------------------------ helpers
 
     @TempDir Path dir;
 

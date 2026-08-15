@@ -31,14 +31,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class MzmlReaderTest {
-
-    // ------------------------------------------------------------------ scan id derivation
-
     @Test
     void scanIdTakesTheLastScanEqualsSegment() {
-        // Take the trailing scan= token and parse it as an int, as the reference does.
-        // This determines every row's identity; the LAST segment matters, and the rule was
-        // missing from the spec entirely until it was derived from source.
         assertEquals(1, MzmlReader.scanIdFrom("controllerType=0 controllerNumber=1 scan=1"));
         assertEquals(48, MzmlReader.scanIdFrom("controllerType=0 controllerNumber=1 scan=48"));
         assertEquals(7, MzmlReader.scanIdFrom("scanId=7"));
@@ -48,16 +42,11 @@ class MzmlReaderTest {
 
     @Test
     void anIdWithNoScanNumberFailsByName() {
-        // MassQL raises ValueError here; we throw a named MassqlException. Documented deviation --
-        // a clean error either way, but ours says which id.
         MassqlException e =
                 assertThrows(MassqlException.class, () -> MzmlReader.scanIdFrom("spectrum=abc"));
         assertTrue(e.getMessage().contains("spectrum=abc"), e.getMessage());
     }
 
-    // ------------------------------------------------------------------ the oracle cross-check
-
-    /** One scan's worth of the parity dump. */
     private record DumpScan(int scan, int mslevel, int peakCount) {}
 
     private static List<DumpScan> loadDump(Path gz) {
@@ -67,8 +56,7 @@ class MzmlReaderTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        // Light regex extraction rather than a JSON dependency: Jackson finds modules via
-        // ServiceLoader, which this project does not use. Only counts are needed here.
+
         Pattern p =
                 Pattern.compile(
                         "\"scan\":\\s*(\\d+),\\s*\"mslevel\":\\s*(\\d+),\\s*\"peak_count\":\\s*(\\d+)");
@@ -84,19 +72,12 @@ class MzmlReaderTest {
         return out;
     }
 
-    /**
-     * The check that matters: our reader against MassQL's own loaded tables.
-     *
-     * <p>The parity gate formalises this across all fixtures with bit-identical digests. Running a counts-level
-     * version <b>here</b> is deliberate — a decoder or walk bug found now points at code written
-     * minutes ago, whereas the same bug found at the parity gate looks like a query-layer problem.
-     */
     @Test
     void smallMzmlMatchesTheOracleParityDump() {
         Path mzml = Fixtures.require("data/small.mzML");
         Path dump = Fixtures.require("goldens/loader-parity/small.mzML.json.gz");
 
-        Map<Integer, Integer> expected = new LinkedHashMap<>(); // scan id -> peak count
+        Map<Integer, Integer> expected = new LinkedHashMap<>();
         int expMs1 = 0, expMs2 = 0;
         for (DumpScan d : loadDump(dump)) {
             expected.put(d.scan(), d.peakCount());
@@ -107,7 +88,7 @@ class MzmlReaderTest {
 
         int ms1 = 0, ms2 = 0;
         long peaks = 0;
-        Map<Integer, Integer> ms1scanOf = new LinkedHashMap<>(); // MS2 scan id -> its ms1scan
+        Map<Integer, Integer> ms1scanOf = new LinkedHashMap<>();
         try (SpectraStream s = SpectraFile.open(mzml)) {
             while (s.hasNext()) {
                 ScanView v = s.next();
@@ -132,16 +113,6 @@ class MzmlReaderTest {
         assertEquals(34, ms2);
         assertEquals(305_214L, peaks, "total peaks across both levels");
 
-        // The six rows in output/small_mzml_results.json, asserted as an explicit MS2 -> MS1
-        // mapping.
-        //
-        // NOT as "the distinct ms1scan values in the file": those six are only the scans that
-        // matched
-        // test_mzml.massql, and the file legitimately references others (30, from MS2 scans the
-        // query
-        // rejected). Asserting the distinct set conflates the golden's filtered subset with the
-        // whole
-        // file and fails for a reason that has nothing to do with the reader.
         Map<Integer, Integer> goldenLinkage = new LinkedHashMap<>();
         goldenLinkage.put(3, 2);
         goldenLinkage.put(10, 9);
@@ -158,7 +129,6 @@ class MzmlReaderTest {
                                         + ms2Scan
                                         + " (document order, not spectrumRef)"));
 
-        // Every MS2 scan must link to an MS1 scan that genuinely precedes it.
         ms1scanOf.forEach(
                 (ms2Scan, linked) ->
                         assertTrue(
@@ -172,9 +142,6 @@ class MzmlReaderTest {
 
     @Test
     void scanThreeMatchesTheGoldenRecordFieldForField() {
-        // output/small_mzml_results.json's first record. rt is asserted BIT-exact: the value does
-        // not
-        // survive a float round-trip, which is why ScanIndex carries rt as a double (the store).
         Path mzml = Fixtures.require("data/small.mzML");
         try (SpectraStream s = SpectraFile.open(mzml)) {
             while (s.hasNext()) {
@@ -191,8 +158,7 @@ class MzmlReaderTest {
                         "rt must be bit-exact");
                 SpectrumTable t = v.peaks();
                 assertEquals(485, t.rowCount());
-                // First decoded m/z, bit-exact. small.mzML stores m/z as 64-bit, so this value must
-                // survive in full precision -- a 32-bit path would give 231.38883972167970's float.
+
                 assertEquals(
                         Double.doubleToLongBits(231.38883972167969),
                         Double.doubleToLongBits(t.mz(0)),
@@ -202,8 +168,6 @@ class MzmlReaderTest {
             fail("scan 3 not found");
         }
     }
-
-    // ------------------------------------------------------------------ misc
 
     @Test
     void thePeakTableIsTheSameValueOnEveryRead() {
@@ -220,9 +184,6 @@ class MzmlReaderTest {
 
     @Test
     void nextPastTheEndThrowsRatherThanReturningStaleData() {
-        // Replaces `currentBeforeNextIsAnError`, whose subject -- current() -- no longer exists.
-        // Under hasNext()/next() the equivalent hazard is reading past the end, and the equivalent
-        // guarantee is that it fails loudly instead of handing back the last scan a second time.
         try (SpectraStream s = SpectraFile.open(Fixtures.require("data/small.mzML"))) {
             while (s.hasNext()) s.next();
             assertThrows(NoSuchElementException.class, s::next);
@@ -238,9 +199,6 @@ class MzmlReaderTest {
 
     @Test
     void truncatedMzmlThrowsWithNoPartialResult(@TempDir Path dir) throws IOException {
-        // Cut a real file mid-spectrum. A reader that returned the scans it managed to read would
-        // be
-        // worse than one that fails: 40 of 48 scans looks like a filtering bug downstream.
         byte[] all = Files.readAllBytes(Fixtures.require("data/small.mzML"));
         Path cut = dir.resolve("truncated.mzML");
         Files.write(cut, java.util.Arrays.copyOf(all, all.length / 3));

@@ -16,19 +16,7 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * {@code --output FILE}: byte-identity with stdout mode, and atomicity.
- *
- * <p><b>Byte-identity is the load-bearing assertion here</b>, and it is what the differential's
- * differential rests on: that comparison reads the {@code --output} file rather than the pipe
- * (), so if the two modes could differ, the gate would be measuring something other
- * than what a user piping to {@code jq} gets. The property is guaranteed structurally —
- * One render reaches both sinks — but the guarantee
- * is only as good as the thing checking it, and the trailing newline is exactly where two render
- * paths would have drifted.
- */
 class MainOutputFileTest {
-
     @TempDir Path dir;
 
     private static byte[] bytes(Path p) {
@@ -91,9 +79,6 @@ class MainOutputFileTest {
 
     @Test
     void theTempFileIsWrittenBesideTheTargetNotInTheSystemTempDir() {
-        // ATOMIC_MOVE across filesystems throws, and /tmp is very often a different filesystem. The
-        // observable consequence of getting this wrong is a crash on some machines and not others,
-        // so it is asserted structurally: a successful atomic move proves same-filesystem staging.
         Path target = dir.resolve("nested/deep/result.json");
         try {
             Files.createDirectories(target.getParent());
@@ -121,8 +106,6 @@ class MainOutputFileTest {
 
     @Test
     void anUnwritablePathExitsTwoAndLeavesNeitherFileNorTemp() {
-        // A directory where the file should be: the write cannot succeed, and the failure must not
-        // leave a half-written artifact that a downstream consumer would happily parse.
         Path target = dir.resolve("occupied");
         try {
             Files.createDirectory(target);
@@ -147,8 +130,6 @@ class MainOutputFileTest {
 
     @Test
     void anExistingOutputFileIsReplacedWholesale() {
-        // The atomic rename overwrites. A partial overwrite -- old tail after new head -- is the
-        // failure mode temp-then-rename exists to make impossible.
         Path target =
                 CliFixtures.write(dir, "result.json", "PREVIOUS CONTENT THAT MUST NOT SURVIVE");
 

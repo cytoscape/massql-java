@@ -1,13 +1,7 @@
-# massql-java — the ONLY entry point for building and testing.
+# massql-java — the ONLY entry point for building and testing. Do not invoke `gradlew` directly;
+# add a target here instead.
 #
-# Do not invoke `gradlew` directly. Every command a developer or CI runs has a target here, so
-# "build" and "test" mean one thing in a terminal, in the docs and in CI. If you need something
-# this file does not do, ADD A TARGET rather than running Gradle by hand.
-#
-#   make build              both projects' jars, sources and javadoc
-#   make integration-test   the full suite and the coverage gate -- what CI runs
-#
-# Two artifacts, versioned INDEPENDENTLY (gradle.properties):
+# Two artifacts, versioned independently (gradle.properties):
 #   massql-java       the SDK, the thin jar consumers embed  -> make publish-sdk
 #   massql-java-cli   the standalone CLI uber-jar            -> make publish-cli
 
@@ -29,10 +23,6 @@ help:
 all: integration-test
 
 ## build: compile and package both projects -- jar, -sources.jar and -javadoc.jar each
-#
-# `assemble` produces all three per project: withJavadocJar()/withSourcesJar() in the build scripts
-# wire them in, so javadoc and sources are never a separate step. The javadoc task also writes the
-# browsable build/docs/javadoc/index.html on the way.
 build:
 	$(GRADLE) assemble
 	@echo "  -> build/libs/massql-java.jar"
@@ -47,7 +37,7 @@ build:
 test:
 	$(GRADLE) test
 
-## integration-test: everything -- both tiers, coverage gate, lint, banned deps
+## integration-test: everything -- both tiers, coverage gate, lint
 #
 # Both tiers live in src/test/java and are selected by filename: *IT.java is the integration tier,
 # everything else the unit tier. Helpers both tiers use live in the testsupport package.
@@ -94,20 +84,14 @@ stamp:
 	@grep "^$(KEY)=" gradle.properties | sed 's/^/  /'
 
 ## publish-local: install both artifacts into ~/.m2 -- a dry run for the Nexus publishes
-#
-# The POM is what a consumer actually resolves: get its groupId, version or dependency list wrong and
-# their build compiles, then throws NoClassDefFoundError at runtime. This produces that POM and the
-# jars beside it without touching the shared Nexus, so they can be inspected first. It also lets a
-# local project resolve the coordinate before it is released.
 publish-local:
 	$(GRADLE) publishToMavenLocal
 	@echo "  -> ~/.m2/repository/org/cytoscape/"
 
 ## publish-sdk: publish the SDK jar to the Nexus repository.
 #
-# Credentials: ~/.gradle/gradle.properties (<repo-id>User / <repo-id>Pwd), or REPO_USER / REPO_PWD
-# in the environment. The version decides the destination -- a -SNAPSHOT goes to cytoscape_snapshots,
-# anything else to cytoscape_releases.
+# Credentials: ~/.gradle/gradle.properties (<repo-id>User / <repo-id>Pwd), or REPO_USER / REPO_PWD.
+# A -SNAPSHOT version goes to cytoscape_snapshots, anything else to cytoscape_releases.
 publish-sdk:
 	$(GRADLE) :publish
 

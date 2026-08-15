@@ -17,33 +17,16 @@ import org.cytoscape.massql.testsupport.ParityDump;
 import org.cytoscape.massql.testsupport.ParityFixtures;
 import org.junit.jupiter.api.Test;
 
-/**
- * Tests the parity harness itself — because a gate that cannot fail proves nothing.
- *
- * <p>This is not ceremony. A bit-comparison harness that silently coerces to {@code float}, or a digest
- * routine that hashes a decimal rendering instead of the raw bits, produces a green gate while the decoder
- * is wrong. That is the exact failure {@code ReaderParityIT} exists to prevent, so the harness gets its own
- * adversarial tests first.
- *
- * <p>The precedent: {@code ZeroPeakMs1ChainTest} was only trustworthy once the guard was removed and it
- * reported "Got 4 — expected 2". Every assertion below is the same idea — break the input on purpose and
- * require the harness to notice.
- */
 class ReaderParityHarnessTest {
-
-    // ---------------------------------------------------------------- hex parsing
-
     @Test
     void hexParsingRoundTripsExactly() {
-        // The dumps store floats as Java/C99 hex literals precisely so no decimal rounding
-        // intervenes.
         double[] awkward = {
             0.0,
             -0.0,
             1.0,
             0.023,
-            0.011218333333333334, // small.mzML scan 3 rt -- does not survive a float round-trip
-            123.456789012345, // the micro non-float32-exact m/z
+            0.011218333333333334,
+            123.456789012345,
             Double.MIN_VALUE,
             Double.MAX_VALUE,
             1.0 / 3.0,
@@ -59,12 +42,6 @@ class ReaderParityHarnessTest {
 
     @Test
     void hexParsingReadsThePythonEmittedForm() {
-        // The dumps write hex floats as "0x1.436b8f9b13166p-8"; Java's Double.toHexString writes
-        // the
-        // same
-        // shape. Assert against literals lifted from an actual dump, so a generator change is
-        // caught here
-        // rather than as 900 mysterious failures downstream.
         assertEquals(
                 Double.doubleToLongBits(0.004935),
                 Double.doubleToLongBits(ParityDump.parseHex("0x1.436b8f9b13166p-8")),
@@ -75,9 +52,6 @@ class ReaderParityHarnessTest {
 
     @Test
     void aDecimalRoundTripWouldHaveLostBitsHere() {
-        // Documents WHY the dumps are hex, executably. Six significant digits is what a casual
-        // "%.6f"-style dump would keep, and it is not enough: the value comes back a different
-        // double.
         double v = 0.011218333333333334;
         double viaDecimal = Double.parseDouble(String.format("%.6f", v));
         assertNotEquals(
@@ -90,25 +64,18 @@ class ReaderParityHarnessTest {
                 "the hex path must be the lossless one");
     }
 
-    // ---------------------------------------------------------------- digests
-
     @Test
     void aSingleBitPerturbationChangesTheDigest() {
-        // THE assertion that makes this gate meaningful. A decoder reading 8 bytes where 4 were
-        // written
-        // produces values that are *nearly* right; nothing but an exact comparison catches that.
         double[] values = {100.0, 200.5, 300.25, 400.125};
         String clean = ParityDump.sha256Of(values);
 
         double[] perturbed = values.clone();
-        perturbed[2] = Math.nextUp(perturbed[2]); // the smallest possible change
+        perturbed[2] = Math.nextUp(perturbed[2]);
         assertNotEquals(
                 clean,
                 ParityDump.sha256Of(perturbed),
                 "a one-ULP change did not alter the digest -- the harness is not bit-exact");
 
-        // And confirm the perturbation really is one ULP, i.e. this test is not cheating by using a
-        // visibly different number.
         assertEquals(
                 1,
                 Math.abs(
@@ -118,10 +85,6 @@ class ReaderParityHarnessTest {
 
     @Test
     void reorderingChangesTheDigest() {
-        // The dumps store digests, which are order-sensitive, and that is a
-        // feature -- our array order must match MassQL's file order. PeakOrderPreconditionTest
-        // asserts the
-        // precondition that makes this safe.
         double[] a = {100.0, 200.0, 300.0};
         double[] b = {100.0, 300.0, 200.0};
         assertNotEquals(
@@ -132,10 +95,6 @@ class ReaderParityHarnessTest {
 
     @Test
     void signedZeroAndNaNAreDistinguished() {
-        // -0.0 == 0.0 under ==, so a harness comparing with == would treat them as identical. The
-        // digest
-        // must not, because they are different bits and MassQL would have produced one specific
-        // one.
         assertNotEquals(
                 ParityDump.sha256Of(new double[] {0.0}),
                 ParityDump.sha256Of(new double[] {-0.0}),
@@ -148,12 +107,6 @@ class ReaderParityHarnessTest {
 
     @Test
     void theDigestMatchesTheDumpForARealScan() {
-        // End to end on real data: recompute a digest from this decode and compare to what the
-        // reference
-        // wrote.
-        // If this fails, either the packing convention or the decode is wrong, and every other test
-        // in
-        // this class could still pass -- so it belongs here rather than only in ReaderParityIT.
         ParityDump dump = ParityDump.of("micro.mzXML");
         ParityDump.Scan want = dump.scans().get(new ParityDump.Key(1, 2));
         assertNotNull(want, "micro.mzXML should have an MS1 scan 2 entry");
@@ -177,15 +130,8 @@ class ReaderParityHarnessTest {
         }
     }
 
-    // ---------------------------------------------------------------- dump loading
-
     @Test
     void everyExpectedDumpLoadsAndIsNonEmpty() {
-        // Folds in the old ParityCoverageTest: a dump that failed to parse would yield an
-        // empty map
-        // and make every downstream assertion vacuous. ParityDump.of() fails on empty; this asserts
-        // the
-        // whole expected set is present, so a deleted dump cannot quietly shrink the gate.
         for (String f : ParityFixtures.FIXTURES_WITH_DUMPS.keySet()) {
             ParityDump d = ParityDump.of(f);
             assertFalse(d.scans().isEmpty(), f + " parsed to zero scans");
@@ -197,19 +143,11 @@ class ReaderParityHarnessTest {
 
     @Test
     void aMissingDumpFailsRatherThanSkipping() {
-        // absence must be loud. If this ever returns instead of throwing, the gate can
-        // be
-        // silently disabled by deleting a file.
         assertThrows(AssertionError.class, () -> ParityDump.of("no_such_fixture.mzML"));
     }
 
     @Test
     void theDumpKeyIsMslevelPlusScanNotScanAlone() {
-        // Asserted rather than trusted: micro.mgf's synthetic MS1 has scan id 3, which is
-        // ALSO a
-        // real MS2 id. Under a scan-id-only key one of the two would overwrite the other and the
-        // harness
-        // would compare a real spectrum against a row of zeros.
         ParityDump d = ParityDump.of("micro.mgf");
         Map<ParityDump.Key, ParityDump.Scan> scans = d.scans();
 
@@ -219,30 +157,14 @@ class ReaderParityHarnessTest {
         assertNotNull(real, "micro.mgf's real MS2 scan 3 should be present");
         assertNotSame(phantom, real, "these must be two distinct entries sharing one scan id");
 
-        // the fake MS1 row is NOT always an all-zero placeholder. MassQL's
-        // the reference MGF loader
-        // loader builds its 1-row MS1 table from a peak dict that LEAKS from the MS2
-        // peak
-        // loop, so the row is a byte-for-byte DUPLICATE of the last MS2 peak. The all-zero form
-        // (scan=1, mz=0, i=0) is only the `except` branch, reached when the loop never ran -- which
-        // is
-        // PlusRise's case via the manual-loader fallback.
-        //
-        // Both flavours are artifacts our reader correctly omits (MGF has no survey scans), which
-        // is why
-        // the gate skips MGF mslevel==1 entirely rather than trying to match them.
         assertEquals(1, phantom.peakCount(), "the fake MS1 row is always a single row");
         assertTrue(real.peakCount() >= 1, "the real MS2 scan has actual peaks");
-        // micro.mgf takes the primary loader path, so its fake row duplicates the LAST MS2 peak --
-        // meaning a
-        // REAL intensity, not zero. Asserting 0.0 here (as this test first did) fails on correct
-        // data.
+
         assertNotEquals(
                 0.0,
                 phantom.iSum(),
                 "micro.mgf's fake MS1 duplicates a real peak, so its intensity is non-zero");
 
-        // PlusRise is the other flavour: the genuine all-zero synthetic row.
         ParityDump.Scan plusRiseFake =
                 ParityDump.of("PlusRise.mgf").scans().get(new ParityDump.Key(1, 1));
         assertNotNull(plusRiseFake, "PlusRise's fake MS1 sits at scan 1");
@@ -263,7 +185,7 @@ class ReaderParityHarnessTest {
         assertTrue(
                 first > 0.0 && first < 100_000.0,
                 "leading m/z should be a plausible mass, got " + first);
-        // Ascending, which is what makes them a usable ordering diagnostic.
+
         for (int i = 1; i < mzHex.size(); i++) {
             assertTrue(
                     ParityDump.parseHex(mzHex.get(i)) >= ParityDump.parseHex(mzHex.get(i - 1)),

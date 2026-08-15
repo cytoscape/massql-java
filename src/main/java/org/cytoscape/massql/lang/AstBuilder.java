@@ -18,32 +18,15 @@ import org.cytoscape.massql.lang.ast.Qualifier;
 import org.cytoscape.massql.lang.ast.QualifierType;
 import org.cytoscape.massql.lang.ast.QueryFunction;
 
-/**
- * Walks the ANTLR parse tree and builds the typed AST, rejecting every construct that is
- * out of scope for v1.
- *
- * <p><b>The grammar is permissive; this class is where scope is enforced.</b> That split is
- * deliberate: admitting the whole language means a rejection can name the offending
- * construct ({@code MassqlParseException.construct()}) instead of producing
- * "syntax error at 'formula'". 31 of the 46 reference parses need a named rejection.
- *
- * <p>This is the only class that touches both ANTLR types and AST types. Nothing ANTLR
- * escapes past it — asserted by {@code AstEncapsulationTest}.
- */
 final class AstBuilder extends MassqlBaseVisitor<Object> {
-
-    /** Rejects with the construct name and the standard message from the reject list. */
     private static MassqlParseException reject(String construct, ParserRuleContext where) {
         int pos = -1;
         if (where != null && where.getStart() != null) {
-            // ANTLR columns are 0-based; MassqlParseException.position() is documented 1-based.
             pos = where.getStart().getCharPositionInLine() + 1;
         }
         return new MassqlParseException(
                 construct, UnsupportedConstructs.message(construct), pos, null);
     }
-
-    // ---------------------------------------------------------------- statement
 
     MassqlQuery build(MassqlParser.StatementContext stmt) {
         MassqlParser.QueryContext ctx = stmt.query();
@@ -54,8 +37,6 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
                         ? List.of()
                         : conditions(ctx.whereClause().whereConditionList().fullCondition());
 
-        // FILTER evaluates exactly like WHERE; it is kept as a separate
-        // list only so the AST round-trips the source query.
         List<Condition> filter =
                 ctx.filterClause() == null
                         ? List.of()
@@ -68,12 +49,9 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
 
     private QueryTypeInfo queryType(MassqlParser.QueryTypeContext ctx) {
         if (ctx instanceof MassqlParser.BareDataTypeContext bare) {
-            // Legal MassQL, out of scope: a function is required.
             throw reject("<no function>", bare);
         }
         if (ctx instanceof MassqlParser.FunctionDataTypeWithToleranceContext tol) {
-            // Only scanrangesum takes the TOLERANCE param, and it is out of scope anyway;
-            // report the function so the message is about the real problem.
             throw reject(functionName(tol.function()), tol);
         }
         MassqlParser.FunctionDataTypeContext fd = (MassqlParser.FunctionDataTypeContext) ctx;
@@ -89,12 +67,9 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
     }
 
     private static DataSource dataSource(MassqlParser.DataTypeContext ctx) {
-        // Case variants are all accepted by the lexer; normalise here.
         String t = ctx.getText().toUpperCase(java.util.Locale.ROOT);
         return t.equals("MS1DATA") ? DataSource.MS1DATA : DataSource.MS2DATA;
     }
-
-    // --------------------------------------------------------------- conditions
 
     private List<Condition> conditions(List<MassqlParser.FullConditionContext> ctxs) {
         List<Condition> out = new ArrayList<>(ctxs.size());
@@ -105,10 +80,6 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
     }
 
     private Condition fullCondition(MassqlParser.FullConditionContext ctx) {
-        // Validate the condition BEFORE its qualifiers so that when a query contains
-        // several unsupported constructs, the one reported is the one that appears FIRST
-        // IN THE SOURCE TEXT. For `MS1MZ=X-2:INTENSITYMATCH=Y` that is X, which is what a
-        // user reading the error alongside their query expects.
         Condition base = condition(ctx.condition(), List.of());
         List<Qualifier> quals = new ArrayList<>();
         for (MassqlParser.QualifierContext q : ctx.qualifier()) {
@@ -153,7 +124,7 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
             throw reject("ANY", w);
         }
         if (ctx instanceof MassqlParser.VariableRangeConditionContext vr) {
-            throw reject(vr.VARIABLE().getText(), vr); // X=range(...) / X=massdefect(...)
+            throw reject(vr.VARIABLE().getText(), vr);
         }
         if (ctx instanceof MassqlParser.MobilityCondContext mob) {
             throw reject("MOBILITY", mob);
@@ -164,14 +135,10 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
 
     private ConditionType conditionType(MassqlParser.ConditionFieldContext ctx) {
         String t = ctx.getText();
-        // MS2MZ is an alias for MS2PROD. Collapsed here rather than in the grammar so the
-        // grammar stays a faithful mirror of the reference grammar and the engine sees one
-        // spelling.
+
         if (t.equals("MS2MZ")) return ConditionType.MS2PROD;
         return ConditionType.valueOf(t);
     }
-
-    // --------------------------------------------------------------- qualifiers
 
     private Qualifier qualifier(MassqlParser.QualifierContext ctx) {
         if (ctx instanceof MassqlParser.QualifierEqContext q) {
@@ -202,7 +169,7 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
             throw reject("MASSDEFECT", m);
         }
         if (ctx instanceof MassqlParser.QualifierCardinalityContext c) {
-            throw reject(c.cardinality().getText(), c); // CARDINALITY or MATCHCOUNT
+            throw reject(c.cardinality().getText(), c);
         }
         if (ctx instanceof MassqlParser.QualifierOtherScanContext o) {
             throw reject("OTHERSCAN", o);
@@ -213,14 +180,12 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
 
     private QualifierType qualifierType(MassqlParser.QualifierFieldContext ctx) {
         String t = ctx.getText();
-        // The intensity-match family parses as a qualifierField but is out of scope.
+
         if (t.startsWith("INTENSITYMATCH")) {
             throw reject(t, ctx);
         }
         return QualifierType.valueOf(t);
     }
-
-    // -------------------------------------------------------------- expressions
 
     private Expr expr(MassqlParser.NumericalExpressionContext ctx) {
         if (ctx instanceof MassqlParser.LiteralContext lit) {
@@ -261,7 +226,6 @@ final class AstBuilder extends MassqlBaseVisitor<Object> {
                 "unhandled expression alternative: " + ctx.getClass().getSimpleName());
     }
 
-    /** Unused: every node is reached through the typed methods above. */
     @Override
     protected Object aggregateResult(Object aggregate, Object nextResult) {
         return nextResult;

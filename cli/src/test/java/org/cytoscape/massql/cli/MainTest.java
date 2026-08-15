@@ -11,30 +11,15 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * Argument parsing, and the {@code --help} contract.
- *
- * <p>Every rejection here is exit <b>2</b>, and the rule that decides it is: <i>could the user have
- * known from the command line alone?</i> Nothing in this class opens a spectra file to find out.
- */
 class MainTest {
-
     @TempDir Path dir;
-
-    // ------------------------------------------------------------------ positional args
 
     @Test
     void argumentOrderMatchesThePythonReference() {
-        // spectra file first, query file second. Swapped, the differential in the differential
-        // would
-        // compare two programs that were never given the same input.
         CliFixtures.Invocation ok =
                 invoke(CliFixtures.smallMzml().toString(), CliFixtures.standardQuery().toString());
         assertEquals(0, ok.exitCode(), "stderr: " + ok.stderr());
 
-        // Swapped, the "query file" is mzML, which will not parse as MassQL. That is exit 2, not 1:
-        // the query is read and parsed BEFORE the spectra file is opened, and a user who pointed at
-        // the wrong file could have known it from the command line.
         CliFixtures.Invocation swapped =
                 invoke(CliFixtures.standardQuery().toString(), CliFixtures.smallMzml().toString());
         assertEquals(2, swapped.exitCode(), "stderr: " + swapped.stderr());
@@ -69,12 +54,8 @@ class MainTest {
         assertTrue(r.stderr().contains("unknown option"), r.stderr());
     }
 
-    // ------------------------------------------------------------------ --precursor-tol-ppm
-
     @Test
     void precursorTolPpmDefaultsToTwentyAndIsHonouredWhenGiven() {
-        // 20.0 is the reference's default; 60 is the tolerance behind the *_tol60_* goldens. If the
-        // flag were ignored, both runs would agree and this test would be the only thing to notice.
         String spectra = CliFixtures.smallMzml().toString();
         String query = CliFixtures.standardQuery().toString();
 
@@ -92,21 +73,15 @@ class MainTest {
         String query = CliFixtures.standardQuery().toString();
 
         assertEquals(2, invoke(spectra, query, "--precursor-tol-ppm", "abc").exitCode());
-        // Negative is not a narrower window, it is nonsense -- and left unchecked it would match
-        // nothing and read as a data problem rather than a typo.
+
         assertEquals(2, invoke(spectra, query, "--precursor-tol-ppm", "-5").exitCode());
         assertEquals(2, invoke(spectra, query, "--precursor-tol-ppm", "NaN").exitCode());
         assertEquals(
                 2, invoke(spectra, query, "--precursor-tol-ppm").exitCode(), "flag with no value");
     }
 
-    // ------------------------------------------------------------------ file gates
-
     @Test
     void aMissingOrEmptyFileExitsTwoNotOne() {
-        // These are knowable from the command line, so they are USAGE errors -- even
-        // though SpectraFile.open throws the same exception type for them as for unreadable
-        // content.
         Path missing = dir.resolve("nope.mzML");
         CliFixtures.Invocation r1 =
                 invoke(missing.toString(), CliFixtures.standardQuery().toString());
@@ -130,7 +105,6 @@ class MainTest {
         Path empty = CliFixtures.write(dir, "empty.massql", "");
         assertEquals(2, invoke(spectra, empty.toString()).exitCode());
 
-        // Non-empty on disk but empty after the .strip() the reference applies.
         Path blank = CliFixtures.write(dir, "blank.massql", "   \n\t\n");
         CliFixtures.Invocation r = invoke(spectra, blank.toString());
         assertEquals(2, r.exitCode());
@@ -139,8 +113,6 @@ class MainTest {
 
     @Test
     void aQueryFileIsStrippedBeforeParsing() {
-        // The reference strips the query text, and the committed .massql files end with a
-        // newline.
         Path padded =
                 CliFixtures.write(
                         dir,
@@ -153,10 +125,6 @@ class MainTest {
 
     @Test
     void anArgumentThatIsNotAUsablePathExitsTwo() {
-        // A NUL byte cannot appear in a path on any supported platform, so Paths.get rejects it
-        // before the filesystem is ever consulted. Worth covering because it is the one route into
-        // the CLI where an argument fails to become a Path at all -- and an unhandled
-        // InvalidPathException would surface as a stack trace rather than a usage message.
         String nul = "x" + (char) 0 + "y";
         String query = CliFixtures.standardQuery().toString();
 
@@ -174,8 +142,6 @@ class MainTest {
         assertTrue(asOutput.stderr().contains("--output"), asOutput.stderr());
     }
 
-    // ------------------------------------------------------------------ --help
-
     @Test
     void helpGoesToStdoutAndExitsZero() {
         for (String flag : new String[] {"-h", "--help"}) {
@@ -191,9 +157,6 @@ class MainTest {
 
     @Test
     void helpWinsOverAnOtherwiseInvalidCommandLine() {
-        // `--help` with nothing else is the commonest way anyone discovers a CLI. Reporting
-        // "missing
-        // arguments" instead of printing help would be actively unhelpful.
         CliFixtures.Invocation r = invoke("--help", "and", "some", "junk");
         assertEquals(0, r.exitCode());
         assertTrue(r.stdout().contains("Usage:"));
@@ -201,17 +164,11 @@ class MainTest {
 
     @Test
     void usageOnAnErrorGoesToStderrLeavingStdoutEmpty() {
-        // ⛔ The rule that keeps --help from breaking the stdout contract: usage text is the
-        // program's OUTPUT when requested, but a DIAGNOSTIC when it accompanies a failure -- and
-        // exit
-        // 2 must never put non-JSON on stdout, or a piped consumer parses the help screen.
         CliFixtures.Invocation r = invoke();
         assertEquals(2, r.exitCode());
         assertTrue(r.stdoutIsEmpty(), "stdout must stay clean on a usage error: " + r.stdout());
         assertTrue(r.stderr().contains("Usage:"), r.stderr());
     }
-
-    // ------------------------------------------------------------------ --pretty
 
     @Test
     void prettyIsTheDefault() {
@@ -230,7 +187,6 @@ class MainTest {
 
     @Test
     void prettyFalseIsTheMachineForm() {
-        // ⛔ This is the flag a caller piping into jq needs, since the default emits escape codes.
         CliFixtures.Invocation r = run("--pretty", "false");
         assertEquals(0, r.exitCode(), r.stderr());
         assertEquals(
@@ -256,8 +212,6 @@ class MainTest {
     }
 
     void aNonBooleanPrettyValueIsRejectedRatherThanTreatedAsFalse() {
-        // Boolean.parseBoolean maps every unrecognised string to false, which would silently turn
-        // formatting off for a typo. Both of these must say so instead.
         CliFixtures.Invocation typo = run("--pretty", "maybe");
         assertEquals(2, typo.exitCode(), "stdout: " + typo.stdout());
         assertTrue(typo.stderr().contains("--pretty"), typo.stderr());
@@ -267,7 +221,6 @@ class MainTest {
         assertTrue(missing.stdoutIsEmpty(), "no JSON on a usage error: " + missing.stdout());
     }
 
-    /** The standard mzML + query pair, plus whatever flags a {@code --pretty} case is exercising. */
     private static CliFixtures.Invocation run(String... flags) {
         String[] args = new String[flags.length + 2];
         args[0] = CliFixtures.smallMzml().toString();

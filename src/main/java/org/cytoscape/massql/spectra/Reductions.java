@@ -1,16 +1,7 @@
 package org.cytoscape.massql.spectra;
 
-/**
- * Per-scan reductions over a {@link SpectrumTable}.
- *
- * <p>Empty-scan behaviour is deliberate and load-bearing:
- * {@code sum} is {@code 0.0} (the TIC of an empty spectrum really is zero),
- * while {@code max}/{@code min}/{@code first} are {@code NaN} and {@code argmax} is
- * {@code -1} (there is no value to report). Nothing throws — {@code scaninfo(MS1DATA)} can
- * legitimately report a scan with no peaks.
- */
+/** Per-scan reductions over a {@link SpectrumTable}. */
 public final class Reductions {
-
     private Reductions() {}
 
     public static double sum(SpectrumTable t, int scanOrdinal, Column c) {
@@ -54,18 +45,7 @@ public final class Reductions {
         return any ? m : Double.NaN;
     }
 
-    /**
-     * Row index of the maximum, or {@code -1} if the scan (or masked subset) is empty.
-     *
-     * <p><b>Returns a ROW INDEX, not a value</b>, so the caller can read a <i>different</i>
-     * column at that row. That is exactly what {@code base_peak_mz} needs: argmax over
-     * intensity, then read m/z.
-     *
-     * <p><b>Ties resolve to the LOWEST row index</b> — i.e. the lowest m/z, given the store's
-     * ascending-m/z invariant. ⛔ <b>First occurrence wins on a tie</b>, matching the reference. A last-wins
-     * implementation would disagree with the goldens on any spectrum containing two
-     * equal-intensity peaks.
-     */
+    /** Row index of the maximum, or {@code -1} if the scan (or masked subset) is empty. */
     public static int argmax(SpectrumTable t, int scanOrdinal, Column c) {
         return argmax(t, scanOrdinal, c, null);
     }
@@ -77,7 +57,7 @@ public final class Reductions {
         for (int r = idx.rowStart(scanOrdinal); r < idx.rowEnd(scanOrdinal); r++) {
             if (mask != null && !mask.get(r)) continue;
             double v = t.value(r, c);
-            // Strict '>' is what makes ties resolve to the lowest row index.
+
             if (best < 0 || v > bestV) {
                 best = r;
                 bestV = v;

@@ -1,35 +1,13 @@
 package org.cytoscape.massql.spectra;
 
-import java.util.Arrays;
-
-/**
- * Columnar peak store for one MS level. Immutable once built.
- *
- * <p>This is the replacement for the reference's dataframe, and it is written rather than
- * imported because no Java dataframe library is usable here: Tablesaw pulls ~44 MB and finds
- * its I/O registry by classpath scanning, which is unreliable wherever the thread-context classloader
- * cannot see the caller's classes; and Arrow has split packages and needs {@code sun.misc.Unsafe} plus
- * JVM flags we do not control.
- *
- * <p><b>Two tables per file, not one.</b> MS1 and MS2 peaks live in separate instances,
- * mirroring MassQL's own MS1/MS2 table split — its loader returns
- * exactly that pair, and the precursor lookup queries the MS1 table while
- * collating MS2 rows.
- *
- * <p><b>Filtering never prunes.</b> Conditions produce a {@link RowMask}; this class has no
- * "current filter" state and no method returns a smaller table. That is the seam
- * {@code OTHERSCAN} needs later — it requires a second retained index over <i>pre-filter</i>
- * MS1 data, which is free to preserve now and expensive to retrofit.
- */
+/** Columnar peak store for one MS level. */
 public final class SpectrumTable {
-
-    // Parallel arrays, all of length rowCount. No boxing, no per-peak objects.
     private final double[] mz;
     private final double[] i;
-    private final double[] iNorm; // i / max(i in scan)
-    private final double[] iTicNorm; // i / sum(i in scan)
-    private final int[] scan; // non-decreasing
-    private final float[] rt; // minutes; cheap row-level filtering only -- see ScanIndex
+    private final double[] iNorm;
+    private final double[] iTicNorm;
+    private final int[] scan;
+    private final float[] rt;
     private final byte[] polarity;
     private final byte msLevel;
     private final ScanIndex index;
@@ -55,7 +33,7 @@ public final class SpectrumTable {
         this.index = index;
     }
 
-    /** An empty table. Used for MGF's MS1 side, which keeps the collation free of null checks. */
+    /** An empty table. */
     public static SpectrumTable empty(int msLevel) {
         return new SpectrumTableBuilder(msLevel).build();
     }
@@ -100,12 +78,7 @@ public final class SpectrumTable {
         return polarity[row];
     }
 
-    /**
-     * Row-level retention time, at <b>float</b> precision.
-     *
-     * <p>For cheap RT filtering only. Anything that reaches the result JSON must use
-     * {@link ScanIndex#rtOf}, which is an exact double — see that class's note.
-     */
+    /** Row-level retention time, at float precision. */
     public float rtOfRow(int row) {
         return rt[row];
     }
@@ -119,31 +92,7 @@ public final class SpectrumTable {
         };
     }
 
-    /**
-     * Rows within one scan whose m/z lies in {@code [lo, hi]} — <b>both bounds
-     * inclusive</b>, exactly.
-     *
-     * <p><b>Which of the two window methods you want depends on the caller</b>, and the
-     * distinction is not cosmetic — MassQL genuinely differs between them, both verified by execution:
-     *
-     * <table border="1">
-     *   <caption>Bound semantics by caller</caption>
-     *   <tr><th>Caller</th><th>Bound</th><th>Method</th></tr>
-     *   <tr><td>precursor lookup ({@code >=}/{@code <=})</td>
-     *       <td><b>inclusive</b></td><td><b>this method</b></td></tr>
-     *   <tr><td>condition windows ({@code >}/{@code <})</td>
-     *       <td><b>strict</b></td><td>{@link #mzWindowExclusive}</td></tr>
-     * </table>
-     *
-     * <p>Two binary searches bounded to the scan's own slice, so this is O(log n) not O(n).
-     * If the MGF fixture is ever slower than the reference, this method is the first place to look
-     *
-     * <p><b>No epsilon is applied here, ever.</b> The caller computes {@code lo}/{@code hi}
-     * from a tolerance; a "helpful" epsilon at this level would silently widen every tolerance
-     * in the system.
-     *
-     * @return a half-open row range; {@link IntRange#EMPTY} if nothing matches
-     */
+    /** Rows within one scan whose m/z lies in {@code [lo, hi]} — both bounds inclusive, exactly. */
     public IntRange mzWindow(int scanOrdinal, double lo, double hi) {
         if (hi < lo) return IntRange.EMPTY;
         int from = index.rowStart(scanOrdinal);
@@ -156,49 +105,21 @@ public final class SpectrumTable {
         return start >= end ? IntRange.EMPTY : new IntRange(start, end);
     }
 
-    /**
-     * Rows within one scan whose m/z lies in {@code (lo, hi)} — <b>both bounds STRICT</b>. A peak exactly
-     * on either bound is <b>excluded</b>.
-     *
-     * <p>This is what the condition windows require. MassQL filters with
-     * {@code (df["mz"] > mz_min) & (df["mz"] < mz_max)} in all four condition functions
-     * in all four condition functions, and it was confirmed by execution rather than
-     * inferred: {@code micro.mzML} scan 3 has a peak at exactly {@code 201.0}, and
-     * {@code MS2PROD=201.5:TOLERANCEMZ=0.5} — window {@code [201.0, 202.0]} — returns <b>0 rows</b>.
-     * {@code test_micro_edge.massql} pins that with an empty golden.
-     *
-     * <p><b>Do not "unify" this with {@link #mzWindow}.</b> It is tempting to assume one rule serves both
-     * callers; collapsing them silently changes {@code ms1_i} and {@code ms1_precmz}, which the
-     * differential compares at 1e-9.
-     *
-     * <p>Implemented by shifting the inclusive bounds off the exact values: {@code upperBound(lo)} skips
-     * every row equal to {@code lo}, and {@code lowerBound(hi)} stops before every row equal to {@code hi}.
-     * That is exact — no epsilon, and correct in the presence of duplicate m/z.
-     *
-     * @return a half-open row range; {@link IntRange#EMPTY} if nothing matches
-     */
+    /** Rows within one scan whose m/z lies in {@code (lo, hi)} — both bounds STRICT. */
     public IntRange mzWindowExclusive(int scanOrdinal, double lo, double hi) {
         if (hi <= lo) return IntRange.EMPTY;
         int from = index.rowStart(scanOrdinal);
         int to = index.rowEnd(scanOrdinal);
         if (from == to) return IntRange.EMPTY;
 
-        // upperBound(lo) = first row with mz > lo  -> excludes rows equal to lo
         int start = upperBound(from, to, lo);
         if (start == to) return IntRange.EMPTY;
-        // lowerBound(hi) = first row with mz >= hi -> excludes rows equal to hi
+
         int end = lowerBound(from, to, hi);
         return start >= end ? IntRange.EMPTY : new IntRange(start, end);
     }
 
-    /**
-     * First index in {@code [from,to)} with {@code mz >= key}.
-     *
-     * <p>Hand-rolled rather than {@link Arrays#binarySearch} because that method's behaviour
-     * on <b>duplicate keys is unspecified</b> — it may return any matching index. Duplicate
-     * m/z values do occur in real centroided data, and a window that starts at an arbitrary
-     * one of them would silently drop peaks.
-     */
+    /** First index in {@code [from,to)} with {@code mz >= key}. */
     private int lowerBound(int from, int to, double key) {
         int lo = from, hi = to;
         while (lo < hi) {

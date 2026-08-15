@@ -1,18 +1,11 @@
 package org.cytoscape.massql;
 
 /**
- * Immutable execution options.
- *
- * <p>{@code precursorTolPpm} is a SEPARATE knob from a query's own
- * {@code TOLERANCEPPM}/{@code TOLERANCEMZ}: the query tolerance selects scans, this one
- * matches the precursor peak within an already-selected MS1 scan.
- * Conflating them is a silent wrong-answer bug.
- *
- * <p>The default of 20.0 matches the reference. ⚠ A golden generated at a different tolerance
- * is indistinguishable unless the flag is recorded, so every golden records the flags it was made with.
+ * Immutable execution options. {@code precursorTolPpm} is a SEPARATE knob from a query's own
+ * {@code TOLERANCEPPM}/{@code TOLERANCEMZ}: the query tolerance selects scans, this one matches
+ * the precursor peak within an already-selected MS1 scan.
  */
 public final class MassqlOptions {
-
     public static final double DEFAULT_PRECURSOR_TOL_PPM = 20.0;
 
     private final double precursorTolPpm;

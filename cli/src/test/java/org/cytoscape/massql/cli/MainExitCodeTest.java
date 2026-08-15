@@ -11,19 +11,7 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * All four exit codes, each demonstrated rather than assumed.
- *
- * <p>This class exists because of the seam added: {@code Main.run} returns the
- * code and only {@code main} calls {@code System.exit}. Without that split none of these assertions
- * could be made at all — a test cannot observe an exit code from a method that terminates the JVM.
- *
- * <p>The pairing that matters most is <b>0-with-{@code []}</b>. A query that matched nothing is a
- * successful run with an empty answer, and scripts branch on the exit code: reporting failure there
- * would make "no matches" indistinguishable from "the tool broke".
- */
 class MainExitCodeTest {
-
     @TempDir Path dir;
 
     @Test
@@ -36,9 +24,6 @@ class MainExitCodeTest {
 
     @Test
     void zeroWithAnEmptyArrayWhenNothingMatched() {
-        // micro.mzML + test_micro_edge.massql is the committed evidence for the strict window: a
-        // peak sits exactly on the bound and is therefore excluded. The golden for this pair is
-        // deliberately `[]`, and the differential compares against it.
         CliFixtures.Invocation r =
                 invoke(
                         CliFixtures.microMzml().toString(),
@@ -49,8 +34,6 @@ class MainExitCodeTest {
 
     @Test
     void oneWhenTheContentWillNotParse() {
-        // Readable, non-empty, and complete nonsense -- so it clears the usage gate and fails on
-        // CONTENT. This is the half of the split that must not be reported as a usage error.
         Path junk = CliFixtures.write(dir, "junk.mzML", "<notSpectra><at/></notSpectra>\n");
         CliFixtures.Invocation r = invoke(junk.toString(), CliFixtures.standardQuery().toString());
         assertEquals(1, r.exitCode(), "stderr: " + r.stderr());
@@ -59,10 +42,6 @@ class MainExitCodeTest {
 
     @Test
     void twoOnAnUnsupportedQueryWithTheConstructNamedOnStderr() {
-        // the differential asserts the construct name appears, so a generic "syntax error" is not
-        // enough:
-        // the whole reason the grammar admits out-of-scope constructs is to be able to say WHICH
-        // one.
         Path q =
                 CliFixtures.write(
                         dir,
@@ -84,8 +63,6 @@ class MainExitCodeTest {
 
     @Test
     void theFourCodesAreDistinct() {
-        // Guards against a refactor that collapses 1 and 2 back together -- which is easy, because
-        // the exception type does not distinguish them and never did.
         Path junk = CliFixtures.write(dir, "junk.mzML", "<notSpectra/>\n");
         Path bad =
                 CliFixtures.write(dir, "bad.massql", "QUERY scaninfo(MS2DATA) WHERE MOBILITY=1\n");

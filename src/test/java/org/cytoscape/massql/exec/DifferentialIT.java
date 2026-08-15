@@ -22,37 +22,7 @@ import org.cytoscape.massql.testsupport.ResultComparator;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-/**
- * ⛔ <b>THE GATE.</b> Every fixture/golden pair, compared column by column against the answers
- * MassQL's own reference implementation produced.
- *
- * <p>This table is the project's exit criterion. Green means the SDK reproduces MassQL on real
- * files in all three formats; anything less is a finding to report, not a threshold to adjust.
- *
- * <h2>What makes this different from the parity gate</h2>
- *
- * <p>the parity gate proves the three <b>readers</b> decode bit-identically. This proves the whole
- * <b>pipeline</b> — parse, filter, collate, precursor lookup — arrives at the same rows. A decode
- * error surfaces at the parity gate, where it is a one-line fix; a filtering or collation error surfaces
- * here. Keeping them apart is what makes a failure here attributable.
- *
- * <p>⚠ The comparison policy lives in {@link ResultComparator}, deliberately in one place, and
- * {@code ResultComparatorTest} proves it detects a single-bit difference. <b>Do not loosen a
- * tolerance to reach green</b> — the one documented exception is {@code tic}, and it absorbs error in
- * the <i>reference</i> rather than in us.
- *
- * <p>Goldens are read by {@code GoldenResults}, which rejects a truncated or short file rather than
- * comparing fewer rows. Both matter: a lenient reader and a lenient comparator fail the
- * same way, by reporting green.
- */
 class DifferentialIT {
-
-    /**
-     * One fixture/golden pair.
-     *
-     * @param float32Mz true for mzXML, whose {@code precision="32"} truncates a measured
-     *     {@code ms1_precmz} — the only column that allowance touches
-     */
     private record Pair(
             String fixture,
             String query,
@@ -60,7 +30,6 @@ class DifferentialIT {
             int rows,
             double tolPpm,
             boolean float32Mz) {
-
         Pair(String fixture, String query, String golden, int rows) {
             this(
                     fixture,
@@ -80,12 +49,6 @@ class DifferentialIT {
         }
     }
 
-    /**
-     * All 16 pairs from the differential, with the row count the spec states.
-     *
-     * <p>The counts are asserted, not derived from the golden — otherwise a golden regenerated to
-     * zero rows would agree with a broken engine that also returns none.
-     */
     private static List<Pair> pairs() {
         return List.of(
                 new Pair("data/small.mzML", "test_mzml", "small_mzml_results", 6),
@@ -103,8 +66,6 @@ class DifferentialIT {
                 new Pair("data/PlusRise.mgf", "test", "plusrise_results", 664),
                 new Pair("data/DP00570_F02.mzxml", "test_dp00570", "dp00570_mzxml_results", 3),
                 new Pair("data/DP00570_F02.mgf", "test_dp00570", "dp00570_mgf_results", 2),
-                // Deliberately empty: test.massql is the metabolomics query and matches nothing in
-                // this proteomics file. An empty golden is a real assertion, not a missing one.
                 new Pair("data/DP00570_F02.mzxml", "test", "dp00570_mzxml_empty_results", 0),
                 new Pair("fixtures/micro/micro.mgf", "test_micro", "micro_mgf_results", 2),
                 new Pair("fixtures/micro/micro.mzML", "test_micro", "micro_mzml_results", 2),
@@ -114,9 +75,6 @@ class DifferentialIT {
                         "test_micro",
                         "micro_mzml_rtseconds_results",
                         2),
-                // The STRICT half of the condition window's bound sits exactly on scan 3's
-                // 201.0
-                // peak and MassQL excludes it. Inclusive bounds here would return 1 row, not 0.
                 new Pair(
                         "fixtures/micro/micro.mzML",
                         "test_micro_edge",
@@ -127,12 +85,6 @@ class DifferentialIT {
                         "test_micro_ms1var",
                         "micro_ms1var_results",
                         1),
-                // The INCLUSIVE half of the window rule, at the lookup rather than the condition.
-                // Its MS1 peak
-                // sits at 499.99 -- exactly the 20 ppm lower bound for precmz 500.0, and the same
-                // bits on both sides. The reference's `>=` matches it, so ms1_i is 7000.0; the
-                // exclusive variant yields null, which the null-vs-value rule reports. Its
-                // ms1_base_peak_i is a different peak (9000.0), so the two cannot be conflated.
                 new Pair(
                         "fixtures/micro/micro_onbound.mzML",
                         "test_micro_onbound",
@@ -176,7 +128,6 @@ class DifferentialIT {
                                 + " first: the precursor lookup must use the INCLUSIVE mzWindow.");
     }
 
-    /** The two empty goldens deserve their own assertion, so `[]` can never read as "not checked". */
     @ParameterizedTest(name = "{0}")
     @MethodSource("emptyPairs")
     void aQueryThatMatchesNothingReturnsNoRows(Pair pair) {
@@ -200,8 +151,6 @@ class DifferentialIT {
     @ParameterizedTest(name = "{0}")
     @MethodSource("pairs")
     void everyRowCarriesTheTwelveKeyShape(Pair pair) {
-        // one union schema discriminated by mslevel, no key ever absent. The MS1DATA pair is
-        // the one that used to disagree -- precursor columns present and null, base_peak_* real.
         for (ScanInfoResult r : GoldenResults.of(pair.golden())) {
             assertNotNull(r.scan(), "scan is never null");
             assertNotNull(r.rt(), "rt is never null -- 0.0 is a real retention time");
@@ -217,10 +166,6 @@ class DifferentialIT {
         }
     }
 
-    // ------------------------------------------------------------------ fixture lookup
-
-    // Reimplemented rather than reusing io/Fixtures, which is package-private to ...massql.io.
-    // CollationAnchorIT hit the same wall; this is the documented shape of that workaround.
     private static Path resource(String relative) {
         URL url = DifferentialIT.class.getClassLoader().getResource(relative);
         assertNotNull(

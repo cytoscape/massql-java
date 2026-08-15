@@ -1,14 +1,7 @@
 // massql-java-cli -- the standalone command-line wrapper, distributed as an uber-jar.
 //
-// Separate from the SDK for two reasons:
-//
-//   1. It is versioned and released independently (cliVersion in gradle.properties). A CLI fix
-//      does not force consumers to resolve a new SDK coordinate, and vice versa.
-//   2. It can only compile against the SDK's PUBLIC API, so the encapsulation boundary is a compile
-//      error rather than something a test has to catch.
-//
-// Shadow lives HERE and only here. Applied at the root it could make a fat jar the SDK's published
-// artifact, which would hand every SDK consumer a jar with javolution baked inside.
+// Shadow is applied here and only here: at the root it could make a fat jar the SDK's published
+// artifact.
 
 plugins {
     id 'java'
@@ -24,9 +17,6 @@ java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
 
-    // Same three artifacts as the SDK. The CLI is an application rather than a library, so its
-    // javadoc is thin -- but a published coordinate that omits sources is one nobody can debug, and
-    // consistency costs nothing here.
     withJavadocJar()
     withSourcesJar()
 }
@@ -36,21 +26,12 @@ tasks.withType(JavaCompile).configureEach {
     options.compilerArgs << '-Xlint:all'
 }
 
-// Same reasoning as the SDK's: build outputs carry no version, so the Makefile and docs/CLI.md can
-// name cli/build/libs/massql-java-cli.jar literally instead of globbing for a version they cannot
-// predict. shadowJar is a Jar subtype, so this covers the uber-jar too. Publication is unaffected --
-// maven-publish derives the published filename from artifactId/version/classifier.
+// Build outputs carry no version, as in the SDK. shadowJar is a Jar subtype, so this covers it.
 tasks.withType(Jar).configureEach { archiveVersion = '' }
 
-// archiveBaseName defaults to the PROJECT name, which is `cli` -- so these two shipped beside the
-// uber-jar as cli-sources.jar and cli-javadoc.jar, matching neither the artifactId they publish
-// under nor the jar they accompany. The old `ls *.jar` in the Makefile printed whatever it found, so
-// nothing ever pointed it out.
-//
-// ⛔ Named individually, NOT via tasks.withType(Jar). The plain `jar` task also has an empty
-// classifier, so giving every Jar this base name would make it write massql-java-cli.jar too -- the
-// exact path shadowJar produces, with one silently overwriting the other. `jar` keeps the default
-// name; it is an unused intermediate here, since the publication is built from shadowJar.
+// Named individually, NOT via tasks.withType(Jar): the plain `jar` task also has an empty
+// classifier, so it would write to the exact path shadowJar produces and one would overwrite
+// the other.
 tasks.named('sourcesJar') { archiveBaseName = 'massql-java-cli' }
 tasks.named('javadocJar') { archiveBaseName = 'massql-java-cli' }
 
@@ -59,10 +40,7 @@ dependencies {
     testImplementation "org.junit.jupiter:junit-jupiter:${rootProject.ext.junitVersion}"
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-    // The SDK's test RESOURCES only -- the spectra fixtures and the .massql queries -- so the CLI is
-    // exercised against the same real files the goldens were generated from. Deliberately not
-    // sourceSets.test.output: that would put the SDK's test CLASSES here too, and the CLI has no
-    // business reaching into them.
+    // The SDK's test RESOURCES only -- not sourceSets.test.output, which would bring its classes.
     testRuntimeOnly files(rootProject.sourceSets.test.output.resourcesDir)
 
     // The SDK exposes gson as `implementation`, so it reaches the uber-jar at runtime but not the
@@ -107,9 +85,7 @@ tasks.named('check') {
     dependsOn tasks.named('integrationTest')
 }
 
-// Same bar as the SDK. The root gate excluded this project only while it held a single
-// package-info.java; once Main.java exists that exemption would just be an unenforced floor, which
-// would just be an unenforced floor.
+// Same coverage bar as the SDK.
 jacocoTestReport {
     reports {
         xml.required = true
@@ -134,8 +110,7 @@ tasks.named('check') {
     dependsOn tasks.named('jacocoTestCoverageVerification')
 }
 
-// The uber-jar IS this project's artifact, not a classified extra -- hence the empty classifier.
-// Bundles the SDK plus javolution and antlr4-runtime so `java -jar` works with no classpath.
+// The uber-jar IS this project's artifact, hence the empty classifier.
 tasks.named('shadowJar') {
     archiveBaseName = 'massql-java-cli'
     archiveClassifier = ''
@@ -151,9 +126,7 @@ tasks.named('assemble') {
 publishing {
     publications {
         cli(MavenPublication) {
-            // The uber-jar is the primary artifact (archiveClassifier = ''), with -javadoc and
-            // -sources beside it. Listed explicitly because this publication is NOT
-            // `from components.java` -- that would publish the thin jar instead.
+            // Listed explicitly: `from components.java` would publish the thin jar instead.
             artifact tasks.named('shadowJar')
             artifact tasks.named('javadocJar')
             artifact tasks.named('sourcesJar')
@@ -161,8 +134,6 @@ publishing {
             pom {
                 name = 'massql-java-cli'
                 description = 'Standalone MassQL command-line tool (uber-jar).'
-                // Same reasoning as the SDK's POM. ⚠ This jar is an UBER-jar: it also bundles
-                // javolution and antlr4-runtime, whose own licences travel inside it.
                 licenses {
                     license {
                         name = 'Eclipse Public License - v 1.0'
@@ -175,9 +146,6 @@ publishing {
     }
     repositories {
         maven {
-            // Same lookup as the SDK's (see build.gradle): credentials keyed by the repository id
-            // the version selects, from ~/.gradle/gradle.properties, falling back to the
-            // environment so release.yml keeps working with its GitHub secrets.
             name = 'nexus'
             def repoId = version.toString().endsWith('SNAPSHOT')
                     ? 'cytoscape_snapshots'

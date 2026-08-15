@@ -15,35 +15,14 @@ import org.cytoscape.massql.MassqlException;
 import org.cytoscape.massql.lang.ast.Polarity;
 import org.cytoscape.massql.spectra.SpectrumTableBuilder;
 
-/**
- * Streaming MGF reader — hand-written, one {@code BEGIN IONS}…{@code END IONS} block at a time.
- *
- * <p>Hand-written because the alternative, {@code uk.ac.ebi.pride.tools:mgf-parser} (28 KB), drags
- * fastutil (23 MB), logback and both JAXB stacks — every one of which this project refuses.
- *
- * <p><b>The reference loader is the specification</b>, not
- * the MGF format documentation. Where the two differ, MassQL wins, because the parity gate asserts bit-identity
- * against what MassQL loaded.
- *
- * <p>MGF is a text format, so peaks are parsed as the block is read rather than deferred behind an
- * offset the way the binary formats do. Retained memory is still bounded by one scan.
- */
 final class MgfReader extends AbstractSpectraStream {
-
     private final BufferedReader reader;
     private final List<String> diagnostics = new ArrayList<>();
 
-    private int blockIndex = 0; // 1-based once incremented; the scan-id fallback
+    private int blockIndex = 0;
     private final Scan scan = new Scan();
     private ScanView current;
 
-    /**
-     * Charge for blocks carrying no {@code CHARGE=} of their own.
-     *
-     * <p>1 unless the file-level header supplies one. {@code DP00570_F02.mgf} declares
-     * {@code CHARGE=2+ and 3+} and then omits {@code CHARGE=} from 583 of its 625 blocks, all of
-     * which are therefore charge <b>2</b> — the first value of the header's list.
-     */
     private int fileDefaultCharge = 1;
 
     MgfReader(Path path) {
@@ -77,15 +56,6 @@ final class MgfReader extends AbstractSpectraStream {
     private boolean readBlock() throws IOException {
         String line;
 
-        // Skip to BEGIN IONS, tolerating blank lines, comments and file-level headers.
-        //
-        // The file-level header is not merely skipped: a CHARGE= there is the DEFAULT CHARGE for
-        // every block that does not carry its own. The reference copies the header into each
-        // spectrum's
-        // params, so `CHARGE=2+ and 3+` reaches MassQL as [2, 3] on every spectrum and it takes the
-        // first -- 2. Only the header before the FIRST block counts, which is why this is guarded
-        // on
-        // blockIndex.
         while ((line = reader.readLine()) != null) {
             String t = line.trim();
             if (t.equalsIgnoreCase("BEGIN IONS")) break;
@@ -113,8 +83,7 @@ final class MgfReader extends AbstractSpectraStream {
             }
 
             int eq = t.indexOf('=');
-            // A header line is KEY=VALUE; anything else is a peak. Checking for '=' before
-            // attempting a numeric parse keeps an unknown header from being read as a peak.
+
             if (eq > 0
                     && !Character.isDigit(t.charAt(0))
                     && t.charAt(0) != '.'
@@ -131,8 +100,6 @@ final class MgfReader extends AbstractSpectraStream {
             }
             int sp = firstSeparator(t);
             if (sp < 0) {
-                // A malformed peak line is an error, not something to skip: silently dropping peaks
-                // would change tic and base_peak and look like a decoder bug at the parity gate.
                 throw new MassqlException(
                         "malformed peak line in "
                                 + path
@@ -151,26 +118,6 @@ final class MgfReader extends AbstractSpectraStream {
                         "unparseable peak in " + path + " block " + blockIndex + ": " + t, e);
             }
 
-            // MGF drops ZERO-INTENSITY peaks. The reference loader opens its
-            // peak
-            // peak loop by skipping any zero intensity, so such a peak never
-            // becomes
-            // a row and MassQL cannot match it, count it, or sum it.
-            //
-            // ⚠ MGF ONLY. The mzML and mzXML loaders have no such guard -- small.mzML's parity dump
-            // carries eight leading `0x0.0p+0` intensities, retained on both sides. Applying this
-            // to the
-            // other readers would break the parity gate on every mzML fixture.
-            //
-            // This was latent: no MGF fixture contained a zero-intensity peak, so the parity gate
-            // passed
-            // while unable to detect the divergence. micro_zeroint.mgf exists to close that.
-            //
-            // iNorm/iTicNorm are unaffected: MassQL computes i_max/i_sum from the FULL array
-            // *before* the
-            // skip, and a zero changes neither a max nor a sum -- so our builder's denominators,
-            // computed
-            // over the retained peaks, are identical.
             if (peakIntensity == 0.0) continue;
 
             mz[n] = peakMz;
@@ -196,17 +143,6 @@ final class MgfReader extends AbstractSpectraStream {
         return -1;
     }
 
-    /**
-     * The first charge in a {@code CHARGE=} value, or {@code fallback} if there is none.
-     *
-     * <p>Handles every form the fixtures use: {@code 2}, {@code 2+}, {@code 2-}, and the multi-charge
-     * {@code 2+ and 3+}. The multi-charge case is why this takes the <b>first</b> value rather than
-     * rejecting the line: the reference parses it to a list and reads element 0, so
-     * {@code CHARGE=2+ and 3+} means charge 2 and the 3 is never consulted.
-     *
-     * <p>An unparseable value yields {@code fallback} rather than throwing, matching the reference
-     * loader's bare {@code except: charge = 1}.
-     */
     private static int firstCharge(String value, int fallback) {
         int i = 0;
         int n = value.length();
@@ -224,25 +160,18 @@ final class MgfReader extends AbstractSpectraStream {
     private void applyHeader(String key, String value) {
         switch (key) {
             case "PEPMASS" -> {
-                // "PEPMASS=491.555664 3058030.0000" -- a second token is precursor intensity;
-                // ignore it.
                 String first = value.split("\\s+")[0];
                 scan.precmz = parseOr(first, 0.0);
             }
-            case "CHARGE" ->
-            // A block's own CHARGE overrides the file-level default for this block only.
-            scan.charge = firstCharge(value, scan.charge);
+            case "CHARGE" -> scan.charge = firstCharge(value, scan.charge);
             case "RTINSECONDS" -> scan.rt = parseOr(value, 0.0) / 60.0;
             case "SCANS" -> {
                 try {
                     scan.explicitScanId = Integer.parseInt(value.trim());
                 } catch (NumberFormatException ignored) {
-                    // Leave unset; the block index is the documented fallback.
                 }
             }
-            default -> {
-                /* TITLE and everything else are not part of the loaded contract */
-            }
+            default -> {}
         }
     }
 
@@ -263,7 +192,6 @@ final class MgfReader extends AbstractSpectraStream {
         }
     }
 
-    /** Accumulates one block's fields as they are parsed, then builds the immutable view. */
     private static final class Scan {
         int explicitScanId;
         int scanId;
@@ -278,9 +206,7 @@ final class MgfReader extends AbstractSpectraStream {
             explicitScanId = 0;
             scanId = 0;
             precmz = 0.0;
-            // MGF charge is never absent: a block with no CHARGE= takes the file header's charge,
-            // and 1 when the file declares none either, so a genuine 1+ is indistinguishable from
-            // an absent one -- which is what the reference produces.
+
             charge = defaultCharge;
             rt = 0.0;
             n = 0;
@@ -297,8 +223,7 @@ final class MgfReader extends AbstractSpectraStream {
             SpectrumTableBuilder b = new SpectrumTableBuilder(2, n);
             b.startScan(scanId, rt, 1, precmz, 0, charge);
             for (int i = 0; i < n; i++) b.addPeak(mz[i], in[i]);
-            // Both reference MGF loaders hardcode polarity 1 into every peak dict, so every MGF row
-            // is positive; measured across all three MGF fixtures, not one 0.
+
             return new ScanView(
                     scanId,
                     2,

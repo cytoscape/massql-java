@@ -26,14 +26,7 @@ import org.cytoscape.massql.spectra.SpectrumTable;
 import org.cytoscape.massql.spectra.SpectrumTableBuilder;
 import org.junit.jupiter.api.Test;
 
-/**
- * Collation of the 7 native + 5 computed columns, the sentinel and NaN rules, and their ORDER.
- *
- * <p>Runs both on hand-built tables (where every expected value is arithmetic you can check by eye) and
- * end-to-end over the micro fixtures against their committed goldens.
- */
 class ScaninfoCollationTest {
-
     private static Path resource(String relative) {
         var url = ScaninfoCollationTest.class.getClassLoader().getResource(relative);
         if (url == null) throw new AssertionError("fixture missing: " + relative);
@@ -44,7 +37,6 @@ class ScaninfoCollationTest {
         }
     }
 
-    /** Collates a query over a fixture, returning the rows. */
     private static List<ScanInfoResult> run(String queryText, String fixture, MassqlOptions opts) {
         ScaninfoCollation c = new ScaninfoCollation(opts);
         try (SpectraStream s = SpectraFile.open(resource(fixture))) {
@@ -69,7 +61,6 @@ class ScaninfoCollationTest {
         return b.build();
     }
 
-    /** A ScanView over a hand-built single-scan table, for the unit-level cases. */
     private static ScanView view(SpectrumTable t) {
         int polarity = t.index().polarityOf(0);
         double precmz = t.index().precmzOf(0);
@@ -93,11 +84,8 @@ class ScaninfoCollationTest {
         return c.rows().get(0);
     }
 
-    // ---------------------------------------------------------------- base peaks (argmax)
-
     @Test
     void basePeaksComeFromTheArgmaxRowNotFromTwoSeparateMaxima() {
-        // If base_peak_mz were computed as max(mz) instead of mz[argmax(i)], this returns 300.0.
         SpectrumTable t =
                 oneScan(
                         1,
@@ -116,7 +104,6 @@ class ScaninfoCollationTest {
 
     @Test
     void anIntensityTieResolvesToTheFirstLowestMzRow() {
-        // The reference returns the first occurrence; a last-wins loop gives 300.0 here.
         SpectrumTable t =
                 oneScan(
                         1,
@@ -150,13 +137,8 @@ class ScaninfoCollationTest {
         assertEquals(4096.0, r.tic(), "one peak: tic == that peak's intensity");
     }
 
-    // ---------------------------------------------------------------- tic is a SUM
-
     @Test
     void ticIsTheSumOfPeakIntensitiesNotTheBasePeak() {
-        // The distinction the reference guards: `scanmaxint` puts the base peak in `i`,
-        // scaninfo
-        // puts the sum. 250 + 1500 + 750 = 2500, while the base peak is 1500.
         SpectrumTable t =
                 oneScan(
                         1,
@@ -173,28 +155,15 @@ class ScaninfoCollationTest {
         assertNotEquals(r.basePeakI(), r.tic(), "a fixture where sum and max differ, deliberately");
     }
 
-    // ---------------------------------------------------------------- sentinels: exactly three
-    // columns
-
     @Test
     void theThreeZeroSentinelsBecomeNullAndNothingElseDoes() {
         SpectrumTable t =
-                oneScan(
-                        7,
-                        2,
-                        0.0,
-                        1, /*precmz*/
-                        0.0, /*ms1scan*/
-                        0, /*charge*/
-                        0,
-                        new double[] {100.0},
-                        new double[] {5.0});
+                oneScan(7, 2, 0.0, 1, 0.0, 0, 0, new double[] {100.0}, new double[] {5.0});
         ScanInfoResult r = collateOne(t, null, null);
         assertNull(r.precmz(), "0 precmz -> null");
         assertNull(r.ms1scan(), "0 ms1scan -> null");
         assertNull(r.charge(), "0 charge -> null");
 
-        // ...and the columns that must NOT be converted:
         assertEquals(0.0, r.rt(), "rt 0.0 is a GENUINE retention time");
         assertNotNull(r.rt(), "explicitly: rt is not null");
         assertEquals(7, r.scan());
@@ -209,20 +178,15 @@ class ScaninfoCollationTest {
         assertEquals(2, collateOne(t, null, null).charge());
     }
 
-    // ---------------------------------------------------------------- order of operations
-
     @Test
     void sentinelConversionHappensAFTERTheLookupSoMs1scanZeroDoesNotThrow() {
-        // The lookup needs the RAW 0 to detect "no linked scan". If sentinels were converted first,
-        // the
-        // lookup would receive null (or a boxed 0) and either throw or match against scan 0.
         SpectrumTable t =
                 oneScan(
                         1,
                         2,
                         0.0,
                         1,
-                        250.25, /*ms1scan*/
+                        250.25,
                         0,
                         0,
                         new double[] {100.0, 200.5},
@@ -234,13 +198,8 @@ class ScaninfoCollationTest {
         assertNull(r.ms1BasePeakI());
     }
 
-    // ---------------------------------------------------------------- the all-zero-intensity scan
-
     @Test
     void anAllZeroIntensityScanCollatesWithoutNaNReachingTheRow() {
-        // Reachable in mzML/mzXML via a scan-level-only query: only PEAK-level conditions apply the
-        // implicit > 0 floor, so a POLARITY query passes such a scan straight through. mzML retains
-        // zero-intensity peaks, so peakCount > 0 and the executor does not skip it.
         SpectrumTable t =
                 oneScan(
                         4,
@@ -257,26 +216,12 @@ class ScaninfoCollationTest {
         assertEquals(
                 0.0, r.basePeakI(), "argmax over all-zero picks row 0, whose intensity is 0.0");
         assertEquals(100.0, r.basePeakMz(), "and its m/z, which is a real value");
-        // The point: nothing here is NaN. The store's iNorm IS NaN for this scan, but i_norm is
-        // dropped
-        // from the contract entirely and never reaches a row.
+
         assertFalse(Double.isNaN(r.tic()) || Double.isNaN(r.basePeakI()));
     }
 
-    // ---------------------------------------------------------------- NaN / infinity -> null
-
     @Test
     void nonFiniteComputedValuesBecomeNullSoTheJsonStaysValid() {
-        // Mirrors the reference's NaN cleaning. `NaN` and `Infinity` are not valid
-        // JSON
-        // tokens, so a non-finite value must become null BEFORE serialization -- ResultJson throws
-        // if one
-        // reaches it, which is the right place for a belt-and-braces guard but the wrong place to
-        // fix it.
-        //
-        // An infinite intensity is the reachable case: a corrupt binary array can decode to one,
-        // and the
-        // sum then propagates it into tic.
         SpectrumTable t =
                 oneScan(
                         1,
@@ -293,7 +238,6 @@ class ScaninfoCollationTest {
         assertNull(r.basePeakI(), "argmax selects the infinite peak, so this nulls too");
         assertEquals(100.0, r.basePeakMz(), "but its m/z is finite and survives");
 
-        // And the row serializes to valid JSON rather than throwing.
         assertDoesNotThrow(
                 () ->
                         new com.google.gson.GsonBuilder()
@@ -311,15 +255,8 @@ class ScaninfoCollationTest {
         assertNull(r.basePeakI());
     }
 
-    // ---------------------------------------------------------------- ordering assertion
-
     @Test
     void scansArrivingOutOfOrderAreRejectedRatherThanSilentlyMisaligned() {
-        // Scan-ascending order is a property of the fixtures, not a guarantee -- an MGF with
-        // non-monotonic SCANS= would break it, and the differential compares row ORDER before
-        // fields, so
-        // a
-        // silent violation would surface as a confusing field-level diff on misaligned rows.
         ScaninfoCollation c = new ScaninfoCollation(null);
         SpectrumTable hi =
                 oneScan(10, 2, 1.0, 1, 500.0, 0, 0, new double[] {1.0}, new double[] {1.0});
@@ -330,13 +267,8 @@ class ScaninfoCollationTest {
         assertTrue(e.getMessage().contains("out of order"), e.getMessage());
     }
 
-    // ---------------------------------------------------------------- end-to-end against the
-    // goldens
-
     @Test
     void theMicroGoldenIsReproducedRowForRow() {
-        // output/micro_mzml_results.json: 2 rows, scans 1 and 3, values hand-computed in
-        // EXPECTED.md.
         List<ScanInfoResult> rows =
                 run(
                         "QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.5:TOLERANCEMZ=0.5",
@@ -360,7 +292,7 @@ class ScaninfoCollationTest {
         assertEquals(500.0, second.precmz());
         assertEquals(2, second.ms1scan());
         assertEquals(2600.0, second.tic(), "250 + 1500 + 100 + 750");
-        // The precursor-lookup conflict from EXPECTED.md: closest wins over most intense.
+
         assertEquals(1000.0, second.ms1I());
         assertEquals(499.99609375, second.ms1Precmz());
         assertEquals(9000.0, second.ms1BasePeakI(), "max over the WHOLE MS1 scan, including 600.0");
@@ -368,21 +300,19 @@ class ScaninfoCollationTest {
 
     @Test
     void anMs1dataQueryProducesTheSameShapeWithRealBasePeaksAndNullPrecursorFields() {
-        // ⛔ The union shape, end to end. micro_ms1var.mzML has two MS1 scans with DIFFERENT peaks.
         List<ScanInfoResult> rows =
                 run("QUERY scaninfo(MS1DATA)", "fixtures/micro/micro_ms1var.mzML", null);
         assertFalse(rows.isEmpty());
         for (ScanInfoResult r : rows) {
             assertEquals(1, r.mslevel(), "MS1DATA selects MS1 scans");
-            // Null because a survey scan has no precursor -- semantics, not an artifact.
+
             assertNull(r.precmz());
             assertNull(r.ms1scan());
             assertNull(r.charge());
             assertNull(r.ms1I());
             assertNull(r.ms1Precmz());
             assertNull(r.ms1BasePeakI());
-            // NOT null: a survey scan plainly has a base peak. This is the half that was a
-            // left-join artifact in the reference wrapper.
+
             assertNotNull(r.basePeakI(), "an MS1 scan has a base peak");
             assertNotNull(r.basePeakMz());
             assertTrue(r.basePeakI() > 0.0);
@@ -393,16 +323,12 @@ class ScaninfoCollationTest {
 
     @Test
     void anMgfPopulatesChargeAsOneAndLeavesEveryMs1ColumnNull() {
-        // MGF charge is never null -- CHARGE= if present, else 1. And MGF has no
-        // survey
-        // scans at all, so ms1scan and all three ms1_* are null for every row.
         List<ScanInfoResult> rows =
                 run(
                         "QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.5:TOLERANCEMZ=0.5",
                         "fixtures/micro/micro.mgf",
                         null);
-        // micro_mgf_results.json: scans 1 and 2 -- BLOCK indices, since MGF has no MS1 scans to
-        // interleave (contrast micro.mzML's 1 and 3 for the same query).
+
         assertEquals(List.of(1, 2), rows.stream().map(ScanInfoResult::scan).toList());
 
         for (ScanInfoResult r : rows) {
@@ -415,20 +341,12 @@ class ScaninfoCollationTest {
             assertNotNull(r.rt(), "rt is never null");
         }
 
-        // rt per row, against the golden. Only block 1 lacks RTINSECONDS -- blocks 2 and 3 carry
-        // RTINSECONDS=60.0 and 120.0, which become 1.0 and 2.0 MINUTES. So this fixture exercises
-        // both
-        // the "absent -> 0.0, not null" rule and the seconds/60 conversion in one file.
         assertEquals(0.0, rows.get(0).rt(), "block 1 has no RTINSECONDS -> 0.0, and NOT null");
         assertEquals(1.0, rows.get(1).rt(), "RTINSECONDS=60.0 -> 1.0 minute");
     }
 
     @Test
     void thePrecursorToleranceIsHonouredAndIsSeparateFromTheQueryTolerance() {
-        // Two runs differing ONLY in precursorTolPpm. At 1 ppm the nearest MS1 peak (3.9e-3 away,
-        // ~7.8 ppm) misses, so ms1_i nulls while ms1_base_peak_i survives -- the collation at
-        // the
-        // collation level.
         String q = "QUERY scaninfo(MS2DATA) WHERE MS2PROD=200.5:TOLERANCEMZ=0.5";
         var wide = run(q, "fixtures/micro/micro.mzML", MassqlOptions.defaults());
         var tight =

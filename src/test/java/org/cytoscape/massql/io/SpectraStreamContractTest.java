@@ -19,28 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * The {@link SpectraStream} interface contract, asserted against <b>all three</b> readers.
- *
- * <p>They are independent {@code final class}es with no shared base, so the peek state machine is
- * written out three times — which means it can be got wrong three times. Everything here is
- * parameterized over one fixture per format rather than testing whichever reader came to hand.
- *
- * <p>Added with the {@code hasNext()}/{@code next()} refactor. The old shape was
- * {@code next()} returning a boolean plus {@code current()}; the guarantees below either did not exist
- * or could not be stated:
- *
- * <ul>
- *   <li>{@code hasNext()} is <b>repeatable</b> — the classic peek bug is a second call silently
- *       swallowing a scan.</li>
- *   <li>{@code next()} past the end <b>throws</b> instead of handing back the last scan again.</li>
- *   <li>A drained stream <b>stays</b> drained, so reusing one fails loudly rather than looking like a
- *       query that matched nothing.</li>
- * </ul>
- */
 class SpectraStreamContractTest {
-
-    /** One fixture per format — the three readers, not just whichever is convenient. */
     private static final String MGF = "fixtures/micro/micro.mgf";
 
     private static final String MZML = "fixtures/micro/micro.mzML";
@@ -50,13 +29,9 @@ class SpectraStreamContractTest {
         return Fixtures.require(name);
     }
 
-    // ---------------------------------------------------------------- hasNext() is repeatable
-
     @ParameterizedTest
     @ValueSource(strings = {MGF, MZML, MZXML})
     void hasNextIsRepeatableAndConsumesNothing(String f) {
-        // Call hasNext() FIVE times between every advance. If it consumed, the scan list would come
-        // back short -- which is exactly how a peek state machine fails, and silently.
         List<Integer> once = new ArrayList<>();
         try (SpectraStream s = SpectraFile.open(fixture(f))) {
             while (s.hasNext()) once.add(s.next().scanId());
@@ -81,13 +56,10 @@ class SpectraStreamContractTest {
     @ParameterizedTest
     @ValueSource(strings = {MGF, MZML, MZXML})
     void nextWithoutCallingHasNextFirstStillWorks(String f) {
-        // hasNext() is a convenience, not a required handshake -- next() advances on its own.
         try (SpectraStream s = SpectraFile.open(fixture(f))) {
             assertNotNull(s.next());
         }
     }
-
-    // ---------------------------------------------------------------- draining
 
     @ParameterizedTest
     @ValueSource(strings = {MGF, MZML, MZXML})
@@ -104,9 +76,6 @@ class SpectraStreamContractTest {
     @ParameterizedTest
     @ValueSource(strings = {MGF, MZML, MZXML})
     void aDrainedStreamStaysDrained(String f) {
-        // The property that makes a reused stream a loud failure rather than a silent empty result:
-        // hasNext() is false PERMANENTLY, so a second query over the same stream cannot look like
-        // "matched nothing".
         try (SpectraStream s = SpectraFile.open(fixture(f))) {
             while (s.hasNext()) s.next();
             for (int i = 0; i < 5; i++) {
@@ -116,15 +85,13 @@ class SpectraStreamContractTest {
         }
     }
 
-    // ---------------------------------------------------------------- each view is a value
-
     @ParameterizedTest
     @ValueSource(strings = {MGF, MZML, MZXML})
     void eachNextReturnsAnIndependentValue(String f) {
         try (SpectraStream s = SpectraFile.open(fixture(f))) {
             assertTrue(s.hasNext());
             ScanView first = s.next();
-            if (!s.hasNext()) return; // single-scan fixture: nothing to compare
+            if (!s.hasNext()) return;
             ScanView second = s.next();
             assertNotSame(first, second);
             assertNotEquals(first.scanId(), second.scanId());
@@ -144,15 +111,8 @@ class SpectraStreamContractTest {
         }
     }
 
-    // ---------------------------------------------------------------- NOT an Iterator
-
     @Test
     void spectraStreamIsDeliberatelyNotAnIterator() {
-        // Naming only. Extending Iterator<ScanView> would make StreamSupport.stream(...).toList() a
-        // legal, compiling, silently WRONG way to collect N aliases of one mutable object -- every
-        // element reporting the last scan. Keeping the type outside the Iterator hierarchy makes
-        // that
-        // unreachable rather than merely discouraged.
         assertFalse(
                 Iterator.class.isAssignableFrom(SpectraStream.class),
                 "SpectraStream must not be an Iterator -- see the interface javadoc for why");
@@ -160,8 +120,6 @@ class SpectraStreamContractTest {
                 Iterable.class.isAssignableFrom(SpectraStream.class),
                 "and not Iterable either, which would enable for-each and the same collect hazard");
     }
-
-    // ---------------------------------------------------------------- closed streams
 
     @ParameterizedTest
     @ValueSource(strings = {MGF, MZML, MZXML})

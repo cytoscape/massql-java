@@ -6,15 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-/** The public {@code Massql.parse} contract: whitespace tolerance and blank-input handling. */
 class ParseEntryPointTest {
-
     private static final String Q = "QUERY scaninfo(MS2DATA) WHERE MS2PROD=226.18:TOLERANCEPPM=5";
 
     @Test
     void surroundingWhitespaceAndTrailingNewlinesAreIgnored() {
-        // The reference strips the query file before parsing, and the
-        // .massql files on disk end with a newline, so this is the normal case, not an edge.
         String canonical = Massql.parse(Q).canonical();
         for (String variant :
                 new String[] {
@@ -30,7 +26,6 @@ class ParseEntryPointTest {
 
     @Test
     void internalWhitespaceIsFlexible() {
-        // The corpus contains "MS2PROD=X :TOLERANCEMZ=0.1" with a space before the colon.
         assertEquals(
                 Massql.parse(Q).canonical(),
                 Massql.parse(

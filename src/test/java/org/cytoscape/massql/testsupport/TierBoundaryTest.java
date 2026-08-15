@@ -18,19 +18,7 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * Holds the line between the two test tiers, which the filename glob in {@code build.gradle} cannot.
- *
- * <p>The tiers share one source set, so nothing physically stops an {@code *IT} from reaching into a
- * unit test's helpers or from being named such that it runs in the wrong tier — or in neither.
- */
 class TierBoundaryTest {
-
-    /**
-     * {@code CliFixtures} calls the package-private {@code Main.run}, so it must stay in {@code
-     * Main}'s package. Moving it to {@code testsupport} would mean making {@code run} public — the
-     * production API widened to serve test layout.
-     */
     private static final Set<String> ALLOWED = Set.of("CliFixtures");
 
     private static final Pattern DECLARATION =
@@ -110,15 +98,10 @@ class TierBoundaryTest {
         return p.getParent().getFileName().toString().equals("testsupport");
     }
 
-    /**
-     * A bare simple name, never a qualified one — {@code Map.Entry} must not read as a reference to
-     * {@code Corpus.Entry}.
-     */
     private static boolean references(String code, String name) {
         return Pattern.compile("(?<![.\\w])" + Pattern.quote(name) + "\\b").matcher(code).find();
     }
 
-    /** Comments and string literals removed: an IT may name a unit test in prose. */
     private static String codeOnly(String src) {
         String s = src.replaceAll("(?s)/\\*.*?\\*/", " ");
         s = s.replaceAll("(?s)\"\"\".*?\"\"\"", "\"\"");
@@ -147,7 +130,7 @@ class TierBoundaryTest {
                 throw new UncheckedIOException("cannot walk " + tree, e);
             }
         }
-        // Every assertion here passes vacuously on an empty list.
+
         assertFalse(all.isEmpty(), "no test sources found under " + root);
         return all;
     }

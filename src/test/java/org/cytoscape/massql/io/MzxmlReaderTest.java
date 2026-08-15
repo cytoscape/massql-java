@@ -23,15 +23,7 @@ import org.cytoscape.massql.testsupport.Fixtures;
 import org.cytoscape.massql.testsupport.Raw;
 import org.junit.jupiter.api.Test;
 
-/**
- * {@code MzxmlReader} against the oracle, cross-checked <b>inside the mzXML reader</b> rather than deferred.
- *
- * <p>Running a counts-level parity check here is deliberate: a decode or walk bug found now points at
- * code written minutes ago, whereas the same bug surfacing at the parity gate looks like a query-layer problem.
- * The parity gate formalises this across all fixtures with bit-identical digests.
- */
 class MzxmlReaderTest {
-
     private record DumpScan(int scan, int mslevel, int peakCount) {}
 
     private static List<DumpScan> loadDump(Path gz) {
@@ -41,8 +33,7 @@ class MzxmlReaderTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        // Light regex extraction rather than a JSON dependency: Jackson finds modules via
-        // ServiceLoader, which this project does not use.
+
         Pattern p =
                 Pattern.compile(
                         "\"scan\":\\s*(\\d+),\\s*\"mslevel\":\\s*(\\d+),\\s*\"peak_count\":\\s*(\\d+)");
@@ -63,7 +54,7 @@ class MzxmlReaderTest {
         Path mzxml = Fixtures.require("data/small.mzXML");
         Path dump = Fixtures.require("goldens/loader-parity/small.mzXML.json.gz");
 
-        Map<Integer, Integer> expected = new LinkedHashMap<>(); // scan id -> peak count
+        Map<Integer, Integer> expected = new LinkedHashMap<>();
         int expMs1 = 0, expMs2 = 0;
         for (DumpScan d : loadDump(dump)) {
             expected.put(d.scan(), d.peakCount());
@@ -96,12 +87,6 @@ class MzxmlReaderTest {
         assertEquals(14, ms1);
         assertEquals(34, ms2);
 
-        // small.mzXML carries 34 precursorScanNum attributes and every one must be ignored. For
-        // this
-        // file document order and precursorScanNum coincide, so the assertion below cannot DETECT a
-        // precursorScanNum-resolving reader -- that is what Ms1ScanDocumentOrderIT on the Ewing
-        // file
-        // is for. Here we only require internal consistency.
         ms1scanOf.forEach(
                 (ms2Scan, linked) ->
                         assertTrue(
@@ -115,13 +100,6 @@ class MzxmlReaderTest {
 
     @Test
     void bothScanLayoutsProduceIdenticalResults() {
-        // The nested-layout requirement, stated as an equivalence rather than a magic number:
-        // micro.mzXML is flat, micro_nested.mzXML nests MS2 inside its parent MS1, and the two hold
-        // the SAME spectra. A flat-only walk treats </scan> as a spectrum boundary and
-        // mis-associates
-        // every nested child, so the two would disagree.
-        //
-        // Confirmed against MassQL's own loader: both give ms1scan {1:0, 3:2, 5:2}.
         record Row(
                 int scan,
                 int level,
@@ -164,7 +142,6 @@ class MzxmlReaderTest {
         assertEquals(flat.size(), nested.size(), "nested layout dropped or duplicated a scan");
         assertEquals(flat, nested, "flat and nested layouts must produce identical rows");
 
-        // And the specific linkage, so the equivalence above cannot pass with both sides wrong.
         Map<Integer, Integer> links = new LinkedHashMap<>();
         for (Row r : nested) if (r.level() == 2) links.put(r.scan(), r.ms1scan());
         assertEquals(
@@ -175,9 +152,6 @@ class MzxmlReaderTest {
 
     @Test
     void precursorScanNumIsNeverRead() {
-        // small.mzXML carries 34 of them. Assert they are PRESENT in the file, so this test cannot
-        // pass merely because the fixture stopped having any -- then assert the reader's links come
-        // from document order.
         Path mzxml = Fixtures.require("data/small.mzXML");
         String head;
         try {
@@ -211,8 +185,6 @@ class MzxmlReaderTest {
 
     @Test
     void chargeAbsentIsNullNotOne() {
-        // The cross-format trap: mzXML's absent precursorCharge is null, while MGF's absent CHARGE
-        // is 1. micro scans 1 and 3 omit it; scan 5 has charge 2.
         Map<Integer, Integer> charges = new LinkedHashMap<>();
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mzXML"))) {
             while (s.hasNext()) {
@@ -224,8 +196,6 @@ class MzxmlReaderTest {
         assertNull(charges.get(3), "absent precursorCharge -> null");
         assertEquals(2, charges.get(5), "precursorCharge=\"2\" is read");
 
-        // The contrast, made explicit: the SAME logical scans read from MGF give charge 1 where the
-        // attribute is absent. If this ever matches mzXML, one of the two rules has been broken.
         Map<Integer, Integer> mgfCharges = new LinkedHashMap<>();
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mgf"))) {
             while (s.hasNext()) {
@@ -238,9 +208,6 @@ class MzxmlReaderTest {
 
     @Test
     void zeroPeakScanIsYieldedAndMaterialisesEmpty() {
-        // peaksCount="0" must not throw, and must not be dropped (the mzXML reader). Scan 4 of the
-        // micro
-        // table is the empty MS1.
         boolean saw = false;
         int scans = 0;
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mzXML"))) {

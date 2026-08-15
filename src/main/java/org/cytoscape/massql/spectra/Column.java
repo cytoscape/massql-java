@@ -1,10 +1,9 @@
 package org.cytoscape.massql.spectra;
 
 /**
- * Which peak column a reduction operates on.
- *
- * <p>{@link #I_NORM} and {@link #I_TIC_NORM} are pre-computed at freeze time rather than
- * derived on demand, so the engine reads them as plain columns.
+ * Which peak column a reduction operates on. {@link #I_NORM} and {@link #I_TIC_NORM} are
+ * pre-computed at freeze time rather than derived on demand, so the engine reads them as plain
+ * columns.
  */
 public enum Column {
     MZ,

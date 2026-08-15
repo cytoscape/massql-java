@@ -8,8 +8,6 @@ import org.cytoscape.massql.MassqlException;
 import org.junit.jupiter.api.Test;
 
 class ScanIndexTest {
-
-    /** Sparse, non-1-based scan ids -- exactly what real files look like. */
     private static SpectrumTable sparse() {
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
         b.startScan(3, 0.011218333333333334, 1, 810.79, 2, 0);
@@ -36,7 +34,6 @@ class ScanIndexTest {
 
     @Test
     void ordinalLookupHandlesSparseNon1BasedIds() {
-        // Never use a scan id as an array index: ids are neither dense nor 1-based.
         ScanIndex x = sparse().index();
         assertEquals(0, x.ordinalOf(3));
         assertEquals(1, x.ordinalOf(10));
@@ -49,8 +46,6 @@ class ScanIndexTest {
 
     @Test
     void retentionTimeIsExactAtDoublePrecision() {
-        // The mzML golden's rt does NOT survive a float round-trip, so a float-only design
-        // fails the differential with a tiny, confusing delta.
         double golden = 0.011218333333333334;
         ScanIndex x = sparse().index();
         assertEquals(golden, x.rtOf(0), "must be bit-exact");
@@ -61,9 +56,6 @@ class ScanIndexTest {
 
     @Test
     void perScanMetadataIsCarriedIncludingTheZeroSentinels() {
-        // precmz/ms1scan/charge are per-SCAN (verified against the loader: exactly one
-        // distinct value each per scan), and the raw 0 sentinel survives -- the collation owns
-        // the 0-to-null conversion, not this layer.
         ScanIndex x = sparse().index();
         assertEquals(810.79, x.precmzOf(0));
         assertEquals(2, x.ms1scanOf(0));

@@ -1,7 +1,6 @@
 package org.cytoscape.massql;
 
-/** Base class for every failure this SDK raises. Unchecked: callers handle a query
- *  failing the way they handle bad input, not with mandatory try/catch. */
+/** Base class for every failure this SDK raises. */
 public class MassqlException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 

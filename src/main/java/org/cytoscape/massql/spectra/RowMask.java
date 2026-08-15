@@ -4,19 +4,8 @@ import java.util.BitSet;
 
 import org.cytoscape.massql.MassqlException;
 
-/**
- * An immutable set of selected rows.
- *
- * <p><b>Immutable on purpose.</b> {@link #and}, {@link #or} and {@link #not} return new
- * instances rather than mutating in place. Several conditions compose, and a mask
- * mutated under one condition while another still holds a reference is a subtle
- * wrong-answer bug with no exception to point at it.
- *
- * <p>Producing masks rather than pruned tables is also what preserves the {@code OTHERSCAN}
- * seam — see {@link SpectrumTable}.
- */
+/** An immutable set of selected rows. */
 public final class RowMask {
-
     private final BitSet bits;
     private final int length;
 
@@ -69,7 +58,7 @@ public final class RowMask {
         return new RowMask(b, length);
     }
 
-    /** Set a range, returning a new mask. Convenience for accumulating window hits. */
+    /** Set a range, returning a new mask. */
     public RowMask withRange(IntRange range) {
         if (range.isEmpty()) return this;
         BitSet b = copyBits();
@@ -77,19 +66,12 @@ public final class RowMask {
         return new RowMask(b, length);
     }
 
-    /** Next set row at or after {@code from}, or {@code -1}. Lets callers iterate without scanning. */
+    /** Next set row at or after {@code from}, or {@code -1}. */
     public int nextSetRow(int from) {
         return bits.nextSetBit(from);
     }
 
-    /**
-     * Ordinals of scans retaining at least one selected row.
-     *
-     * <p>This is the shape most MassQL conditions actually need: they mean "this scan contains
-     * a peak matching X", not "this row matches X". Conditions are combined by
-     * intersecting these scan sets, because two conditions may be satisfied by <i>different</i>
-     * peaks in the same scan and a row-level AND would wrongly reject it.
-     */
+    /** Ordinals of scans retaining at least one selected row. */
     public java.util.BitSet scansWithAnyRow(SpectrumTable table) {
         ScanIndex idx = table.index();
         BitSet scans = new BitSet(idx.scanCount());

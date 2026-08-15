@@ -2,24 +2,15 @@ package org.cytoscape.massql.lang.ast;
 
 import java.util.List;
 
-/**
- * One condition in a {@code WHERE} or {@code FILTER} clause, with its qualifiers.
- *
- * <p>Two shapes, because polarity carries an enum rather than a numeric expression and
- * collapsing them would force the engine to re-discover which is which.
- */
+/** One condition in a {@code WHERE} or {@code FILTER} clause, with its qualifiers. */
 public sealed interface Condition {
-
-    /** The qualifiers attached to this condition via {@code :}. Never null; may be empty. */
+    /** The qualifiers attached to this condition via {@code :}. */
     List<Qualifier> qualifiers();
 
     /**
-     * A field compared against one or more values.
-     *
-     * <p>{@code values} has more than one element only for an {@code OR} list —
-     * {@code MS2PROD=(58.06 OR 60.04)} — which the engine treats as "any of these". A plain
-     * {@code MS2PROD=226.18} yields a single-element list, so the
-     * engine has one code path rather than two.
+     * A field compared against one or more values. {@code values} has more than one element only
+     * for an {@code OR} list — {@code MS2PROD=(58.06 OR 60.04)} — which the engine treats as "any
+     * of these".
      */
     record Value(ConditionType type, List<Expr> values, List<Qualifier> qualifiers)
             implements Condition {

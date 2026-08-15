@@ -3,12 +3,9 @@
 Every rule the engine implements, with the source line that establishes it. **Where this document and
 the cited source lines disagree, the source lines win.**
 
-> ⚠ **The authority is `msql_engine_filters.py`, not `msql_engine.py`.** The tolerance computation, the
-> intensity comparators and **all four condition functions** live in `msql_engine_filters.py`; only the
-> scan-level conditions are in `msql_engine.py`.
-
-Each rule below is **one line of code and a silent wrong answer if missed** — no exception, no warning, just a
-different set of rows than MassQL returns.
+> **The authority is `msql_engine_filters.py`, not `msql_engine.py`.** Tolerance, the intensity
+> comparators and all four condition functions live there; only scan-level conditions are in
+> `msql_engine.py`.
 
 ---
 
@@ -28,20 +25,17 @@ different set of rows than MassQL returns.
 All four condition functions use `>` and `<`: `:253` (MS2PROD), `:410` (MS2PREC), `:493`/`:519` (MS1MZ),
 `:607` (`ms1_filter`).
 
-**Verified by execution, not inference.** `micro.mzML` scan 3 carries a peak at exactly `201.0`; the query
-`MS2PROD=201.5:TOLERANCEMZ=0.5` gives the window `[201.0, 202.0]`, placing that peak precisely on the lower
-bound — and **MassQL returns 0 rows**. `test_micro_edge.massql` pins it with an **empty golden**.
+`micro.mzML` scan 3 carries a peak at exactly `201.0`; `MS2PROD=201.5:TOLERANCEMZ=0.5` gives the window
+`[201.0, 202.0]`, placing it on the lower bound — and MassQL returns 0 rows.
 
-**Use `SpectrumTable.mzWindowExclusive`, never `mzWindow`.** The two exist because the two callers genuinely
-differ, both verified:
+**Use `SpectrumTable.mzWindowExclusive`, never `mzWindow`.** The two callers differ:
 
 | Caller | Bound | Evidence |
 |---|---|---|
 | Condition windows | **strict** | the empty golden above |
 | Precursor lookup | **inclusive** | `massql_query.py`'s `ms1_df["mz"] >= precmz - tol` uses `>=`/`<=`; at `--precursor-tol-ppm 7.8125` an exactly-on-bound peak **does** populate `ms1_i` |
 
-Unifying them would introduce a divergence in `ms1_i`/`ms1_precmz` — the columns the differential compares
-at 1e-9.
+Unifying them would diverge on `ms1_i`/`ms1_precmz`.
 
 ## 2. Comparators
 

@@ -16,28 +16,14 @@ import java.util.Set;
 import org.cytoscape.massql.lang.ast.MassqlQuery;
 import org.junit.jupiter.api.Test;
 
-/**
- * No third-party type may appear on the public surface.
- *
- * <p>This is what keeps the parser swappable — for a hand-written one, or the remote
- * {@code /parse} escape hatch — without touching the engine or any caller. It is cheap to
- * assert and easy to violate by accident, e.g. by returning an ANTLR {@code ParserRuleContext}
- * or accepting a {@code Token} in a helper that later becomes public.
- *
- * <p>The same check catches an MSDK or vendored reader type leaking out of the readers/7's readers, which is
- * why the forbidden list is a prefix allowlist rather than a list of the types known today.
- */
 class AstEncapsulationTest {
-
-    /** Package prefixes that must never appear in a public signature. */
     private static final List<String> FORBIDDEN =
             List.of(
-                    "org.antlr.", // the parser must stay swappable
-                    "io.github.msdk.", // vendoring source, never a dependency
-                    "org.cytoscape.massql.io.vendor.", // vendored parser internals
-                    "com.google.common.", // Guava is deliberately absent
-                    "org.slf4j." // the SDK logs nothing
-                    );
+                    "org.antlr.",
+                    "io.github.msdk.",
+                    "org.cytoscape.massql.io.vendor.",
+                    "com.google.common.",
+                    "org.slf4j.");
 
     private static final List<Class<?>> PUBLIC_API =
             List.of(
@@ -83,8 +69,6 @@ class AstEncapsulationTest {
 
     @Test
     void theAstPackageItselfIsFreeOfThirdPartyTypes() {
-        // Walk the AST reachable from MassqlQuery: its own records must be clean too, not
-        // just the entry points.
         Deque<Class<?>> todo = new ArrayDeque<>(List.of(MassqlQuery.class));
         Set<Class<?>> seen = new HashSet<>();
         List<String> violations = new ArrayList<>();
@@ -114,7 +98,6 @@ class AstEncapsulationTest {
 
     @Test
     void massqlParseExceptionIsCatchableAsMassqlException() {
-        // The app catches one type; a parse failure must not require a separate catch block.
         assertTrue(MassqlException.class.isAssignableFrom(MassqlParseException.class));
         assertTrue(RuntimeException.class.isAssignableFrom(MassqlException.class));
     }

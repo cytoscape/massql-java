@@ -1,21 +1,11 @@
 // massql-java -- the SDK. The CLI is a separate, independently versioned project in cli/.
-//
-// Build/lint conventions follow a sibling project so both behave the same way, taking only what
-// applies here: java, spotless, jacoco, maven-publish. Its packaging and extra repositories are
-// irrelevant to a plain library.
-//
-// Code style is NOT documented in prose anywhere. Spotless below is the whole specification:
-// `make lint` reports, `make lint-fix` fixes.
 
 plugins {
     id 'java'
     id 'antlr'
     id 'jacoco'
     id 'maven-publish'
-    // 8.9.0, not the sibling project's 6.25.0: forbidWildcardImports arrived in 7.1.0 and
-    // expandWildcardImports in 8.2.0, and this project relies on both.
     id 'com.diffplug.spotless' version '8.9.0' apply false
-    // Dead-code detection at compile time -- see the ErrorProne block below.
     id 'net.ltgt.errorprone' version '5.1.0' apply false
 }
 
@@ -38,46 +28,25 @@ allprojects {
 
     spotless {
         java {
-            // Vendored MSDK code is held byte-identical to upstream by policy (docs/VENDORED.md,
-            // asserted by VendoredProvenanceTest). Formatting it would break that guarantee.
-            // Vendored MSDK sources are held byte-identical to upstream by policy. NOTE this is
-            // src/MAIN only: src/test/.../io/vendor/ holds OUR tests OF the vendored decoder, which
-            // are formatted like everything else.
+            // Vendored MSDK is held byte-identical to upstream; formatting would break that.
             targetExclude 'src/main/java/org/cytoscape/massql/io/vendor/**',
-            // ANTLR's generated lexer/parser. The antlr plugin adds build/generated-src as a java
-            // source directory, so Spotless picks it up unless told otherwise -- and it is full of
-            // wildcard imports that forbidWildcardImports cannot auto-fix and nobody should hand-fix.
                     'build/generated-src/**'
 
-            // .aosp() = 4-space indent, 100-column limit -- what this codebase already uses.
-            //
-            // .skipJavadocFormatting() is deliberate: in this project the javadoc IS the
-            // specification (reader sentinel contracts, the zero-intensity note, and so on),
-            // written with intentional line breaks. Google's javadoc formatter would reflow ~1,965
-            // lines of it -- harmless semantically, unreviewable as a diff.
             googleJavaFormat('1.17.0').aosp().skipJavadocFormatting()
 
             importOrder('java', 'javax', 'org', 'com')
             removeUnusedImports()
 
-            // No wildcard imports, anywhere.
-            //
-            // The companion auto-fix step, expandWildcardImports(), is NOT used: it needs a
-            // JavaParser SymbolResolver wired to the compile classpath, Spotless provides no way to
-            // configure one (diffplug/spotless#2846), and it fails with "Symbol resolution not
-            // configured" on 33 files here. The 53 wildcards this repo had were expanded once,
-            // mechanically, from measured usage; this check is what keeps them from coming back.
+            // expandWildcardImports() is unusable here: it needs a SymbolResolver Spotless
+            // cannot configure (diffplug/spotless#2846).
             forbidWildcardImports()
 
-            // Escape hatch for the few places where manual alignment carries meaning -- e.g. the
-            // column-aligned one-line accessors in MgfReader's Scan.
             toggleOffOn()
         }
     }
 }
 
-// The Makefile gets no formatter otherwise. Markdown is deliberately EXCLUDED: two trailing spaces is
-// a semantic line break there, so reformatting docs would change how they render.
+// Markdown is excluded: two trailing spaces is a semantic line break there.
 spotless {
     format 'makefile', {
         target 'Makefile'
@@ -90,77 +59,31 @@ java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
 
-    // Published alongside the main jar, with -javadoc and -sources classifiers. The javadoc jar is
-    // where the SDK's class-level documentation lives -- docs/SDK.md deliberately documents no
-    // classes, because prose duplicating javadoc drifts from it.
     withJavadocJar()
     withSourcesJar()
 }
 
-// ⛔ Vendored MSDK sources are excluded from JAVADOC but NOT from the sources jar, and the asymmetry
-// is deliberate:
-//
-//   - javadoc documents OUR API. io/vendor/ is an implementation detail of the mzML/mzXML decoders,
-//     not something a consumer calls. It also carries 5 upstream javadoc errors (bad HTML entity,
-//     unresolvable @see references) that FAIL the javadoc task -- and they cannot be fixed here
-//     without breaking the byte-identity docs/VENDORED.md asserts.
-//   - the sources jar must match the binary we ship, which does contain those classes, and a
-//     redistributor needs them to satisfy the EPL-1.0 election.
+// Vendored MSDK is excluded from javadoc (it carries upstream javadoc errors that fail the task)
+// but NOT from the sources jar, which a redistributor needs for the EPL-1.0 election.
 tasks.named('javadoc') {
-    // Keep the doclint groups that catch BROKEN javadoc -- bad HTML, unresolvable @link/@see,
-    // malformed syntax -- and drop `missing`, which demands an @param/@return on every member.
-    // This codebase documents behaviour in prose rather than in tags (the reader sentinel contracts,
-    // the zero-intensity note, the two m/z window semantics), so `missing` reports ~100 non-problems and would
-    // bury a real one. Removing `-missing` is a tag-completeness project, not a correctness fix.
+    // Broken javadoc fails the build; missing javadoc does not.
     options.addStringOption('Xdoclint:all,-missing', '-quiet')
 
     exclude 'org/cytoscape/massql/io/vendor/**'
-    // Same reasoning for the generated lexer/parser: machine-written, not our API, and the source of
-    // ~100 "no comment" warnings that bury anything real.
     exclude '**/MassqlLexer.java', '**/MassqlParser.java', '**/MassqlVisitor.java',
             '**/MassqlBaseVisitor.java'
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    // Free, no plugin. Not -Werror: that is only worth enabling once the warning count is
-    // measured at zero, rather than assumed.
     options.compilerArgs << '-Xlint:all'
 }
 
-// Build outputs carry no version: build/libs/massql-java.jar, not massql-java-0.0.1-SNAPSHOT.jar.
-//
-// WHY. A version in the filename forces every consumer of that path to glob for it -- the Makefile
-// ran `ls *.jar | sed`, and docs/CLI.md told readers to paste a version-stamped path that went stale
-// on the next bump. A fixed name lets both state the path literally.
-//
-// This does NOT affect what is PUBLISHED. maven-publish names artifacts from
-// artifactId/version/classifier, so the Nexus still receives massql-java-<version>.jar; only the
-// local build output loses the stamp. release.yml copies the built jar to a versioned name before
-// attaching it to a GitHub release, where a bare massql-java.jar would tell a downloader nothing.
+// Build outputs carry no version so callers can state the path literally. Publication is
+// unaffected: maven-publish names artifacts from artifactId/version/classifier.
 tasks.withType(Jar).configureEach { archiveVersion = '' }
 
-// ---------------------------------------------------------------------------------------------
-// ErrorProne -- dead code fails the build
-// ---------------------------------------------------------------------------------------------
-//
-// WHY. A migration audit found three methods with zero coverage that turned out to be genuinely
-// unreachable: an AstBuilder.reject overload that no call site bound to, SpectrumTable's
-// assertRowInRange, and RowMask.ofRange. Nothing in the build objected to any of them; they were
-// found only because the coverage report happened to be read line by line.
-//
-// ⚠ WHAT THIS DOES AND DOES NOT CATCH. UnusedMethod flags PRIVATE members only -- deliberately, so
-// it never has to reason about callers in other files. Of those three it would have caught exactly
-// one (the private reject overload). No static analyser can flag an unused PUBLIC method in a
-// library, because a library's callers are by definition outside the repo.
-//
-// The other half of the answer is the coverage gate: a method at 0% is either dead or untested, and
-// both are worth acting on. That is what actually surfaced all three. The two tools cover different
-// halves, so they are not redundant.
-//
-// Only the unused-code checks are enabled. This is not a general static-analysis adoption -- turning
-// on ErrorProne's full catalogue would flood a mature codebase with findings unrelated to the reason
-// it was added, which is how a check gets switched off wholesale.
+// ErrorProne: only the unused-code checks are enabled.
 allprojects {
     dependencies {
         // 2.39.0 is the NEWEST release still compiled for Java 17. From 2.40 onward ErrorProne
@@ -189,9 +112,7 @@ dependencies {
     antlr "org.antlr:antlr4:${antlrVersion}"
 }
 
-// ---------------------------------------------------------------------------------------------
 // ANTLR
-// ---------------------------------------------------------------------------------------------
 
 // Gradle's antlr plugin makes compile/runtime extendFrom `antlr`, which would put the whole ANTLR
 // TOOL closure on the consumer classpath. generateGrammarSource takes its tool classpath from the
@@ -203,8 +124,6 @@ configurations.configureEach { conf ->
 }
 
 tasks.named('generateGrammarSource') {
-    // Visitor yes, listener no -- the parser is consumed through a visitor. Gradle's plugin
-    // generates listeners by default, which the Maven build explicitly disabled.
     //
     // -package is REQUIRED and is not optional the way Gradle's documentation implies. The plugin
     // mirrors src/main/antlr's directory structure into the output folder, but ANTLR itself emits
@@ -214,9 +133,7 @@ tasks.named('generateGrammarSource') {
     arguments += ['-visitor', '-no-listener', '-package', 'org.cytoscape.massql.lang']
 }
 
-// ---------------------------------------------------------------------------------------------
 // Tests: *IT is the integration tier, everything else is the unit tier
-// ---------------------------------------------------------------------------------------------
 
 // This block also supplies junit-jupiter and useJUnitPlatform() to the `test` task -- there is no
 // explicit JUnit dependency anywhere else.
@@ -257,9 +174,7 @@ tasks.named('check') {
     dependsOn tasks.named('integrationTest')
 }
 
-// ---------------------------------------------------------------------------------------------
 // Coverage gate
-// ---------------------------------------------------------------------------------------------
 
 // 90% instruction coverage, enforced by the build. A coverage floor rather than a test-count floor: a
 // hand-maintained count rots on every test added, and cannot notice a test that stopped running.
@@ -280,8 +195,7 @@ def coverageExclusions = [
 ]
 
 tasks.withType(JacocoReportBase).configureEach {
-    // Both suites contribute. Binding the agent to the unit suite alone would silently exclude every
-    // IT -- and in this project the gates ARE the ITs.
+    // Both tiers contribute; binding the agent to the unit tier alone would exclude every IT.
     dependsOn tasks.named('test'), tasks.named('integrationTest')
     executionData.setFrom(fileTree(layout.buildDirectory.dir('jacoco')).include('*.exec'))
     classDirectories.setFrom(
@@ -313,9 +227,7 @@ tasks.named('check') {
     dependsOn tasks.named('jacocoTestCoverageVerification')
 }
 
-// ---------------------------------------------------------------------------------------------
 // Publishing
-// ---------------------------------------------------------------------------------------------
 
 publishing {
     publications {

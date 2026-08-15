@@ -3,16 +3,9 @@ package org.cytoscape.massql.lang.ast;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * A parsed, validated MassQL query. Immutable.
- *
- * <p>Everything here is in scope for v1 by construction: {@code AstBuilder} rejects every
- * unsupported construct before an instance can be built, so the engine never
- * needs defensive handling for {@code MOBILITY}, variables, {@code formula()} and the rest.
- */
+/** A parsed, validated MassQL query. */
 public record MassqlQuery(
         QueryFunction function, DataSource source, List<Condition> where, List<Condition> filter) {
-
     public MassqlQuery {
         if (function == null) throw new IllegalArgumentException("function is required");
         if (source == null) throw new IllegalArgumentException("source is required");
@@ -20,7 +13,7 @@ public record MassqlQuery(
         filter = filter == null ? List.of() : List.copyOf(filter);
     }
 
-    /** Every condition from both clauses, in order. Convenience for the engine. */
+    /** Every condition from both clauses, in order. */
     public List<Condition> allConditions() {
         List<Condition> all = new ArrayList<>(where.size() + filter.size());
         all.addAll(where);
@@ -28,15 +21,7 @@ public record MassqlQuery(
         return List.copyOf(all);
     }
 
-    /**
-     * Stable textual form used by the conformance test to compare two ASTs.
-     *
-     * <p>Condition order is <b>preserved, not sorted</b>. The grammar's {@code AND} is a
-     * flat sequence and MassQL evaluates conditions as a conjunction, so order carries no
-     * semantics — but preserving it means this form round-trips the source query and a
-     * reordering bug in {@code AstBuilder} stays visible instead of being normalised away.
-     * See docs/internals/GRAMMAR_NOTES.md.
-     */
+    /** Stable textual form used by the conformance test to compare two ASTs. */
     public String canonical() {
         StringBuilder b = new StringBuilder();
         b.append(function).append('(').append(source).append(')');

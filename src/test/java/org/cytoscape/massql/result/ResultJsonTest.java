@@ -18,8 +18,6 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.annotations.SerializedName;
 
 class ResultJsonTest {
-
-    /** What the CLI configures: null columns must survive, since the contract has no optional key. */
     private static final Gson GSON = new GsonBuilder().serializeNulls().create();
 
     private static ScanInfoResult ms2Row() {
@@ -31,8 +29,6 @@ class ResultJsonTest {
     private static ScanInfoResult allNullable() {
         return new ScanInfoResult(1, null, null, 0.0, null, 1.0, 1, 2.0, 3.0, null, null, null);
     }
-
-    // ------------------------------------------------------------------ round trip
 
     @Test
     void aRowSurvivesSerializationAndBack() {
@@ -59,8 +55,6 @@ class ResultJsonTest {
 
     @Test
     void everyKeyIsPresentEvenWhenNull() {
-        // serializeNulls is what makes this true; without it gson drops the null columns and the
-        // 12-key contract silently becomes 6 keys on an MS1 row.
         String json = GSON.toJson(new ResultJson(List.of(allNullable())));
         for (String key : keysInDeclarationOrder()) {
             assertTrue(json.contains('"' + key + '"'), key + " missing from " + json);
@@ -69,8 +63,6 @@ class ResultJsonTest {
 
     @Test
     void keysAreSerializedInDeclarationOrder() {
-        // The one assertion that must read the text: order is a property of the document, and
-        // deserializing loses it. docs/RESULT_SCHEMA.md freezes it.
         String json = GSON.toJson(new ResultJson(List.of(ms2Row())));
         int at = 0;
         for (String key : keysInDeclarationOrder()) {
@@ -88,8 +80,6 @@ class ResultJsonTest {
 
     private static String keyOf(java.lang.reflect.RecordComponent c) {
         try {
-            // @SerializedName targets FIELD, so it propagates to the record's field rather than
-            // staying readable on the component -- which is also where gson reads it.
             return c.getDeclaringRecord()
                     .getDeclaredField(c.getName())
                     .getAnnotation(SerializedName.class)
@@ -98,8 +88,6 @@ class ResultJsonTest {
             throw new AssertionError(c.getName(), e);
         }
     }
-
-    // ------------------------------------------------------------------ immutability
 
     @Test
     void theResultsAccessorIsImmutable() {
@@ -125,8 +113,6 @@ class ResultJsonTest {
 
     @Test
     void aDeserializedInstanceIsEquallyImmutable() {
-        // Gson uses the canonical constructor for records, so the defensive copy must still run --
-        // otherwise mutability returns through the deserialization path alone.
         ResultJson r =
                 GSON.fromJson(GSON.toJson(new ResultJson(List.of(ms2Row()))), ResultJson.class);
         assertThrows(UnsupportedOperationException.class, () -> r.results().add(allNullable()));

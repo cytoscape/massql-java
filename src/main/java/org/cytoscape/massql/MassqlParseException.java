@@ -1,11 +1,10 @@
 package org.cytoscape.massql;
 
 /**
- * Thrown for query text this version cannot parse or does not support.
- *
- * <p>{@link #construct()} is mandatory, not decoration: the rejection tests assert on it and the CLI
- * names the offending construct on stderr, where a generic "syntax error" would leave a user with
- * nothing to act on. {@code UnsupportedConstructs} is the single list it is drawn from.
+ * Thrown for query text this version cannot parse or does not support. {@link #construct()} is
+ * mandatory, not decoration: the rejection tests assert on it and the CLI names the offending
+ * construct on stderr, where a generic "syntax error" would leave a user with nothing to act on.
+ * {@code UnsupportedConstructs} is the single list it is drawn from.
  */
 public class MassqlParseException extends MassqlException {
     private static final long serialVersionUID = 1L;
@@ -27,7 +26,7 @@ public class MassqlParseException extends MassqlException {
         this.position = position;
     }
 
-    /** The offending construct, e.g. "scansum" or "FILTER". Never null or blank. */
+    /** The offending construct, e.g. "scansum" or "FILTER". */
     public String construct() {
         return construct;
     }

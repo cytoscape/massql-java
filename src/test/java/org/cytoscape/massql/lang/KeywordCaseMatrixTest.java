@@ -8,16 +8,7 @@ import org.cytoscape.massql.MassqlParseException;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * MassQL's keyword casing is ASYMMETRIC, and this test is what stops someone
- * "simplifying" the lexer into a case-insensitive one.
- *
- * <p>{@code QUERY}/{@code WHERE}/{@code AND}/{@code MS1DATA}/{@code MS2DATA}/
- * {@code POSITIVE}/{@code NEGATIVE} have case variants. {@code FILTER}, {@code OR}, every
- * condition name and every qualifier name do not. Function names are lowercase only.
- */
 class KeywordCaseMatrixTest {
-
     @ParameterizedTest
     @ValueSource(
             strings = {
@@ -46,19 +37,15 @@ class KeywordCaseMatrixTest {
     @ParameterizedTest
     @ValueSource(
             strings = {
-                // FILTER has no lowercase or mixed form in the source grammar.
                 "QUERY scaninfo(MS2DATA) WHERE MS2PROD=100 filter MS2PROD=200",
                 "QUERY scaninfo(MS2DATA) WHERE MS2PROD=100 Filter MS2PROD=200",
-                // OR likewise.
                 "QUERY scaninfo(MS2DATA) WHERE MS2PROD=(100 or 200)",
                 "QUERY scaninfo(MS2DATA) WHERE MS2PROD=(100 Or 200)",
-                // Condition and qualifier names are strictly uppercase.
                 "QUERY scaninfo(MS2DATA) WHERE ms2prod=100",
                 "QUERY scaninfo(MS2DATA) WHERE Ms2Prod=100",
                 "QUERY scaninfo(MS2DATA) WHERE MS2PROD=100:tolerancemz=0.1",
                 "QUERY scaninfo(MS2DATA) WHERE MS2PROD=100:ToleranceMz=0.1",
                 "QUERY scaninfo(MS1DATA) WHERE rtmin=50",
-                // Function names are lowercase only.
                 "QUERY SCANINFO(MS2DATA) WHERE MS2PROD=100",
                 "QUERY ScanInfo(MS2DATA) WHERE MS2PROD=100",
             })
@@ -67,7 +54,6 @@ class KeywordCaseMatrixTest {
                 MassqlParseException.class, () -> Massql.parse(query), "must reject: " + query);
     }
 
-    /** FILTER is accepted in its one legal casing, so the rejections above are about case. */
     @ParameterizedTest
     @ValueSource(
             strings = {

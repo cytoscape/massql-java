@@ -19,38 +19,7 @@ import org.cytoscape.massql.result.ResultJson;
 import org.cytoscape.massql.result.ScanInfoResult;
 import org.junit.jupiter.api.Test;
 
-/**
- * Every type on the public surface is either a JDK type or one of ours — <b>and is itself public</b>.
- *
- * <p>This is the check that keeps the parser and the readers swappable. ANTLR could be replaced with
- * a hand-written parser, or the vendored MSDK decoders re-synced, without any caller noticing —
- * but only while nothing from those layers has leaked into a signature.
- *
- * <h2>Why an allowlist, when {@code AstEncapsulationTest} already uses a blocklist</h2>
- *
- * <p>They are complements, and the difference is what they catch. A blocklist of known offenders
- * ({@code org.antlr.}, {@code io.github.msdk.}, …) cannot catch a <i>new</i> third-party type that
- * nobody thought to add to it. This test inverts that: anything that is not a JDK type or one of
- * ours is a violation by default, so a future dependency leaking out fails here without anyone
- * having to predict it.
- *
- * <h2>The second rule, and why it exists</h2>
- *
- * <p>"One of ours" is not sufficient on its own. {@code Format} lives in {@code massql.io} and is
- * therefore ours, but narrowed it to <b>package-private</b> precisely so it
- * appears in no public signature — a consumer cannot name a type they cannot see, so exposing one is
- * a compile error waiting to happen for them and an unusable API for everyone. Asserting that every
- * type in a public signature is itself {@code public} catches that, and catches the next one.
- */
 class ApiEncapsulationTest {
-
-    /**
-     * The published surface — what a consumer, including the CLI, actually codes against.
-     *
-     * <p>{@code exec.*} is deliberately absent: those classes are public for the CLI project to
-     * reach across the module boundary, not because a consumer should call them. {@code docs/SDK.md}
-     * documents this list as the contract.
-     */
     private static final List<Class<?>> PUBLIC_API =
             List.of(
                     Massql.class,
@@ -95,11 +64,6 @@ class ApiEncapsulationTest {
 
     @Test
     void formatStaysInvisible() {
-        // The specific case, asserted by name so the reason survives: SpectraStream
-        // used
-        // to carry a format() accessor whose ONLY caller was a test. Removing it let Format become
-        // package-private, so it now appears in no public signature at all. This fails loudly if
-        // someone re-widens it "for convenience".
         Class<?> format;
         try {
             format = Class.forName("org.cytoscape.massql.io.Format");
@@ -112,7 +76,6 @@ class ApiEncapsulationTest {
                         + "reader was chosen, and a public API cannot mention a type callers cannot see");
     }
 
-    /** Recurses through generics, so {@code List<SomeLeakedType>} cannot hide inside a container. */
     private static void check(List<String> out, String where, Type t) {
         if (t instanceof ParameterizedType p) {
             check(out, where, p.getRawType());
@@ -121,7 +84,7 @@ class ApiEncapsulationTest {
             }
             return;
         }
-        if (!(t instanceof Class<?> c)) return; // type variables and wildcards carry no package
+        if (!(t instanceof Class<?> c)) return;
         while (c.isArray()) c = c.getComponentType();
         if (c.isPrimitive()) return;
 

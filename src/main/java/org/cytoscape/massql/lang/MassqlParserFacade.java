@@ -8,25 +8,11 @@ import org.antlr.v4.runtime.Recognizer;
 import org.cytoscape.massql.MassqlParseException;
 import org.cytoscape.massql.lang.ast.MassqlQuery;
 
-/**
- * Turns query text into a typed AST. The only place ANTLR is driven.
- *
- * <p>Package-private on purpose: {@code Massql.parse} is the public entry point, so the
- * choice of parser stays an implementation detail and could be swapped for a hand-written
- * one without touching callers.
- */
+/** Turns query text into a typed AST. */
 public final class MassqlParserFacade {
-
     private MassqlParserFacade() {}
 
-    /**
-     * Error listener that THROWS.
-     *
-     * <p>ANTLR's default {@code ConsoleErrorListener} writes to stderr and then <b>recovers</b>,
-     * returning a partial parse tree. That is the single easiest way to ship a parser that
-     * silently accepts nonsense: without replacing it, malformed queries produce a
-     * half-built AST and the rejection tests pass for the wrong reason.
-     */
+    /** Error listener that THROWS. */
     private static final class ThrowingErrorListener extends BaseErrorListener {
         @Override
         public void syntaxError(
@@ -72,8 +58,7 @@ public final class MassqlParserFacade {
         if (queryText == null) {
             throw new MassqlParseException("<empty>", "query text is null");
         }
-        // The reference strips the query file before parsing, and the
-        // .massql files on disk end with a newline.
+
         String text = queryText.strip();
         if (text.isEmpty()) {
             throw new MassqlParseException("<empty>", "query text is empty");
@@ -95,8 +80,6 @@ public final class MassqlParserFacade {
         } catch (MassqlParseException e) {
             throw e;
         } catch (RuntimeException e) {
-            // Never let an ANTLR internal failure surface as something other than our type;
-            // "never a crash" is a requirement even on garbage input.
             throw new MassqlParseException(
                     "<syntax>", "could not parse query: " + e.getMessage(), -1, e);
         }

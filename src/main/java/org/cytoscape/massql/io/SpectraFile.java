@@ -8,18 +8,11 @@ import java.nio.file.Path;
 
 import org.cytoscape.massql.MassqlException;
 
-/**
- * Opens a spectra file as a {@link SpectraStream}, sniffing the format from its content.
- *
- * <p>Sniffing is by <b>content, not extension</b>. The fixtures disagree on case — msconvert writes
- * {@code small.mzXML} while the Ewing download is {@code DP00570_F02.mzxml}, so an extension-driven reader
- * is a trap. Extension is not consulted at all.
- */
+/** Opens a spectra file as a {@link SpectraStream}, sniffing the format from its content. */
 public final class SpectraFile {
-
     private SpectraFile() {}
 
-    /** How much of the head to inspect. Enough for an XML declaration plus the root element. */
+    /** How much of the head to inspect. */
     private static final int SNIFF_BYTES = 8192;
 
     public static SpectraStream open(Path path) {
@@ -46,15 +39,12 @@ public final class SpectraFile {
         String head = head(path);
         String lower = head.toLowerCase(java.util.Locale.ROOT);
 
-        // MGF first: a peak list has no angle brackets at all, and its blocks are unmistakable.
-        // Both real fixtures carry a COM=/CHARGE= preamble before the first BEGIN IONS, so look
-        // anywhere in the head rather than only at the first non-blank line.
         if (lower.contains("begin ions")) return Format.MGF;
 
         if (lower.contains("<mzxml") || lower.contains("<msrun")) return Format.MZXML;
         if (lower.contains("<mzml") || lower.contains("<indexedmzml")) return Format.MZML;
 
-        if (!head.contains("<")) return Format.MGF; // text with no markup: treat as a peak list
+        if (!head.contains("<")) return Format.MGF;
 
         throw new MassqlException(
                 "cannot determine format of "

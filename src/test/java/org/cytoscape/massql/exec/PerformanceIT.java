@@ -23,38 +23,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
-/**
- * Wall-clock and peak heap per fixture — <b>recorded, not gated</b> (the differential).
- *
- * <h2>Why the assertions are deliberately loose</h2>
- *
- * <p>A timing threshold tight enough to be meaningful is also tight enough to fail on a loaded CI box,
- * and a test that fails for reasons unrelated to the code gets disabled — taking its real coverage with
- * it. So the only assertions here are absurdity ceilings: they catch an accidental quadratic, not a
- * regression of 20%. The <i>numbers</i> are the deliverable, written to the report fragment below.
- *
- * <h2>The host spec is captured, never transcribed</h2>
- *
- * <p>⚠ A machine spec typed into a review document by hand is a number that is wrong later. This class
- * writes {@code build/reports/performance/measurements.txt} with the processor count, heap ceiling, OS
- * and JVM it actually ran on, and the report quotes that file. Any cross-implementation comparison is a
- * dated historical datapoint from a different machine, and is labelled as one — the two are not
- * measured under the same conditions and must not be presented as if they were.
- *
- * <p>The MGF is the fixture that matters: if this is not at least as fast as the reference on it, something is
- * quadratic — probably a linear scan where a binary search belongs. If that ever fires, look at {@code mzWindowExclusive} first — it is the hotter of the two window
- * methods, being called per condition per scan.
- */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class PerformanceIT {
-
-    /** No fixture in this suite is anywhere near this; it catches an accidental quadratic, nothing finer. */
     private static final long CEILING_MILLIS = 120_000;
 
-    /** One fixture's measurement. */
     private record Measurement(
             String fixture, String query, int rows, long millis, long peakHeapBytes) {
-
         String line() {
             return String.format(
                     Locale.ROOT,
@@ -69,11 +43,6 @@ class PerformanceIT {
 
     private final List<Measurement> measurements = new ArrayList<>();
 
-    /**
-     * ⛔ The one that matters — 34,513 spectra of MGF.
-     *
-     * <p>Run first and reported first, because it is the fixture whose timing carries information.
-     */
     @Test
     void plusRiseMgfIsTheFixtureThatMatters() {
         measure("data/PlusRise.mgf", "test");
@@ -95,13 +64,6 @@ class PerformanceIT {
         measure("data/small.mzXML", "test_mzml");
     }
 
-    /**
-     * Times one run and records its peak heap.
-     *
-     * <p>Peak usage is reset immediately before the run, so the figure is this query's, not whatever the
-     * suite happened to accumulate earlier. A GC is requested first for the same reason — it is a hint,
-     * not a guarantee, which is another reason these numbers are reported rather than asserted on.
-     */
     private void measure(String fixture, String query) {
         Path path = resource(fixture);
         String q = queryText(query);
@@ -131,7 +93,6 @@ class PerformanceIT {
                                 + " it runs per condition per scan (the store).");
     }
 
-    /** Writes the measurements and the host they were taken on. */
     @AfterAll
     void writeTheReportFragment() {
         Runtime rt = Runtime.getRuntime();
@@ -174,12 +135,8 @@ class PerformanceIT {
             throw new UncheckedIOException(e);
         }
 
-        // Tests may print; the SDK may not. This is what makes `make it` output usable
-        // directly.
         System.out.println(sb);
     }
-
-    // ------------------------------------------------------------------ measurement plumbing
 
     private static void resetPeakUsage() {
         for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
@@ -200,8 +157,6 @@ class PerformanceIT {
         return slash < 0 ? path : path.substring(slash + 1);
     }
 
-    // Reimplemented rather than reusing io/Fixtures, which is package-private to ...massql.io.
-    // DifferentialIT and CollationAnchorIT hit the same wall; this is the documented shape of it.
     private static Path resource(String relative) {
         URL url = PerformanceIT.class.getClassLoader().getResource(relative);
         if (url == null) {

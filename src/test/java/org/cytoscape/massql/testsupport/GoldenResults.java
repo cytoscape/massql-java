@@ -26,17 +26,7 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.annotations.SerializedName;
 
-/**
- * Reads a reference-generated golden from {@code goldens/query-results/} into {@link ScanInfoResult}
- * rows.
- *
- * <p>Gson maps the values; the structural checks here are what gson does not do. A golden that lost a
- * key would otherwise deserialize as a row of nulls and compare "successfully" against a genuinely
- * null column, so the key set and the value types are asserted before mapping.
- */
 public final class GoldenResults {
-
-    /** The frozen key order, read from the record itself rather than restated. */
     public static final List<String> KEYS =
             Arrays.stream(ScanInfoResult.class.getRecordComponents())
                     .map(GoldenResults::keyOf)
@@ -44,8 +34,6 @@ public final class GoldenResults {
 
     private static String keyOf(RecordComponent c) {
         try {
-            // @SerializedName targets FIELD, so it propagates to the record's field rather than
-            // staying readable on the component -- which is also where gson reads it.
             return c.getDeclaringRecord()
                     .getDeclaredField(c.getName())
                     .getAnnotation(SerializedName.class)
@@ -55,7 +43,6 @@ public final class GoldenResults {
         }
     }
 
-    /** Key -> component type, so the integral check below follows the record rather than a list. */
     private static final Map<String, Class<?>> TYPES =
             Arrays.stream(ScanInfoResult.class.getRecordComponents())
                     .collect(
@@ -69,16 +56,10 @@ public final class GoldenResults {
 
     private GoldenResults() {}
 
-    /**
-     * Reads the golden named by its bare stem, e.g. {@code "small_mzml_results"}.
-     *
-     * @throws AssertionError if the golden is missing or malformed — never a skip
-     */
     public static List<ScanInfoResult> of(String name) {
         return read(Fixtures.require("goldens/query-results/" + name + ".json"));
     }
 
-    /** Reads a golden from an explicit path, for tests that construct malformed input. */
     public static List<ScanInfoResult> read(Path path) {
         String text;
         try {
@@ -134,15 +115,13 @@ public final class GoldenResults {
             if (!v.isJsonPrimitive() || !v.getAsJsonPrimitive().isNumber()) {
                 throw new AssertionError(at + ": '" + key + "' must be a number or null, got " + v);
             }
-            // Gson would truncate 3.5 to 3 for an Integer column, making an exact comparison
-            // silently approximate.
+
             if (TYPES.get(key) == Integer.class && v.getAsDouble() % 1 != 0) {
                 throw new AssertionError(at + ": '" + key + "' must be integral, got " + v);
             }
         }
     }
 
-    /** Asserts the golden exists, so a missing file fails here rather than as an empty comparison. */
     public static void requireExists(String name) {
         assertNotNull(
                 GoldenResults.class

@@ -1,6 +1,6 @@
 package org.cytoscape.massql.lang.ast;
 
-/** Arithmetic operator. Folding happens in the engine, not here. */
+/** Arithmetic operator. */
 public enum Op {
     ADD("+"),
     SUB("-"),

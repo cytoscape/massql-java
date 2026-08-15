@@ -1,7 +1,6 @@
 package org.cytoscape.massql.lang.ast;
 
-/** {@code MS1DATA} or {@code MS2DATA}. Determines both which peak table is queried and
- *  which peak table is queried. */
+/** {@code MS1DATA} or {@code MS2DATA}. */
 public enum DataSource {
     MS1DATA,
     MS2DATA

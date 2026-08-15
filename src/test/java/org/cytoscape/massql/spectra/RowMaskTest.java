@@ -12,7 +12,6 @@ import org.cytoscape.massql.MassqlException;
 import org.junit.jupiter.api.Test;
 
 class RowMaskTest {
-
     @Test
     void allAndNoneAndCardinality() {
         assertEquals(10, RowMask.all(10).cardinality());
@@ -23,10 +22,6 @@ class RowMaskTest {
 
     @Test
     void operationsReturnNewInstancesAndLeaveOperandsUntouched() {
-        // Immutability is the point: the condition filters composes conditions, and a mask mutated
-        // under
-        // one condition while another holds a reference is a wrong-answer bug with no
-        // exception to point at it.
         RowMask a = RowMask.all(4);
         RowMask b = RowMask.none(4);
         RowMask and = a.and(b);
@@ -44,8 +39,8 @@ class RowMaskTest {
 
     @Test
     void andOrNotSemantics() {
-        RowMask x = RowMask.none(4).withRange(new IntRange(0, 2)); // rows 0,1
-        RowMask y = RowMask.none(4).withRange(new IntRange(1, 3)); // rows 1,2
+        RowMask x = RowMask.none(4).withRange(new IntRange(0, 2));
+        RowMask y = RowMask.none(4).withRange(new IntRange(1, 3));
 
         RowMask and = x.and(y);
         assertFalse(and.get(0));
@@ -76,15 +71,12 @@ class RowMaskTest {
 
     @Test
     void scansWithAnyRowIsTheShapeConditionsActuallyNeed() {
-        // Most MassQL conditions mean "this scan contains a peak matching X", not "this row
-        // matches X" -- the condition filters intersects these scan sets.
         SpectrumTableBuilder b = new SpectrumTableBuilder(2);
-        b.startScan(1, 0.0, 1).addPeak(100, 1).addPeak(200, 2); // rows 0,1
-        b.startScan(2, 0.1, 1).addPeak(300, 3); // row 2
-        b.startScan(3, 0.2, 1).addPeak(400, 4).addPeak(500, 5); // rows 3,4
+        b.startScan(1, 0.0, 1).addPeak(100, 1).addPeak(200, 2);
+        b.startScan(2, 0.1, 1).addPeak(300, 3);
+        b.startScan(3, 0.2, 1).addPeak(400, 4).addPeak(500, 5);
         SpectrumTable t = b.build();
 
-        // Select row 1 (scan 1) and row 4 (scan 3); scan 2 has nothing.
         RowMask m =
                 RowMask.none(t.rowCount())
                         .withRange(new IntRange(1, 2))
@@ -100,7 +92,7 @@ class RowMaskTest {
     void emptyScansAreNeverReportedAsMatching() {
         SpectrumTableBuilder b = new SpectrumTableBuilder(1);
         b.startScan(1, 0.0, 1).addPeak(100, 1);
-        b.startScan(2, 0.1, 1); // empty scan, rowStart == rowEnd
+        b.startScan(2, 0.1, 1);
         b.startScan(3, 0.2, 1).addPeak(300, 3);
         SpectrumTable t = b.build();
 
