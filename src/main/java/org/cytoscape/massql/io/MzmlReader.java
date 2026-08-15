@@ -16,7 +16,7 @@ import org.cytoscape.massql.io.vendor.MzMLBitLength;
 import org.cytoscape.massql.io.vendor.MzMLCV;
 import org.cytoscape.massql.io.vendor.MzMLCompressionType;
 import org.cytoscape.massql.io.vendor.MzMLPeaksDecoder;
-import org.cytoscape.massql.spectra.SpectrumTable;
+import org.cytoscape.massql.lang.ast.Polarity;
 import org.cytoscape.massql.spectra.SpectrumTableBuilder;
 
 import javolution.text.CharArray;
@@ -61,6 +61,7 @@ final class MzmlReader extends AbstractSpectraStream {
     private int previousMs1Scan = 0;
 
     private final Scan scan = new Scan();
+    private ScanView current;
 
     MzmlReader(Path path) {
         super(path);
@@ -95,7 +96,7 @@ final class MzmlReader extends AbstractSpectraStream {
 
     @Override
     protected ScanView view() {
-        return scan;
+        return current;
     }
 
     @Override
@@ -124,6 +125,7 @@ final class MzmlReader extends AbstractSpectraStream {
                 } else {
                     scan.ms1scan = previousMs1Scan;
                 }
+                current = scan.toView();
                 return true;
             }
             return false;
@@ -356,7 +358,8 @@ final class MzmlReader extends AbstractSpectraStream {
     }
 
     /** Mutable, reused across spectra — retained memory stays bounded by one scan. */
-    private final class Scan implements ScanView {
+    /** Accumulates one spectrum as it is parsed, then builds the immutable view. */
+    private final class Scan {
         int scanId;
         int msLevel;
         double rt;
@@ -373,8 +376,8 @@ final class MzmlReader extends AbstractSpectraStream {
             msLevel = 0;
             rt = 0.0;
             polarity = 0;
-            precmz = 0.0; // 0 sentinel -- collation converts, not us
-            ms1scan = 0; // 0 = no preceding MS1; the origin of the sentinel
+            precmz = 0.0;
+            ms1scan = 0;
             charge = 0;
             peakCount = 0;
             mzArray = null;
@@ -387,48 +390,7 @@ final class MzmlReader extends AbstractSpectraStream {
             // Any other array type (e.g. retention time arrays on chromatograms) is ignored.
         }
 
-        @Override
-        public int scanId() {
-            return scanId;
-        }
-
-        @Override
-        public int msLevel() {
-            return msLevel;
-        }
-
-        @Override
-        public double rt() {
-            return rt;
-        }
-
-        @Override
-        public int polarity() {
-            return polarity;
-        }
-
-        @Override
-        public double precmz() {
-            return precmz;
-        }
-
-        @Override
-        public int ms1scan() {
-            return ms1scan;
-        }
-
-        @Override
-        public int charge() {
-            return charge;
-        }
-
-        @Override
-        public int peakCount() {
-            return peakCount;
-        }
-
-        @Override
-        public SpectrumTable materialize() {
+        ScanView toView() {
             double[] mz = decode(mzArray, "m/z");
             double[] in = decode(intensityArray, "intensity");
             int n = Math.min(mz.length, in.length);
@@ -447,7 +409,15 @@ final class MzmlReader extends AbstractSpectraStream {
             SpectrumTableBuilder b = new SpectrumTableBuilder(msLevel == 1 ? 1 : 2, n);
             b.startScan(scanId, rt, polarity, precmz, ms1scan, charge);
             for (int i = 0; i < n; i++) b.addPeak(mz[i], in[i]);
-            return b.build();
+            return new ScanView(
+                    scanId,
+                    msLevel,
+                    rt,
+                    polarity == 1 ? Polarity.POSITIVE : polarity == 2 ? Polarity.NEGATIVE : null,
+                    precmz == 0.0 ? null : precmz,
+                    ms1scan == 0 ? null : ms1scan,
+                    charge == 0 ? null : charge,
+                    b.build());
         }
 
         private double[] decode(Binary bin, String what) {

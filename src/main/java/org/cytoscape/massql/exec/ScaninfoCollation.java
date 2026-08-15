@@ -60,9 +60,9 @@ public final class ScaninfoCollation implements QualifyingScanConsumer {
         // reader's own metadata authority and cannot be confused with the other table.
         int scanId = view.scanId();
         int msLevel = view.msLevel();
-        double rawPrecmz = view.precmz();
-        int rawMs1scan = view.ms1scan();
-        int rawCharge = view.charge();
+        Double precmz = view.precmz();
+        Integer ms1scan = view.ms1scan();
+        Integer charge = view.charge();
 
         // Ordering is a promise QualifyingScanConsumer makes ("scan-id-ascending falls out of
         // document
@@ -109,14 +109,8 @@ public final class ScaninfoCollation implements QualifyingScanConsumer {
         Double basePeakI = topRow < 0 ? null : scan.intensity(topRow);
         Double basePeakMz = topRow < 0 ? null : scan.mz(topRow);
 
-        // ---- the precursor lookup, on RAW sentinels.
         PrecursorLookup.Result ms1 =
-                PrecursorLookup.lookup(retainedMs1, rawMs1scan, rawPrecmz, precursorTolPpm);
-
-        // ---- sentinel conversion, AFTER the lookup. Exactly three columns; never rt.
-        Double precmz = rawPrecmz == 0.0 ? null : rawPrecmz;
-        Integer ms1scan = rawMs1scan == 0 ? null : rawMs1scan;
-        Integer charge = rawCharge == 0 ? null : rawCharge;
+                PrecursorLookup.lookup(retainedMs1, ms1scan, precmz, precursorTolPpm);
 
         rows.add(
                 new ScanInfoResult(

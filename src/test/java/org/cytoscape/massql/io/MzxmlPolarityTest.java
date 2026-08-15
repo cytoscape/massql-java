@@ -1,8 +1,10 @@
 package org.cytoscape.massql.io;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.cytoscape.massql.testsupport.Fixtures;
+import org.cytoscape.massql.testsupport.Raw;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -67,7 +69,7 @@ class MzxmlPolarityTest {
                     ScanView v = s.next();
                     assertEquals(
                             1,
-                            v.polarity(),
+                            Raw.polarity(v.polarity()),
                             "scan " + v.scanId() + ": small.mzXML is polarity=\"+\" throughout");
                     scans++;
                 }
@@ -102,7 +104,7 @@ class MzxmlPolarityTest {
                     SpectraFile.open(Fixtures.require("fixtures/micro/micro_nopolarity.mzXML"))) {
                 while (s.hasNext()) {
                     ScanView v = s.next();
-                    assertEquals(0, v.polarity());
+                    assertNull(v.polarity());
                     scans++;
                 }
             }
@@ -136,11 +138,11 @@ class MzxmlPolarityTest {
                                         new Row(
                                                 v.scanId(),
                                                 v.msLevel(),
-                                                v.ms1scan(),
+                                                Raw.orZero(v.ms1scan()),
                                                 v.rt(),
-                                                v.precmz(),
-                                                v.charge(),
-                                                v.materialize().rowCount()));
+                                                Raw.orZero(v.precmz()),
+                                                Raw.orZero(v.charge()),
+                                                v.peaks().rowCount()));
                             }
                         }
                         return out;

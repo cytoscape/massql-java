@@ -33,7 +33,7 @@ class MzxmlDecodeTest {
         try (SpectraStream s = SpectraFile.open(p)) {
             while (s.hasNext()) {
                 ScanView v = s.next();
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 for (int i = 0; i < t.rowCount(); i++)
                     out.add(new double[] {t.mz(i), t.intensity(i)});
             }
@@ -134,7 +134,7 @@ class MzxmlDecodeTest {
             while (s.hasNext()) {
                 ScanView v = s.next();
                 if (v.scanId() != 2) continue;
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 assertEquals(3, t.rowCount());
                 // m/z all in the 400-700 band, intensities all >= 1000: only correct
                 // de-interleaving
@@ -167,7 +167,7 @@ class MzxmlDecodeTest {
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mzXML"))) {
             while (s.hasNext()) {
                 ScanView v = s.next();
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 for (int i = 0; i < t.rowCount(); i++) {
                     assertTrue(
                             t.mz(i) > 1.0 && t.mz(i) < 100_000.0,

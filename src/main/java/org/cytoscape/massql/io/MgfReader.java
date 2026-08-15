@@ -12,7 +12,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.cytoscape.massql.MassqlException;
-import org.cytoscape.massql.spectra.SpectrumTable;
+import org.cytoscape.massql.lang.ast.Polarity;
 import org.cytoscape.massql.spectra.SpectrumTableBuilder;
 
 /**
@@ -35,6 +35,7 @@ final class MgfReader extends AbstractSpectraStream {
 
     private int blockIndex = 0; // 1-based once incremented; the scan-id fallback
     private final Scan scan = new Scan();
+    private ScanView current;
 
     /**
      * Charge for blocks carrying no {@code CHARGE=} of their own.
@@ -61,7 +62,7 @@ final class MgfReader extends AbstractSpectraStream {
 
     @Override
     protected ScanView view() {
-        return scan;
+        return current;
     }
 
     @Override
@@ -183,6 +184,7 @@ final class MgfReader extends AbstractSpectraStream {
         }
 
         scan.finish(blockIndex, mz, in, n);
+        current = scan.toView();
         return true;
     }
 
@@ -261,8 +263,8 @@ final class MgfReader extends AbstractSpectraStream {
         }
     }
 
-    /** Mutable, reused across blocks — retained memory stays bounded by one scan. */
-    private static final class Scan implements ScanView {
+    /** Accumulates one block's fields as they are parsed, then builds the immutable view. */
+    private static final class Scan {
         int explicitScanId;
         int scanId;
         double precmz;
@@ -275,85 +277,37 @@ final class MgfReader extends AbstractSpectraStream {
         void reset(int defaultCharge) {
             explicitScanId = 0;
             scanId = 0;
-            precmz = 0.0; // 0 sentinel: not recorded
-            // ⚠ MGF charge is NEVER null and never 0. A block with no CHARGE= of its own
-            // takes the file-level header's charge, and 1 only when the file declares none either.
-            // A genuine 1+ is therefore indistinguishable from an absent one -- deliberately, since
-            // that is what the reference produces.
+            precmz = 0.0;
+            // MGF charge is never absent: a block with no CHARGE= takes the file header's charge,
+            // and 1 when the file declares none either, so a genuine 1+ is indistinguishable from
+            // an absent one -- which is what the reference produces.
             charge = defaultCharge;
-            rt = 0.0; // ⚠ absent RTINSECONDS is 0.0, a REAL value, never null
+            rt = 0.0;
             n = 0;
         }
 
         void finish(int blockIndex, double[] mz, double[] in, int n) {
-            // SCANS= when present, else the 1-based block index.
             this.scanId = explicitScanId > 0 ? explicitScanId : blockIndex;
             this.mz = mz;
             this.in = in;
             this.n = n;
         }
 
-        @Override
-        public int scanId() {
-            return scanId;
-        }
-
-        @Override
-        public int msLevel() {
-            return 2;
-        } // MGF is an MS2-only peak list
-
-        @Override
-        public double rt() {
-            return rt;
-        }
-
-        /**
-         * MGF polarity is a hardcoded <b>1</b>, not 0.
-         *
-         * <p>It is tempting to reason that MGF polarity "is not read on the live path" and infer 0 from that. The
-         * first half is true: no MGF header supplies polarity. The inference was wrong. Both MGF loaders
-         * write {@code "polarity": 1  # Default} into every peak dict
-         * hardcoded, so the reference reports **positive** for every MGF row.
-         *
-         * <p>Measured across all three MGF fixtures — {@code micro.mgf} 7 rows, {@code DP00570_F02.mgf}
-         * 107,178, {@code PlusRise.mgf} 758,544 — the polarity distribution is {@code {1: all}}. Not one 0.
-         *
-         * <p>Found by {@code ReaderParityIT}, the parity gate, before any query logic existed. Returning 0
-         * here would have failed the differential on the polarity column for **every MGF row**, and
-         * at that layer it would have looked like a collation bug.
-         */
-        @Override
-        public int polarity() {
-            return 1;
-        }
-
-        @Override
-        public double precmz() {
-            return precmz;
-        }
-
-        @Override
-        public int ms1scan() {
-            return 0;
-        } // hardcoded 0 in the reference
-
-        @Override
-        public int charge() {
-            return charge;
-        }
-
-        @Override
-        public int peakCount() {
-            return n;
-        }
-
-        @Override
-        public SpectrumTable materialize() {
-            SpectrumTableBuilder b = new SpectrumTableBuilder(2, n); // exact: peaks already counted
-            b.startScan(scanId, rt, 0, precmz, 0, charge);
+        ScanView toView() {
+            SpectrumTableBuilder b = new SpectrumTableBuilder(2, n);
+            b.startScan(scanId, rt, 1, precmz, 0, charge);
             for (int i = 0; i < n; i++) b.addPeak(mz[i], in[i]);
-            return b.build();
+            // Both reference MGF loaders hardcode polarity 1 into every peak dict, so every MGF row
+            // is positive; measured across all three MGF fixtures, not one 0.
+            return new ScanView(
+                    scanId,
+                    2,
+                    rt,
+                    Polarity.POSITIVE,
+                    precmz == 0.0 ? null : precmz,
+                    null,
+                    charge,
+                    b.build());
         }
     }
 }

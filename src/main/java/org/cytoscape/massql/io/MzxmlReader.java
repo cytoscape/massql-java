@@ -16,7 +16,7 @@ import java.util.zip.Inflater;
 import org.cytoscape.massql.MassqlException;
 import org.cytoscape.massql.io.vendor.ByteBufferInputStream;
 import org.cytoscape.massql.io.vendor.FileMemoryMapper;
-import org.cytoscape.massql.spectra.SpectrumTable;
+import org.cytoscape.massql.lang.ast.Polarity;
 import org.cytoscape.massql.spectra.SpectrumTableBuilder;
 
 import javolution.text.CharArray;
@@ -68,6 +68,7 @@ final class MzxmlReader extends AbstractSpectraStream {
     private boolean scanStarted = false;
 
     private final Scan scan = new Scan();
+    private ScanView current;
 
     MzxmlReader(Path path) {
         super(path);
@@ -120,7 +121,7 @@ final class MzxmlReader extends AbstractSpectraStream {
 
     @Override
     protected ScanView view() {
-        return scan;
+        return current;
     }
 
     @Override
@@ -189,6 +190,7 @@ final class MzxmlReader extends AbstractSpectraStream {
         } else {
             scan.ms1scan = previousMs1Scan;
         }
+        current = scan.toView();
         return true;
     }
 
@@ -432,7 +434,8 @@ final class MzxmlReader extends AbstractSpectraStream {
     }
 
     /** Mutable, reused across scans — retained memory stays bounded by one scan. */
-    private final class Scan implements ScanView {
+    /** Accumulates one scan as it is parsed, then builds the immutable view. */
+    private final class Scan {
         int scanId;
         int msLevel;
         double rt;
@@ -483,55 +486,22 @@ final class MzxmlReader extends AbstractSpectraStream {
             return width == 0 ? 0 : bytes / width;
         }
 
-        @Override
-        public int scanId() {
-            return scanId;
-        }
-
-        @Override
-        public int msLevel() {
-            return msLevel;
-        }
-
-        @Override
-        public double rt() {
-            return rt;
-        }
-
-        @Override
-        public int polarity() {
-            return polarity;
-        }
-
-        @Override
-        public double precmz() {
-            return precmz;
-        }
-
-        @Override
-        public int ms1scan() {
-            return ms1scan;
-        }
-
-        @Override
-        public int charge() {
-            return charge;
-        }
-
-        @Override
-        public int peakCount() {
-            return peakCount;
-        }
-
-        @Override
-        public SpectrumTable materialize() {
+        ScanView toView() {
             double[][] pair = decode();
             double[] mz = pair[0], in = pair[1];
             int n = mz.length;
             SpectrumTableBuilder b = new SpectrumTableBuilder(msLevel == 1 ? 1 : 2, Math.max(n, 1));
             b.startScan(scanId, rt, polarity, precmz, ms1scan, charge);
             for (int i = 0; i < n; i++) b.addPeak(mz[i], in[i]);
-            return b.build();
+            return new ScanView(
+                    scanId,
+                    msLevel,
+                    rt,
+                    polarity == 1 ? Polarity.POSITIVE : polarity == 2 ? Polarity.NEGATIVE : null,
+                    precmz == 0.0 ? null : precmz,
+                    ms1scan == 0 ? null : ms1scan,
+                    charge == 0 ? null : charge,
+                    b.build());
         }
 
         /**

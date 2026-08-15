@@ -92,7 +92,7 @@ class PeakOrderPreconditionTest {
                                         : "data/" + fixture))) {
             while (s.hasNext()) {
                 ScanView v = s.next();
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 for (int i = 1; i < t.rowCount(); i++) {
                     assertTrue(
                             t.mz(i) >= t.mz(i - 1),

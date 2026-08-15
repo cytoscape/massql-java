@@ -40,7 +40,7 @@ class ZeroIntensityPeakTest {
         try (SpectraStream s = SpectraFile.open(Fixtures.require(fixture))) {
             while (s.hasNext()) {
                 ScanView v = s.next();
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 double[] mz = new double[t.rowCount()];
                 double[] in = new double[t.rowCount()];
                 for (int i = 0; i < t.rowCount(); i++) {
@@ -111,7 +111,7 @@ class ZeroIntensityPeakTest {
                 SpectraFile.open(Fixtures.require("fixtures/micro/micro_zeroint.mgf"))) {
             while (s.hasNext()) {
                 ScanView v = s.next();
-                peaks += v.materialize().rowCount();
+                peaks += v.peaks().rowCount();
             }
         }
         assertEquals(
@@ -134,7 +134,7 @@ class ZeroIntensityPeakTest {
             while (s.hasNext()) {
                 ScanView v = s.next();
                 if (v.scanId() != 1) continue;
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 assertEquals(
                         1500.0 / 1500.0, t.iNorm(1), 0.0, "the base peak's iNorm is exactly 1.0");
                 assertEquals(
@@ -176,7 +176,7 @@ class ZeroIntensityPeakTest {
             while (s.hasNext()) {
                 ScanView v = s.next();
                 if (v.scanId() != 1) continue;
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 for (int i = 0; i < 8; i++) {
                     assertEquals(
                             0.0,
@@ -211,7 +211,7 @@ class ZeroIntensityPeakTest {
                     if (want == null) continue; // zero-peak scan, absent from the dump
                     assertEquals(
                             want.peakCount(),
-                            v.materialize().rowCount(),
+                            v.peaks().rowCount(),
                             f + " scan " + v.scanId() + ": mzXML applies no intensity filter");
                 }
             }

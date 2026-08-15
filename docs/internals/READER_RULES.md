@@ -57,8 +57,7 @@ for each spectrum in document order:
 MassQL reads neither mzML's `spectrumRef` nor mzXML's `precursorScanNum` — the two attribute names appear
 **zero times** in all 892 lines of `msql_fileloading.py`. Consequences:
 
-- An MS2 scan before any MS1 gets `ms1scan = 0` → null downstream. **That is where the 0 sentinel comes
-  from.**
+- An MS2 scan before any MS1 has no linked scan, so its `ms1scan` is null.
 - A reader that "correctly" resolves `spectrumRef` disagrees with MassQL whenever the reference is not the
   immediately preceding MS1 scan. For simple DDA they coincide, which is why `small.mzML` **cannot** detect
   the difference; the Ewing mzXML (zero `precursorScanNum`) is the only fixture that can.

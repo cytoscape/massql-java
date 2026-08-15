@@ -182,7 +182,7 @@ class PrecursorLookupTest {
     void theZeroSentinelOnMs1scanSuppressesTheLookupEvenIfATableIsPresent() {
         // This is why the collation converts sentinels AFTER the lookup: ms1scan == 0 is the
         // signal.
-        var r = PrecursorLookup.lookup(microMs1(), 0, 500.0, 20.0);
+        var r = PrecursorLookup.lookup(microMs1(), null, 500.0, 20.0);
         assertNull(
                 r.ms1BasePeakI(), "ms1scan == 0 means 'no linked scan', so nothing is looked up");
     }
@@ -191,7 +191,7 @@ class PrecursorLookupTest {
     void precmzZeroMeansNoLookupButTheBasePeakStillPopulates() {
         // precmz == 0 is "not recorded" -- it must NOT be matched against as if it were an m/z of
         // zero.
-        var r = PrecursorLookup.lookup(microMs1(), 2, 0.0, 20.0);
+        var r = PrecursorLookup.lookup(microMs1(), 2, null, 20.0);
         assertNull(r.ms1I());
         assertNull(r.ms1Precmz());
         assertEquals(9000.0, r.ms1BasePeakI(), "the linked scan exists, so the base peak is known");

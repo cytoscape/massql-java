@@ -19,6 +19,8 @@ import org.cytoscape.massql.io.SpectraFile;
 import org.cytoscape.massql.io.SpectraStream;
 import org.cytoscape.massql.result.ResultJson;
 
+import com.google.gson.GsonBuilder;
+
 /**
  * The standalone MassQL command-line tool — a batch filter mirroring the reference tool's interface.
  *
@@ -98,8 +100,7 @@ public final class Main {
               --precursor-tol-ppm <double>   tolerance for matching the precursor peak in MS1 \
             (default 20.0)
               --output <FILE|->              write JSON to FILE; '-' means stdout (the default)
-              --pretty <true|false>          indent 2 spaces, one key per line; colour on
-                                             stdout (default true)
+              --pretty <true|false>          indent the JSON 2 spaces (default true)
               -h, --help                     this message
 
             Give the query exactly one way: a file, '-' for stdin, or --query.
@@ -193,25 +194,14 @@ public final class Main {
             err.println(d);
         }
 
-        // ONE render per sink, chosen HERE, at the single point where the payload meets its
-        // destination -- including the trailing newline, which is a console convention rather than
-        // part
-        // of the JSON document, and which appending per-sink is exactly how the two modes would
-        // drift.
-        //
-        // ⛔ The two sinks no longer receive identical BYTES, and that is deliberate: colour goes to
-        // stdout only. They still carry identical VALUES -- same keys, same order, same number
-        // formatting -- so anything comparing the two must parse, not diff. A file must never
-        // receive
-        // escape codes; nothing downstream of --output could parse them.
-        boolean toStdout = parsed.output == null;
-        String json =
-                parsed.pretty
-                        ? ResultJson.writePretty(result.rows(), toStdout)
-                        : ResultJson.write(result.rows());
+        // One render, both sinks, including the trailing newline -- appending it per-sink is how
+        // the two modes would drift.
+        GsonBuilder gson = new GsonBuilder().serializeNulls();
+        if (parsed.pretty) gson.setPrettyPrinting();
+        String json = gson.create().toJson(new ResultJson(result.rows()));
         String payload = json + System.lineSeparator();
 
-        if (toStdout) {
+        if (parsed.output == null) {
             out.print(payload);
             out.flush();
             return OK;

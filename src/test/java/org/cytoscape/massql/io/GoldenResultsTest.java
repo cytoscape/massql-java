@@ -43,6 +43,10 @@ class GoldenResultsTest {
     }
 
     /** One well-formed row, as the generator emits it. */
+    private static String wrap(String rows) {
+        return "{\"results\": [" + rows + "]}";
+    }
+
     private static String row(int scan) {
         return "{\"scan\": "
                 + scan
@@ -126,7 +130,11 @@ class GoldenResultsTest {
     void aTruncatedGoldenFails() {
         // The ParityDump failure mode, exactly: a lenient parser reads what it can and reports
         // success on a partial document.
-        Path p = write(dir, "truncated.json", "[\n  " + row(3) + ",\n  {\"scan\": 10, \"precmz\":");
+        Path p =
+                write(
+                        dir,
+                        "truncated.json",
+                        "{\"results\": [\n  " + row(3) + ",\n  {\"scan\": 10, \"precmz\":");
         AssertionError e = assertThrows(AssertionError.class, () -> GoldenResults.read(p));
         assertTrue(e.getMessage().contains("not valid JSON"), e.getMessage());
     }
@@ -136,7 +144,7 @@ class GoldenResultsTest {
         // Silently reading a dropped key as null would compare "null vs null" against a genuinely
         // null column and pass -- which is how three columns went unchecked for five steps.
         String missing = row(3).replace(", \"charge\": null", "");
-        Path p = write(dir, "missing-key.json", "[" + missing + "]");
+        Path p = write(dir, "missing-key.json", wrap(missing));
         AssertionError e = assertThrows(AssertionError.class, () -> GoldenResults.read(p));
         assertTrue(e.getMessage().contains("12 frozen keys"), e.getMessage());
         assertTrue(e.getMessage().contains("charge"), "the message must name what is missing");
@@ -145,7 +153,7 @@ class GoldenResultsTest {
     @Test
     void aGoldenWithAnExtraKeyFails() {
         String extra = row(3).replace("{\"scan\"", "{\"surprise\": 1, \"scan\"");
-        Path p = write(dir, "extra-key.json", "[" + extra + "]");
+        Path p = write(dir, "extra-key.json", wrap(extra));
         assertThrows(AssertionError.class, () -> GoldenResults.read(p));
     }
 
@@ -157,16 +165,16 @@ class GoldenResultsTest {
                 write(
                         dir,
                         "stringy.json",
-                        "[" + row(3).replace("\"tic\": 1000.0", "\"tic\": \"null\"") + "]");
+                        wrap(row(3).replace("\"tic\": 1000.0", "\"tic\": \"null\"")));
         AssertionError e = assertThrows(AssertionError.class, () -> GoldenResults.read(p));
         assertTrue(e.getMessage().contains("tic"), e.getMessage());
     }
 
     @Test
-    void aDocumentThatIsNotAnArrayFails() {
-        Path p = write(dir, "object.json", row(3));
+    void aDocumentWithoutAResultsArrayFails() {
+        Path p = write(dir, "bare-array.json", "[" + row(3) + "]");
         AssertionError e = assertThrows(AssertionError.class, () -> GoldenResults.read(p));
-        assertTrue(e.getMessage().contains("must be a JSON array"), e.getMessage());
+        assertTrue(e.getMessage().contains("'results' array"), e.getMessage());
     }
 
     @Test
@@ -174,8 +182,8 @@ class GoldenResultsTest {
         // The reader cannot know a row is missing -- that is the differential's job -- but it must
         // report the count faithfully so the differential can. This asserts it does not, say,
         // deduplicate or skip.
-        Path two = write(dir, "two.json", "[" + row(3) + "," + row(10) + "]");
-        Path one = write(dir, "one.json", "[" + row(3) + "]");
+        Path two = write(dir, "two.json", wrap(row(3) + "," + row(10)));
+        Path one = write(dir, "one.json", wrap(row(3)));
         assertEquals(2, GoldenResults.read(two).size());
         assertEquals(1, GoldenResults.read(one).size());
     }
@@ -185,10 +193,7 @@ class GoldenResultsTest {
         // scan/ms1scan/charge/mslevel are compared EXACTLY, so reading 3.5 as 3 would make an exact
         // comparison silently approximate.
         Path p =
-                write(
-                        dir,
-                        "fractional.json",
-                        "[" + row(3).replace("\"scan\": 3", "\"scan\": 3.5") + "]");
+                write(dir, "fractional.json", wrap(row(3).replace("\"scan\": 3", "\"scan\": 3.5")));
         AssertionError e = assertThrows(AssertionError.class, () -> GoldenResults.read(p));
         assertTrue(e.getMessage().contains("integral"), e.getMessage());
     }

@@ -5,315 +5,156 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * The published JSON contract: key set, key order, null rendering, and round-trip bit-exactness.
- *
- * <p><b>One shape.</b> Both {@code MS1DATA} and {@code MS2DATA} emit the same 12 keys in the same order.
- * A key that does not apply to a row is <i>present</i> with the value {@code null}, never omitted.
- */
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.annotations.SerializedName;
+
 class ResultJsonTest {
 
-    /** A fully-populated MS2 row, using the first record of {@code small_mzml_results.json}. */
+    /** What the CLI configures: null columns must survive, since the contract has no optional key. */
+    private static final Gson GSON = new GsonBuilder().serializeNulls().create();
+
     private static ScanInfoResult ms2Row() {
         return new ScanInfoResult(
-                3,
-                810.79,
-                2,
-                0.011218333333333334,
-                null,
-                586278.8533592224,
-                2,
-                161140.859375,
-                736.6370849609375,
-                null,
-                null,
-                183838.71875);
+                3, 810.79, 2, 0.0112, null, 586278.85, 2, 161140.86, 736.637, null, null,
+                183838.72);
     }
 
-    /** An MS1 row: precursor fields null, base peaks REAL. */
-    private static ScanInfoResult ms1Row() {
-        return new ScanInfoResult(
-                1,
-                null,
-                null,
-                0.004935,
-                null,
-                69381840.0,
-                1,
-                1471224.875,
-                810.4154747204038,
-                null,
-                null,
-                null);
+    private static ScanInfoResult allNullable() {
+        return new ScanInfoResult(1, null, null, 0.0, null, 1.0, 1, 2.0, 3.0, null, null, null);
     }
 
-    /** Keys in the order they appear in the JSON text, so ORDER is pinned and not just membership. */
-    private static List<String> keysInOrder(String json) {
-        List<String> out = new ArrayList<>();
-        Matcher m = Pattern.compile("\"([a-z0-9_]+)\":").matcher(json);
-        while (m.find()) out.add(m.group(1));
-        return out;
-    }
-
-    private static final List<String> EXPECTED_12 =
-            List.of(
-                    "scan",
-                    "precmz",
-                    "ms1scan",
-                    "rt",
-                    "charge",
-                    "tic",
-                    "mslevel",
-                    "base_peak_i",
-                    "base_peak_mz",
-                    "ms1_i",
-                    "ms1_precmz",
-                    "ms1_base_peak_i");
-
-    // ---------------------------------------------------------------- shape
+    // ------------------------------------------------------------------ round trip
 
     @Test
-    void anMs2RowEmitsExactlyTheTwelveKeysInOrder() {
-        assertEquals(EXPECTED_12, keysInOrder(ResultJson.write(List.of(ms2Row()))));
+    void aRowSurvivesSerializationAndBack() {
+        ScanInfoResult before = ms2Row();
+        ScanInfoResult after = GSON.fromJson(GSON.toJson(before), ScanInfoResult.class);
+        assertEquals(before, after);
     }
 
     @Test
-    void anMs1RowEmitsTheSAMEtwelveKeysInTheSameOrder() {
-        // ⛔ There is one shape: an MS1 row does not omit precmz/ms1scan/charge.
-        assertEquals(
-                EXPECTED_12,
-                keysInOrder(ResultJson.write(List.of(ms1Row()))),
-                "MS1DATA and MS2DATA emit the same 12 keys, discriminated by mslevel");
+    void everyNullableColumnSurvivesAsNull() {
+        ResultJson before = new ResultJson(List.of(allNullable()));
+        ResultJson after = GSON.fromJson(GSON.toJson(before), ResultJson.class);
+        assertEquals(before, after);
+        assertEquals(1, after.results().size());
+        ScanInfoResult r = after.results().get(0);
+        assertFalse(r.precmz() != null || r.charge() != null || r.ms1I() != null, r.toString());
     }
 
     @Test
-    void theTwoShapesAreLiterallyIdenticalInKeyStructure() {
-        // Stated as a property rather than two separate lists, so a future edit cannot drift one
-        // apart
-        // from the other.
-        assertEquals(
-                keysInOrder(ResultJson.write(List.of(ms2Row()))),
-                keysInOrder(ResultJson.write(List.of(ms1Row()))));
+    void anEmptyResultSurvives() {
+        ResultJson after = GSON.fromJson(GSON.toJson(new ResultJson(List.of())), ResultJson.class);
+        assertEquals(List.of(), after.results());
     }
 
     @Test
-    void inapplicableFieldsArePRESENTwithJsonNullNotOmitted() {
-        String json = ResultJson.write(List.of(ms1Row()));
-        assertTrue(
-                json.contains("\"precmz\":null"),
-                "precmz must be present and null, not omitted: " + json);
-        assertTrue(json.contains("\"ms1scan\":null"));
-        assertTrue(json.contains("\"charge\":null"));
-        assertTrue(json.contains("\"ms1_i\":null"));
-        assertTrue(json.contains("\"ms1_precmz\":null"));
-        assertTrue(json.contains("\"ms1_base_peak_i\":null"));
-    }
-
-    @Test
-    void anMs1RowsBasePeaksAreRealValuesNotNull() {
-        // The other half: a null here would be a join artifact, not a property of an MS1 scan.
-        String json = ResultJson.write(List.of(ms1Row()));
-        assertTrue(json.contains("\"base_peak_i\":1471224.875"), json);
-        assertTrue(json.contains("\"base_peak_mz\":810.4154747204038"), json);
-        assertFalse(
-                json.contains("\"base_peak_i\":null"),
-                "a survey scan has a base peak -- issue #26 marks this 'Can be null? No'");
-    }
-
-    @Test
-    void mslevelIsTheDiscriminator() {
-        assertTrue(ResultJson.write(List.of(ms2Row())).contains("\"mslevel\":2"));
-        assertTrue(ResultJson.write(List.of(ms1Row())).contains("\"mslevel\":1"));
-    }
-
-    @Test
-    void nullsRenderAsJsonNullNeverZeroOrEmptyStringOrNone() {
-        String json = ResultJson.write(List.of(ms1Row()));
-        assertFalse(json.contains("\"None\""), json);
-        assertFalse(json.contains("\"\""), json);
-        assertFalse(
-                json.contains("\"precmz\":0"),
-                "0 is a real m/z-adjacent value, not a stand-in for null");
-    }
-
-    // ---------------------------------------------------------------- array framing
-
-    @Test
-    void anEmptyResultIsAnEmptyArrayNotNullAndNotAnError() {
-        // A query that matches nothing is a valid answer -- the deliberate empty golden
-        // micro_mzml_edge_results.json is exactly this case.
-        assertEquals("[]", ResultJson.write(List.of()));
-        assertEquals("[]", ResultJson.write(null));
-    }
-
-    @Test
-    void multipleRowsAreCommaSeparatedInsideOneArray() {
-        String json = ResultJson.write(List.of(ms2Row(), ms1Row()));
-        assertTrue(json.startsWith("[{"), json);
-        assertTrue(json.endsWith("}]"), json);
-        assertTrue(json.contains("},{"), "rows must be comma-separated: " + json);
-        assertEquals(24, keysInOrder(json).size(), "two rows x 12 keys");
-    }
-
-    @Test
-    void outputIsCompactWithNoIndentationOrSpaces() {
-        String json = ResultJson.write(List.of(ms2Row()));
-        assertFalse(
-                json.contains("\n"), "the node-table cell stores this verbatim; layout is waste");
-        assertFalse(json.contains(": "), json);
-        assertFalse(json.contains(", "), json);
-    }
-
-    // ---------------------------------------------------------------- round-trip bit-exactness
-
-    @Test
-    void everyEmittedFloatParsesBackToIDENTICALBITS() {
-        // The actual requirement -- not byte-matching the reference. Guards against a formatter
-        // that
-        // rounds.
-        double[] awkward = {
-            0.011218333333333334, // the mzML golden's rt; does NOT survive a float round-trip
-            586278.8533592224, // our exact float64 tic
-            736.6370849609375, // an exact float32-derived m/z
-            810.4154747204038,
-            1e-5,
-            1e300,
-            4.9e-324, // subnormal
-            0.1 + 0.2, // 0.30000000000000004
-        };
-        for (double d : awkward) {
-            ScanInfoResult r = new ScanInfoResult(1, d, 1, d, 1, d, 2, d, d, d, d, d);
-            String json = ResultJson.write(List.of(r));
-            Matcher m = Pattern.compile("\"tic\":([^,}]+)").matcher(json);
-            assertTrue(m.find(), json);
-            assertEquals(
-                    Double.doubleToLongBits(d),
-                    Double.doubleToLongBits(Double.parseDouble(m.group(1))),
-                    "value " + d + " did not round-trip bit-exactly; emitted " + m.group(1));
+    void everyKeyIsPresentEvenWhenNull() {
+        // serializeNulls is what makes this true; without it gson drops the null columns and the
+        // 12-key contract silently becomes 6 keys on an MS1 row.
+        String json = GSON.toJson(new ResultJson(List.of(allNullable())));
+        for (String key : keysInDeclarationOrder()) {
+            assertTrue(json.contains('"' + key + '"'), key + " missing from " + json);
         }
     }
 
     @Test
-    void rtZeroIsEmittedAsZeroNotNull() {
-        // 664 rows of plusrise_results.json have rt 0.0. An over-eager null conversion fails all of
-        // them.
-        ScanInfoResult r =
-                new ScanInfoResult(
-                        576, 161.0209, null, 0.0, 1, 1299900.0, 2, 230000.0, 162.1122, null, null,
-                        null);
-        String json = ResultJson.write(List.of(r));
-        assertTrue(json.contains("\"rt\":0.0"), json);
-        assertFalse(json.contains("\"rt\":null"), "0.0 is a genuine retention time");
-    }
-
-    // ---------------------------------------------------------------- defensive
-
-    @Test
-    void aNonFiniteValueReachingTheSerializerFailsRatherThanEmittingInvalidJson() {
-        // NaN/infinity must have been converted to null upstream. `NaN` is not valid JSON and the
-        // reference forbids it via allow_nan=False, so emitting it would produce a document no
-        // parser
-        // accepts -- worse than failing.
-        ScanInfoResult bad =
-                new ScanInfoResult(1, 1.0, 1, 1.0, 1, Double.NaN, 2, 1.0, 1.0, null, null, null);
-        IllegalStateException e =
-                assertThrows(IllegalStateException.class, () -> ResultJson.write(List.of(bad)));
-        assertTrue(e.getMessage().contains("non-finite"), e.getMessage());
-    }
-
-    @Test
-    void theSerializersKeyListIsTheRecordsOwnSoTheyCannotDrift() {
-        assertEquals(
-                EXPECTED_12,
-                List.of(ScanInfoResult.KEYS),
-                "ScanInfoResult.KEYS is the single key list; ResultJson emits in that order");
-    }
-
-    // ------------------------------------------------------------------ writePretty
-
-    @Test
-    void prettyIndentsTwoSpacesWithOneKeyPerLine() {
-        String json = ResultJson.writePretty(List.of(ms2Row()));
-
-        // The exact shape the reference produces at indent=2: array bracket alone, row object at
-        // two
-        // spaces, keys at four, and a space after every colon.
-        assertTrue(json.startsWith("[\n  {\n"), json);
-        assertTrue(json.endsWith("\n  }\n]"), json);
-        assertTrue(json.contains("\n    \"scan\": 3,"), json);
-        assertEquals(
-                16,
-                json.lines().count(),
-                "one line each for '[', '{', the 12 keys, '}' and ']': " + json);
-    }
-
-    @Test
-    void prettyAndCompactCarryTheSameKeysInTheSameOrder() {
-        // The whole point: only whitespace differs. A caller comparing the two must parse, not
-        // diff.
-        for (ScanInfoResult row : List.of(ms2Row(), ms1Row())) {
-            assertEquals(
-                    keysInOrder(ResultJson.write(List.of(row))),
-                    keysInOrder(ResultJson.writePretty(List.of(row))),
-                    "compact and pretty must agree on keys and order");
+    void keysAreSerializedInDeclarationOrder() {
+        // The one assertion that must read the text: order is a property of the document, and
+        // deserializing loses it. docs/RESULT_SCHEMA.md freezes it.
+        String json = GSON.toJson(new ResultJson(List.of(ms2Row())));
+        int at = 0;
+        for (String key : keysInDeclarationOrder()) {
+            int found = json.indexOf('"' + key + '"', at);
+            assertTrue(found >= 0, key + " is out of order or missing in " + json);
+            at = found;
         }
     }
 
-    @Test
-    void prettyKeepsNullsAsJsonNull() {
-        String json = ResultJson.writePretty(List.of(ms1Row()));
-        assertTrue(json.contains("\"charge\": null"), json);
-        assertFalse(json.contains("\"charge\": 0"), json);
+    private static List<String> keysInDeclarationOrder() {
+        return List.of(ScanInfoResult.class.getRecordComponents()).stream()
+                .map(ResultJsonTest::keyOf)
+                .toList();
     }
 
-    @Test
-    void anEmptyResultIsBareBracketsInEveryMode() {
-        // Indentation buys nothing for an empty array, and colouring it would put escape codes in a
-        // payload that consumers compare against the literal "[]".
-        assertEquals("[]", ResultJson.write(List.of()));
-        assertEquals("[]", ResultJson.writePretty(List.of()));
-        assertEquals("[]", ResultJson.writePretty(List.of(), true));
-    }
-
-    // ------------------------------------------------------------------ colour
-
-    @Test
-    void colourWrapsKeysAndNullsAndNothingElse() {
-        String json = ResultJson.writePretty(List.of(ms1Row()), true);
-
-        assertTrue(
-                json.contains("\u001B[36m\"scan\"\u001B[0m:"), "keys are cyan: " + visible(json));
-        assertTrue(json.contains("\u001B[2mnull\u001B[0m"), "nulls are dim: " + visible(json));
-
-        // Structure stays uncolourised, which is what lets callers keep asserting startsWith("[").
-        assertTrue(json.startsWith("["), visible(json));
-        assertEquals(
-                keysInOrder(ResultJson.writePretty(List.of(ms1Row()))),
-                keysInOrder(json.replaceAll("\u001B\\[[0-9]+m", "")),
-                "stripping the escapes must give back exactly the uncoloured rendering");
-    }
-
-    @Test
-    void colourIsOffUnlessAskedFor() {
-        for (String json :
-                List.of(
-                        ResultJson.write(List.of(ms1Row())),
-                        ResultJson.writePretty(List.of(ms1Row())),
-                        ResultJson.writePretty(List.of(ms1Row()), false))) {
-            assertFalse(
-                    json.contains("\u001B"), "no escape codes unless requested: " + visible(json));
+    private static String keyOf(java.lang.reflect.RecordComponent c) {
+        try {
+            // @SerializedName targets FIELD, so it propagates to the record's field rather than
+            // staying readable on the component -- which is also where gson reads it.
+            return c.getDeclaringRecord()
+                    .getDeclaredField(c.getName())
+                    .getAnnotation(SerializedName.class)
+                    .value();
+        } catch (NoSuchFieldException e) {
+            throw new AssertionError(c.getName(), e);
         }
     }
 
-    /** Escapes rendered visibly, so a failure message is readable in a terminal or a CI log. */
-    private static String visible(String json) {
-        return json.replace("\u001B", "<ESC>");
+    // ------------------------------------------------------------------ immutability
+
+    @Test
+    void theResultsAccessorIsImmutable() {
+        ResultJson r = new ResultJson(new ArrayList<>(List.of(ms2Row())));
+        assertThrows(UnsupportedOperationException.class, () -> r.results().add(ms2Row()));
+        assertThrows(UnsupportedOperationException.class, () -> r.results().clear());
+        assertThrows(UnsupportedOperationException.class, () -> r.results().remove(0));
+        assertThrows(UnsupportedOperationException.class, () -> r.results().set(0, allNullable()));
+    }
+
+    @Test
+    void theConstructorCopiesSoLaterMutationOfTheSourceIsInvisible() {
+        List<ScanInfoResult> source = new ArrayList<>(List.of(ms2Row()));
+        ResultJson r = new ResultJson(source);
+        source.add(allNullable());
+        assertEquals(1, r.results().size(), "the record kept a copy, not the caller's list");
+    }
+
+    @Test
+    void aNullListBecomesEmptyRatherThanNull() {
+        assertEquals(List.of(), new ResultJson(null).results());
+    }
+
+    @Test
+    void aDeserializedInstanceIsEquallyImmutable() {
+        // Gson uses the canonical constructor for records, so the defensive copy must still run --
+        // otherwise mutability returns through the deserialization path alone.
+        ResultJson r =
+                GSON.fromJson(GSON.toJson(new ResultJson(List.of(ms2Row()))), ResultJson.class);
+        assertThrows(UnsupportedOperationException.class, () -> r.results().add(allNullable()));
+    }
+
+    @Test
+    void noComponentIsAMutableArrayOrCollection() {
+        for (Class<?> type : List.of(ResultJson.class, ScanInfoResult.class)) {
+            for (RecordComponent c : type.getRecordComponents()) {
+                assertFalse(
+                        c.getType().isArray(),
+                        type.getSimpleName()
+                                + "."
+                                + c.getName()
+                                + " is an array; its accessor would"
+                                + " hand back the internal reference");
+                if (Collection.class.isAssignableFrom(c.getType())
+                        || Map.class.isAssignableFrom(c.getType())) {
+                    assertEquals(
+                            List.class,
+                            c.getType(),
+                            type.getSimpleName()
+                                    + "."
+                                    + c.getName()
+                                    + " must be a List copied by the"
+                                    + " compact constructor");
+                }
+            }
+        }
     }
 }

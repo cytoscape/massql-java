@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.cytoscape.massql.testsupport.Fixtures;
+import org.cytoscape.massql.testsupport.Raw;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -43,7 +44,7 @@ class ZeroPeakMs1ChainTest {
         try (SpectraStream s = SpectraFile.open(p)) {
             while (s.hasNext()) {
                 ScanView v = s.next();
-                if (v.msLevel() == 2) out.put(v.scanId(), v.ms1scan());
+                if (v.msLevel() == 2) out.put(v.scanId(), Raw.orZero(v.ms1scan()));
             }
         }
         return out;
@@ -83,10 +84,10 @@ class ZeroPeakMs1ChainTest {
                 if (v.scanId() == 4) {
                     sawEmptyMs1 = true;
                     assertEquals(1, v.msLevel());
-                    assertEquals(0, v.peakCount(), "scan 4 is the zero-peak MS1");
+                    assertEquals(0, v.peaks().rowCount(), "scan 4 is the zero-peak MS1");
                     assertEquals(
                             0,
-                            v.materialize().rowCount(),
+                            v.peaks().rowCount(),
                             "materialising an empty scan yields an empty table, not an error");
                 }
             }

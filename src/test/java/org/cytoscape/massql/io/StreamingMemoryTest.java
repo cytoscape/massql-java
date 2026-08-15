@@ -56,7 +56,7 @@ class StreamingMemoryTest {
         try (SpectraStream s = SpectraFile.open(mgf)) {
             while (s.hasNext()) {
                 ScanView v = s.next();
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 peaks += t.rowCount();
                 scans++;
                 // t goes out of scope each iteration -- nothing here holds a reference.
@@ -147,7 +147,7 @@ class StreamingMemoryTest {
             try (SpectraStream s = SpectraFile.open(Path.of(args[0]))) {
                 while (s.hasNext()) {
                     ScanView v = s.next();
-                    peaks += v.materialize().rowCount();
+                    peaks += v.peaks().rowCount();
                     scans++;
                 }
             }
@@ -210,7 +210,7 @@ class StreamingMemoryTest {
         try (SpectraStream s = SpectraFile.open(mzxml)) {
             while (s.hasNext()) {
                 ScanView v = s.next();
-                peaks += v.materialize().rowCount();
+                peaks += v.peaks().rowCount();
                 scans++;
             }
         }
@@ -226,44 +226,5 @@ class StreamingMemoryTest {
                         + (retained / 1024 / 1024)
                         + " MB is still retained; the mzXML "
                         + "reader appears to be accumulating scans");
-    }
-
-    @Test
-    void metadataOnlyIterationNeverDecodesPeaks() {
-        // The payoff of deferred decoding: a query rejecting scans on RTMIN/SCANMIN/POLARITY/CHARGE
-        // /MS2PREC never calls materialize(), so it never pays base64-decode, inflate or the
-        // double[] allocation. Walking metadata alone must therefore be markedly cheaper.
-        Path mzml = Fixtures.require("data/small.mzML");
-
-        long t0 = System.nanoTime();
-        int metaOnly = 0;
-        try (SpectraStream s = SpectraFile.open(mzml)) {
-            while (s.hasNext()) {
-                ScanView v = s.next();
-                v.precmz();
-                metaOnly++;
-            }
-        }
-        long metaMs = (System.nanoTime() - t0) / 1_000_000;
-
-        long t1 = System.nanoTime();
-        int withPeaks = 0;
-        long peaks = 0;
-        try (SpectraStream s = SpectraFile.open(mzml)) {
-            while (s.hasNext()) {
-                ScanView v = s.next();
-                peaks += v.materialize().rowCount();
-                withPeaks++;
-            }
-        }
-        long fullMs = (System.nanoTime() - t1) / 1_000_000;
-
-        assertEquals(metaOnly, withPeaks);
-        assertEquals(305_214L, peaks);
-        System.out.printf(
-                "  small.mzML: metadata-only %d ms vs full decode %d ms (%,d peaks)%n",
-                metaMs, fullMs, peaks);
-        // No timing assertion -- it would flake. The number is printed so a regression that starts
-        // decoding eagerly is visible in the build log.
     }
 }

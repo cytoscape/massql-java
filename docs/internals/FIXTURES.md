@@ -15,7 +15,7 @@ running shows up as lost coverage.
 | `fixtures/micro/` | Hand-written 5-scan files with hand-computable values, one variable each — see below |
 | `fixtures/edge/` | Pathological inputs — currently MSDK's `empty_msLevel_tag.mzXML` |
 | `goldens/loader-parity/` | **16 dumps.** Per scan: counts, hex intensity sum, SHA-256 of the m/z **and** intensity arrays, the leading 8 values of each as hex, `rt_hex` and `polarity` — all from MassQL's own loaded tables. The input to the parity gate, via `ReaderParityIT.FIXTURES_WITH_DUMPS` |
-| `goldens/query-results/` | `scaninfo` output per fixture/query |
+| `goldens/query-results/` | `scaninfo` output per fixture/query, as `{"results": [...]}`. The reference emits a bare array, so a regenerated golden must be wrapped |
 | `goldens/queries/` | The `.massql` query files those goldens were produced from |
 | `reference_parses/` | MassQL's own 46-file parse corpus (+ manifest) — `ParseConformanceTest` |
 

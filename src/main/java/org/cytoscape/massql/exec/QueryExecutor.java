@@ -86,14 +86,14 @@ public final class QueryExecutor {
 
             // (1) Zero-peak scans are invisible to MassQL -- see the class note. Before the MS1
             // retention, so an empty MS1 cannot become an ms1scan link either.
-            if (v.peakCount() == 0) {
+            if (v.peaks().isEmpty()) {
                 skippedEmpty++;
                 continue;
             }
 
             // (2) Retain the most recent non-empty MS1, for MS1MZ here and the precursor lookup in
             // collation.
-            if (v.msLevel() == 1) retainedMs1 = v.materialize();
+            if (v.msLevel() == 1) retainedMs1 = v.peaks();
 
             if (v.msLevel() != wantedLevel) continue;
 
@@ -119,8 +119,8 @@ public final class QueryExecutor {
             // (4) Peak-level conditions on the materialised scan.
             SpectrumTable scan =
                     (wantedLevel == 1 && retainedMs1 != null && v.msLevel() == 1)
-                            ? retainedMs1 // already materialised at (2); do not decode twice
-                            : v.materialize();
+                            ? retainedMs1
+                            : v.peaks();
 
             for (Condition c : peakLevel) {
                 if (!ConditionFilters.peakLevelHolds(c, scan, v, retainedMs1)) {

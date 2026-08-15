@@ -81,8 +81,8 @@ class IntensityAlgebraTest {
         try (SpectraStream s = SpectraFile.open(resource(FIXTURE))) {
             while (s.hasNext()) {
                 ScanView v = s.next();
-                if (v.msLevel() != 2 || v.peakCount() == 0) continue;
-                var t = v.materialize();
+                if (v.msLevel() != 2 || v.peaks().rowCount() == 0) continue;
+                var t = v.peaks();
                 int inWindow = t.mzWindowExclusive(0, 200.5 - 0.01, 200.5 + 0.01).size();
                 assertTrue(
                         inWindow <= 1,

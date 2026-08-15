@@ -49,9 +49,9 @@ class MzxmlSchema20IT {
                                 + "emitting scans out of document order");
                 previousId = v.scanId();
 
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 assertEquals(
-                        v.peakCount(),
+                        v.peaks().rowCount(),
                         t.rowCount(),
                         "scan "
                                 + v.scanId()
@@ -110,9 +110,9 @@ class MzxmlSchema20IT {
         try (SpectraStream s = SpectraFile.open(mzxml)) {
             while (s.hasNext()) {
                 ScanView v = s.next();
-                if (v.peakCount() != 3) continue;
+                if (v.peaks().rowCount() != 3) continue;
                 threePeak++;
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 assertEquals(3, t.rowCount());
                 for (int i = 0; i < 3; i++) {
                     assertTrue(t.mz(i) > 0.0, "m/z must be positive");

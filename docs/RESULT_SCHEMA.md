@@ -7,7 +7,7 @@ restating it.
 
 ## One shape, always
 
-`ResultJson` emits a **JSON array** of objects. Every object carries **these 12 keys, in this order**:
+`ResultJson` emits an object with a **`results` array**. Every entry carries **these 12 keys, in this order**:
 
 ```
 scan, precmz, ms1scan, rt, charge, tic, mslevel, base_peak_i, base_peak_mz, ms1_i, ms1_precmz, ms1_base_peak_i

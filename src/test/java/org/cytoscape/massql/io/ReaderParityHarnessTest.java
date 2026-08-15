@@ -162,7 +162,7 @@ class ReaderParityHarnessTest {
             while (s.hasNext()) {
                 ScanView v = s.next();
                 if (v.scanId() != 2) continue;
-                var t = v.materialize();
+                var t = v.peaks();
                 double[] mz = new double[t.rowCount()];
                 double[] in = new double[t.rowCount()];
                 for (int i = 0; i < t.rowCount(); i++) {

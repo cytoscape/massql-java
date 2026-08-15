@@ -2,7 +2,8 @@ package org.cytoscape.massql.io;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -22,8 +23,10 @@ import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 import org.cytoscape.massql.MassqlException;
+import org.cytoscape.massql.lang.ast.Polarity;
 import org.cytoscape.massql.spectra.SpectrumTable;
 import org.cytoscape.massql.testsupport.Fixtures;
+import org.cytoscape.massql.testsupport.Raw;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -111,9 +114,9 @@ class MzmlReaderTest {
                 if (v.msLevel() == 1) ms1++;
                 else {
                     ms2++;
-                    ms1scanOf.put(v.scanId(), v.ms1scan());
+                    ms1scanOf.put(v.scanId(), Raw.orZero(v.ms1scan()));
                 }
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 peaks += t.rowCount();
                 Integer want = expected.get(v.scanId());
                 assertNotNull(
@@ -180,14 +183,13 @@ class MzmlReaderTest {
                 assertEquals(2, v.msLevel());
                 assertEquals(810.79, v.precmz());
                 assertEquals(2, v.ms1scan(), "document order, not spectrumRef");
-                assertEquals(
-                        0, v.charge(), "not recorded -> 0 sentinel; collation converts to null");
-                assertEquals(1, v.polarity());
+                assertNull(v.charge(), "not recorded -> null");
+                assertEquals(Polarity.POSITIVE, v.polarity());
                 assertEquals(
                         Double.doubleToLongBits(0.011218333333333334),
                         Double.doubleToLongBits(v.rt()),
                         "rt must be bit-exact");
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 assertEquals(485, t.rowCount());
                 // First decoded m/z, bit-exact. small.mzML stores m/z as 64-bit, so this value must
                 // survive in full precision -- a 32-bit path would give 231.38883972167970's float.
@@ -204,16 +206,15 @@ class MzmlReaderTest {
     // ------------------------------------------------------------------ misc
 
     @Test
-    void materializeIsRepeatableAndIndependent() {
+    void thePeakTableIsTheSameValueOnEveryRead() {
         Path mzml = Fixtures.require("data/small.mzML");
         try (SpectraStream s = SpectraFile.open(mzml)) {
             assertTrue(s.hasNext());
             ScanView v = s.next();
-            SpectrumTable a = v.materialize();
-            SpectrumTable b = v.materialize();
-            assertNotSame(a, b);
+            SpectrumTable a = v.peaks();
+            SpectrumTable b = v.peaks();
+            assertSame(a, b, "the view is a value; peaks are decoded once");
             assertEquals(a.rowCount(), b.rowCount());
-            assertEquals(a.mz(0), b.mz(0));
         }
     }
 
@@ -250,7 +251,7 @@ class MzmlReaderTest {
                     try (SpectraStream s = SpectraFile.open(cut)) {
                         while (s.hasNext()) {
                             ScanView v = s.next();
-                            v.materialize();
+                            v.peaks();
                         }
                     }
                 });

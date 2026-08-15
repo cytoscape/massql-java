@@ -45,13 +45,7 @@ class MainQuerySourceTest {
 
     /** Counts top-level rows without a JSON parser: every row object starts with `{"scan"`. */
     private static int rows(String json) {
-        int n = 0;
-        int at = json.indexOf("{\"scan\"");
-        while (at >= 0) {
-            n++;
-            at = json.indexOf("{\"scan\"", at + 1);
-        }
-        return n;
+        return CliFixtures.parse(json).results().size();
     }
 
     // ------------------------------------------------------------------ each source works

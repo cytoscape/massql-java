@@ -15,6 +15,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import org.cytoscape.massql.result.ResultJson;
+
+import com.google.gson.Gson;
+
 /**
  * Fixture lookup and stream capture for the CLI tests.
  *
@@ -99,6 +103,14 @@ final class CliFixtures {
      * <p>Empty rather than {@code System.in}: a test that accidentally selected the stdin source would
      * otherwise block on the terminal forever instead of failing.
      */
+
+    /** The CLI's payload, deserialized. Tests assert on the object graph, not on the text. */
+    static ResultJson parse(String json) {
+        ResultJson r = new Gson().fromJson(json, ResultJson.class);
+        assertNotNull(r, "payload did not deserialize: " + json);
+        return r;
+    }
+
     static Invocation invoke(String... args) {
         return invokeWithStdin("", args);
     }

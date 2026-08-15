@@ -21,12 +21,7 @@ import java.util.NoSuchElementException;
  * {@link #next()} throws — so reusing a spent stream fails loudly rather than looking like a query
  * that matched nothing.
  *
- * <p><b>Deliberately NOT an {@link java.util.Iterator}</b>, despite the method names. {@link #next()}
- * returns the <i>same mutable {@link ScanView} instance</i> every call, so anything that accumulates
- * the results of iteration — {@code StreamSupport.stream(…).toList()}, {@code Iterators.addAll}, a
- * for-each that stashes elements — would collect N references to one object and produce a list whose
- * every element looks identical. Not implementing {@code Iterator} makes that unreachable rather than
- * merely discouraged. Use {@link ScanView#materialize()} to retain a scan.
+ * <p><b>Deliberately NOT an {@link java.util.Iterator}</b>, despite the method names.
  *
  * <p><b>{@code close()} is load-bearing</b>, not ceremony: the cursor holds a memory mapping (mzML,
  * mzXML) or an open reader (MGF) for its whole lifetime. It must be idempotent.
@@ -61,14 +56,6 @@ public interface SpectraStream extends AutoCloseable {
 
     /**
      * Advances to the next spectrum and returns it.
-     *
-     * <p>⚠ <b>The returned view is the SAME object on every call</b>, rewound onto the new spectrum.
-     * It is valid only until the following {@code next()}. Do not retain it, put it in a collection,
-     * or compare two of them — call {@link ScanView#materialize()} for a scan you need to keep, which
-     * is what the engine does for exactly one MS1 scan to serve the precursor lookup.
-     *
-     * <p>Reusing one instance is the whole reason retained memory is bounded by the largest single
-     * scan rather than by file size.
      *
      * @throws NoSuchElementException if the stream is drained — including when a spent stream is
      *         handed to a second query, which is a bug worth a stack trace rather than an empty result

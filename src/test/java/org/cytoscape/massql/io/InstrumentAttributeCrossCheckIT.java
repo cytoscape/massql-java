@@ -111,7 +111,7 @@ class InstrumentAttributeCrossCheckIT {
                 Declared d = byNum.get(v.scanId());
                 assertNotNull(d, "scan " + v.scanId() + " has no declared attributes");
 
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 if (t.rowCount() == 0) continue;
 
                 double tic = 0, maxI = Double.NEGATIVE_INFINITY, bpMz = Double.NaN;
@@ -194,7 +194,7 @@ class InstrumentAttributeCrossCheckIT {
         try (SpectraStream s = SpectraFile.open(mzxml)) {
             while (s.hasNext() && checked < 50) {
                 ScanView v = s.next();
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 if (t.rowCount() < 2) continue;
                 int best = 0, second = -1;
                 for (int i = 1; i < t.rowCount(); i++)

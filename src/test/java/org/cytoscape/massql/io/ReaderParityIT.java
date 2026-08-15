@@ -11,6 +11,7 @@ import java.util.Set;
 import org.cytoscape.massql.spectra.SpectrumTable;
 import org.cytoscape.massql.testsupport.ParityDump;
 import org.cytoscape.massql.testsupport.ParityFixtures;
+import org.cytoscape.massql.testsupport.Raw;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -106,7 +107,7 @@ class ReaderParityIT {
                 if (v.msLevel() == 1) ms1++;
                 else ms2++;
 
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 peaks += t.rowCount();
 
                 ParityDump.Key key = new ParityDump.Key(v.msLevel(), v.scanId());
@@ -201,7 +202,7 @@ class ReaderParityIT {
         String at = fixture + " " + key;
 
         assertEquals(want.peakCount(), t.rowCount(), at + ": peak count");
-        assertEquals(want.polarity(), v.polarity(), at + ": polarity");
+        assertEquals(want.polarity(), Raw.polarity(v.polarity()), at + ": polarity");
 
         // ⛔ The PRECURSOR metadata, on MS2 scans.
         //
@@ -216,11 +217,11 @@ class ReaderParityIT {
         // reader
         // is wrong" and "some result rows differ".
         if (key.mslevel() == 2) {
-            assertEquals(want.charge().intValue(), v.charge(), at + ": charge");
-            assertEquals(want.ms1scan().intValue(), v.ms1scan(), at + ": ms1scan");
+            assertEquals(want.charge().intValue(), Raw.orZero(v.charge()), at + ": charge");
+            assertEquals(want.ms1scan().intValue(), Raw.orZero(v.ms1scan()), at + ": ms1scan");
             assertEquals(
                     Double.doubleToLongBits(want.precmz()),
-                    Double.doubleToLongBits(v.precmz()),
+                    Double.doubleToLongBits(Raw.orZero(v.precmz())),
                     at
                             + ": precmz must be bit-identical (want "
                             + want.precmz()

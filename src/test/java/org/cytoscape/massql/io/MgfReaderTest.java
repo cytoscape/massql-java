@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 import org.cytoscape.massql.MassqlException;
 import org.cytoscape.massql.spectra.SpectrumTable;
 import org.cytoscape.massql.testsupport.Fixtures;
+import org.cytoscape.massql.testsupport.Raw;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -50,12 +51,12 @@ class MgfReaderTest {
                         new Row(
                                 v.scanId(),
                                 v.rt(),
-                                v.precmz(),
-                                v.charge(),
-                                v.ms1scan(),
+                                Raw.orZero(v.precmz()),
+                                Raw.orZero(v.charge()),
+                                Raw.orZero(v.ms1scan()),
                                 v.msLevel(),
-                                v.polarity(),
-                                v.materialize().rowCount()));
+                                Raw.polarity(v.polarity()),
+                                v.peaks().rowCount()));
             }
         }
         return out;
@@ -419,7 +420,7 @@ class MgfReaderTest {
         try (SpectraStream s = SpectraFile.open(p)) {
             assertTrue(s.hasNext());
             ScanView v = s.next();
-            SpectrumTable t = v.materialize();
+            SpectrumTable t = v.peaks();
             assertEquals(
                     1, t.index().scanCount(), "exactly one scan -- this is the streaming unit");
             assertEquals(7, t.index().scanIdAt(0));

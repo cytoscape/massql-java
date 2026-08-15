@@ -65,9 +65,9 @@ dependencies {
     // business reaching into them.
     testRuntimeOnly files(rootProject.sourceSets.test.output.resourcesDir)
 
-    // Test-only: checkBannedDependencies inspects runtimeClasspath, which this cannot reach, and the
-    // uber-jar is built from `implementation`.
-    testImplementation "com.google.code.gson:gson:${rootProject.ext.gsonVersion}"
+    // The SDK exposes gson as `implementation`, so it reaches the uber-jar at runtime but not the
+    // CLI's compile classpath.
+    implementation "com.google.code.gson:gson:${rootProject.ext.gsonVersion}"
 }
 
 tasks.named('test') {

@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.cytoscape.massql.testsupport.Fixtures;
+import org.cytoscape.massql.testsupport.Raw;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -51,7 +52,10 @@ class MultiPrecursorTest {
         try (SpectraStream s = SpectraFile.open(p)) {
             while (s.hasNext()) {
                 ScanView v = s.next();
-                if (v.msLevel() == 2) out.put(v.scanId(), new double[] {v.precmz(), v.charge()});
+                if (v.msLevel() == 2)
+                    out.put(
+                            v.scanId(),
+                            new double[] {Raw.orZero(v.precmz()), Raw.orZero(v.charge())});
             }
         }
         return out;
@@ -159,10 +163,10 @@ class MultiPrecursorTest {
                                     new Row(
                                             v.scanId(),
                                             v.msLevel(),
-                                            v.ms1scan(),
+                                            Raw.orZero(v.ms1scan()),
                                             v.rt(),
-                                            v.polarity(),
-                                            v.materialize().rowCount()));
+                                            Raw.polarity(v.polarity()),
+                                            v.peaks().rowCount()));
                         }
                     }
                     return out;

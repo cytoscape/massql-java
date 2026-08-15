@@ -2,6 +2,7 @@ package org.cytoscape.massql.io;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -19,6 +20,7 @@ import java.util.zip.GZIPInputStream;
 
 import org.cytoscape.massql.spectra.SpectrumTable;
 import org.cytoscape.massql.testsupport.Fixtures;
+import org.cytoscape.massql.testsupport.Raw;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -80,7 +82,7 @@ class MzxmlReaderTest {
                     ms2++;
                     ms1scanOf.put(v.scanId(), v.ms1scan());
                 }
-                SpectrumTable t = v.materialize();
+                SpectrumTable t = v.peaks();
                 Integer want = expected.get(v.scanId());
                 assertNotNull(
                         want, "reader produced scan " + v.scanId() + ", absent from the dump");
@@ -138,16 +140,16 @@ class MzxmlReaderTest {
                             SpectraFile.open(Fixtures.require("fixtures/micro/" + name))) {
                         while (s.hasNext()) {
                             ScanView v = s.next();
-                            SpectrumTable t = v.materialize();
+                            SpectrumTable t = v.peaks();
                             out.add(
                                     new Row(
                                             v.scanId(),
                                             v.msLevel(),
-                                            v.ms1scan(),
+                                            Raw.orZero(v.ms1scan()),
                                             v.rt(),
-                                            v.precmz(),
-                                            v.charge(),
-                                            v.polarity(),
+                                            Raw.orZero(v.precmz()),
+                                            Raw.orZero(v.charge()),
+                                            Raw.polarity(v.polarity()),
                                             t.rowCount(),
                                             t.rowCount() == 0 ? Double.NaN : t.mz(0)));
                         }
@@ -194,11 +196,11 @@ class MzxmlReaderTest {
             while (s.hasNext()) {
                 ScanView v = s.next();
                 if (v.msLevel() == 1) {
-                    if (v.peakCount() > 0) previousMs1 = v.scanId();
+                    if (v.peaks().rowCount() > 0) previousMs1 = v.scanId();
                 } else {
                     assertEquals(
                             previousMs1,
-                            v.ms1scan(),
+                            Raw.orZero(v.ms1scan()),
                             "scan "
                                     + v.scanId()
                                     + " must link by document order, not precursorScanNum");
@@ -208,11 +210,9 @@ class MzxmlReaderTest {
     }
 
     @Test
-    void chargeAbsentIsZeroNotOne() {
-        // The cross-format trap: mzXML's absent precursorCharge is 0,
-        // while
-        // MGF's absent CHARGE is 1. micro scans 1 and 3 omit it; scan 5 has charge
-        // 2.
+    void chargeAbsentIsNullNotOne() {
+        // The cross-format trap: mzXML's absent precursorCharge is null, while MGF's absent CHARGE
+        // is 1. micro scans 1 and 3 omit it; scan 5 has charge 2.
         Map<Integer, Integer> charges = new LinkedHashMap<>();
         try (SpectraStream s = SpectraFile.open(Fixtures.require("fixtures/micro/micro.mzXML"))) {
             while (s.hasNext()) {
@@ -220,8 +220,8 @@ class MzxmlReaderTest {
                 if (v.msLevel() == 2) charges.put(v.scanId(), v.charge());
             }
         }
-        assertEquals(0, charges.get(1), "absent precursorCharge -> 0 in mzXML, unlike MGF's 1");
-        assertEquals(0, charges.get(3), "absent precursorCharge -> 0");
+        assertNull(charges.get(1), "absent precursorCharge -> null in mzXML, unlike MGF's 1");
+        assertNull(charges.get(3), "absent precursorCharge -> null");
         assertEquals(2, charges.get(5), "precursorCharge=\"2\" is read");
 
         // The contrast, made explicit: the SAME logical scans read from MGF give charge 1 where the
@@ -249,10 +249,10 @@ class MzxmlReaderTest {
                 scans++;
                 if (v.scanId() == 4) {
                     saw = true;
-                    assertEquals(0, v.peakCount());
+                    assertEquals(0, v.peaks().rowCount());
                     assertEquals(
                             0,
-                            v.materialize().rowCount(),
+                            v.peaks().rowCount(),
                             "an empty scan materialises to an empty table, not an error");
                 }
             }

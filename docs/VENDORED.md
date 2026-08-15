@@ -91,6 +91,5 @@ it from its only caller. ⚠ Not everything in that directory is upstream code, 
 
 ## References
 
-- `bannedDependencies` in `build.gradle` — the jsr305 and Guava bans, and the closure-size budget
 - The mzXML parser is **hand-written** rather than vendored: reusing MSDK's would have dragged in 7
   `datamodel` types and Guava via `SimpleMsScan`

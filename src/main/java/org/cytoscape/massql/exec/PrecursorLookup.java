@@ -37,14 +37,12 @@ public final class PrecursorLookup {
     /**
      * @param retainedMs1 the linked MS1 scan as a single-scan table, or null if none precedes this scan
      * @param ms1scan     the scan's {@code ms1scan} metadata, carrying MassQL's raw {@code 0} sentinel
-     * @param precmz      the scan's {@code precmz}, carrying the raw {@code 0} sentinel
+     * @param precmz      the scan's {@code precmz}; {@code null} when not recorded
      * @param tolPpm      {@code MassqlOptions.precursorTolPpm} — <b>not</b> the query's own TOLERANCEPPM
      */
     public static Result lookup(
-            SpectrumTable retainedMs1, int ms1scan, double precmz, double tolPpm) {
-        // The raw 0 sentinel is what tells us there is no linked scan, which is why the collation
-        // converts sentinels to null only AFTER this runs. Converting earlier loses the signal.
-        if (ms1scan == 0 || retainedMs1 == null || retainedMs1.isEmpty()) return Result.NONE;
+            SpectrumTable retainedMs1, Integer ms1scan, Double precmz, double tolPpm) {
+        if (ms1scan == null || retainedMs1 == null || retainedMs1.isEmpty()) return Result.NONE;
 
         // The stream retains exactly the linked MS1 scan, because the
         // document-order rule guarantees ms1scan is always the most recent PRECEDING MS1. If this
@@ -71,8 +69,8 @@ public final class PrecursorLookup {
         // NaN from Reductions.max would otherwise reach the JSON as a null for the wrong reason.
         Double ms1BasePeakI = topRow < 0 ? null : retainedMs1.intensity(topRow);
 
-        // A precmz of 0 is "not recorded", and NaN cannot be matched against.
-        if (precmz == 0.0 || Double.isNaN(precmz)) return new Result(null, null, ms1BasePeakI);
+        // NaN cannot be matched against.
+        if (precmz == null || precmz.isNaN()) return new Result(null, null, ms1BasePeakI);
 
         IntRange cand = candidates(retainedMs1, precmz, tolPpm);
         if (cand.size() == 0) return new Result(null, null, ms1BasePeakI);

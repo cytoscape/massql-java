@@ -1,6 +1,7 @@
 package org.cytoscape.massql.cli;
 
 import static org.cytoscape.massql.cli.CliFixtures.invoke;
+import static org.cytoscape.massql.cli.CliFixtures.parse;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -22,7 +23,7 @@ import org.junit.jupiter.api.io.TempDir;
  * differential rests on: that comparison reads the {@code --output} file rather than the pipe
  * (), so if the two modes could differ, the gate would be measuring something other
  * than what a user piping to {@code jq} gets. The property is guaranteed structurally —
- * {@code ResultJson.write} returns one {@code String} and both sinks receive it — but the guarantee
+ * One render reaches both sinks — but the guarantee
  * is only as good as the thing checking it, and the trailing newline is exactly where two render
  * paths would have drifted.
  */
@@ -44,8 +45,6 @@ class MainOutputFileTest {
         String query = CliFixtures.standardQuery().toString();
         Path target = dir.resolve("result.json");
 
-        // --pretty false on BOTH: the byte-identity below only holds for an uncolourised render,
-        // and colour goes to stdout only.
         CliFixtures.Invocation piped = invoke(spectra, query, "--pretty", "false");
         CliFixtures.Invocation filed =
                 invoke(spectra, query, "--pretty", "false", "--output", target.toString());
@@ -109,7 +108,7 @@ class MainOutputFileTest {
                                 "--output",
                                 target.toString())
                         .exitCode());
-        assertEquals("[]", Files.exists(target) ? readString(target).strip() : null);
+        assertTrue(parse(readString(target)).results().isEmpty());
     }
 
     private static String readString(Path p) {
@@ -162,6 +161,6 @@ class MainOutputFileTest {
                                 target.toString())
                         .exitCode());
 
-        assertEquals("[]", readString(target).strip());
+        assertTrue(parse(readString(target)).results().isEmpty());
     }
 }

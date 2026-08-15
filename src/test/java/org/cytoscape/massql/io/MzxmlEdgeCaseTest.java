@@ -15,6 +15,7 @@ import java.util.List;
 import org.cytoscape.massql.MassqlException;
 import org.cytoscape.massql.spectra.SpectrumTable;
 import org.cytoscape.massql.testsupport.Fixtures;
+import org.cytoscape.massql.testsupport.Raw;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -81,7 +82,7 @@ class MzxmlEdgeCaseTest {
             int decoded = 0;
             while (s.hasNext()) {
                 ScanView v = s.next();
-                int n = v.materialize().rowCount();
+                int n = v.peaks().rowCount();
                 assertTrue(n > 0, "scan " + v.scanId() + " decoded to zero peaks");
                 decoded++;
             }
@@ -105,7 +106,7 @@ class MzxmlEdgeCaseTest {
                 if (v.msLevel() == 2) {
                     assertEquals(
                             0.0,
-                            v.precmz(),
+                            Raw.orZero(v.precmz()),
                             "absent <precursorMz> -> the 0 sentinel (our contract, not parity)");
                     ms2++;
                 }
@@ -145,8 +146,8 @@ class MzxmlEdgeCaseTest {
         try (SpectraStream s = SpectraFile.open(p)) {
             assertTrue(s.hasNext());
             ScanView v = s.next();
-            assertEquals(0, v.peakCount());
-            assertEquals(0, v.materialize().rowCount());
+            assertEquals(0, v.peaks().rowCount());
+            assertEquals(0, v.peaks().rowCount());
             assertFalse(s.hasNext());
         }
     }
@@ -244,9 +245,9 @@ class MzxmlEdgeCaseTest {
             ScanView v = s.next();
             assertEquals(
                     2,
-                    v.peakCount(),
+                    v.peaks().rowCount(),
                     "with peaksCount absent the count must come from the base64 length, not default to 0");
-            SpectrumTable t = v.materialize();
+            SpectrumTable t = v.peaks();
             assertEquals(2, t.rowCount(), "the decoded peaks must agree with the derived count");
             assertEquals(100.5, t.mz(0), 1e-4);
             assertEquals(200.25, t.mz(1), 1e-4);

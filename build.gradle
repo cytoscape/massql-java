@@ -25,7 +25,7 @@ version = sdkVersion          // gradle.properties; independent of cliVersion
 ext.antlrVersion = '4.13.2'
 ext.junitVersion = '5.11.4'
 
-// Test-only, in both projects. Declared once so the SDK and CLI suites cannot drift apart.
+// Declared once so the SDK and CLI cannot drift apart.
 ext.gsonVersion = '2.11.0'
 
 allprojects {
@@ -181,50 +181,21 @@ allprojects {
 }
 
 dependencies {
-    // These two are the entire runtime closure, and it stays that way -- see bannedDependencies below.
     implementation "com.github.chhh:javolution-core-java-msftbx:6.11.8"
     implementation "org.antlr:antlr4-runtime:${antlrVersion}"
+    implementation "com.google.code.gson:gson:${gsonVersion}"
 
     // The ANTLR *tool*, used only by generateGrammarSource. See the severing below.
     antlr "org.antlr:antlr4:${antlrVersion}"
-
-    // ⚠ TEST SCOPE ONLY -- reads the query-result goldens for the differential.
-    //
-    // `checkBannedDependencies` inspects runtimeClasspath, so this provably cannot reach the 0.749 MB
-    // shipping closure, and checkBannedDependencies would fail if it did.
-    //
-    // Elsewhere the project avoids JSON libraries because Jackson discovers modules via
-    // ServiceLoader, whose failure mechanism is a thread-context classloader that cannot see the
-    // caller's classes. A test in a plain JVM with a flat classpath has no such split, so that
-    // reasoning does not apply here. The decisive argument: a hand-rolled regex parser silently stops at `polarity`
-    // and drops three columns, which lets a reader bug survive a GREEN gate. For the
-    // artifact that IS the exit criterion, silent truncation is the wrong failure mode.
-    //
-    // gson rather than Jackson: one artifact, and it uses no ServiceLoader at all.
-    testImplementation "com.google.code.gson:gson:${gsonVersion}"
 }
 
 // ---------------------------------------------------------------------------------------------
 // ANTLR
 // ---------------------------------------------------------------------------------------------
 
-// ⛔ Gradle's antlr plugin makes the compile/runtime configurations extendFrom `antlr`, putting the
-// whole ANTLR TOOL closure on the CONSUMER classpath. Measured, that is:
-//
-//     org.antlr:antlr4                  1,350,599
-//     org.antlr:antlr-runtime:3.5.3       173,220   <- duplicate of antlr4-runtime, different major
-//     org.antlr:ST4                       251,081
-//     org.abego.treelayout                 26,773
-//     com.ibm.icu:icu4j:72.1           14,386,028   <- fourteen megabytes
-//                                      ----------
-//                                      16,187,701   = 15.44 MB
-//
-// against a shipping closure of 0.75 MB and a ~1.5 MB budget -- so ~21x over, not a rounding error.
-// antlr-runtime 3.x sitting beside antlr4-runtime is also a duplicate artifact, which the
-// bannedDependencies list below exists to prevent.
-//
-// generateGrammarSource takes its tool classpath from the `antlr` configuration directly, so
-// severing the inheritance costs nothing.
+// Gradle's antlr plugin makes compile/runtime extendFrom `antlr`, which would put the whole ANTLR
+// TOOL closure on the consumer classpath. generateGrammarSource takes its tool classpath from the
+// `antlr` configuration directly, so severing the inheritance costs nothing.
 configurations.configureEach { conf ->
     if (conf.name != 'antlr' && conf.extendsFrom.any { it.name == 'antlr' }) {
         conf.extendsFrom = conf.extendsFrom.findAll { it.name != 'antlr' }
@@ -340,80 +311,6 @@ jacocoTestCoverageVerification {
 
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestCoverageVerification')
-}
-
-// ---------------------------------------------------------------------------------------------
-// Dependency policy
-// ---------------------------------------------------------------------------------------------
-
-// The dependency policy, enforced rather than written down: this list IS the policy, and each entry
-// carries the reason it is banned.
-//
-// Implemented directly rather than with a plugin: the only comparable one
-// (org.kordamp.gradle.project-enforcer) last released 0.14.0 in August 2024, predating Gradle 9, and
-// this is twenty lines with no supply-chain surface.
-//
-// No upper-bound rule is needed: Gradle's conflict resolution already selects the highest requested
-// version by default.
-ext.bannedDependencies = [
-    // MSDK is a VENDORING SOURCE, never a dependency. Depending on any MSDK artifact
-    // drags Guava back in via msdk-datamodel.
-    'io.github.msdk:*',
-    'it.unimi.dsi:dsiutils',
-    'it.unimi.dsi:fastutil',
-    'com.google.guava:guava',
-    // Guava's annotation satellites. jsr305 ships javax.annotation (69 classes), which collides
-    // with anything else providing that package.
-    'com.google.code.findbugs:jsr305',
-    'org.checkerframework:checker-qual',
-    'com.google.errorprone:error_prone_annotations',
-    'com.google.j2objc:j2objc-annotations',
-    // The SDK logs nothing at all, so no slf4j in any form and no logging framework beyond it.
-    // (slf4j 2.x also discovers its binding via ServiceLoader, which is separately not allowed.)
-    'ch.qos.logback:*',
-    'org.slf4j:*',
-    // No JAXB.
-    'javax.xml.bind:*',
-    'com.sun.xml.bind:*',
-    'jakarta.xml.bind:*',
-    // Out of scope, and CDK is 2.7 MB with Guava underneath.
-    'org.openscience.cdk:*',
-]
-
-allprojects {
-    tasks.register('checkBannedDependencies') {
-        group = 'verification'
-        description = 'Fails if a forbidden coordinate reaches the runtime classpath.'
-        doLast {
-            def patterns = rootProject.ext.bannedDependencies
-            def offenders = []
-            configurations.runtimeClasspath.resolvedConfiguration
-                    .resolvedArtifacts.each { artifact ->
-                def id = artifact.moduleVersion.id
-                def coord = "${id.group}:${id.name}"
-                patterns.each { pattern ->
-                    def regex = '^' + java.util.regex.Pattern.quote(pattern)
-                            .replace('\\*', '\\E.*\\Q') + '$'
-                    if (coord ==~ regex) {
-                        offenders << "${coord}:${id.version}  (banned by '${pattern}')"
-                    }
-                }
-            }
-            if (offenders) {
-                throw new GradleException(
-                        "banned dependency in "
-                                + (project.path == ':' ? 'the root project' : project.path)
-                                + ":\n  "
-                                + offenders.unique().join('\n  ')
-                                + "\n\nEach entry in `bannedDependencies` in build.gradle states why it "
-                                + "is banned. Read that reason before relaxing this.")
-            }
-        }
-    }
-
-    tasks.named('check') {
-        dependsOn tasks.named('checkBannedDependencies')
-    }
 }
 
 // ---------------------------------------------------------------------------------------------

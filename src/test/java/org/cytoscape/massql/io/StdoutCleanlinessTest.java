@@ -59,7 +59,7 @@ class StdoutCleanlinessTest {
                             try (SpectraStream s = SpectraFile.open(mzml)) {
                                 while (s.hasNext()) {
                                     ScanView v = s.next();
-                                    v.materialize();
+                                    v.peaks();
                                 }
                             }
                         });
@@ -84,7 +84,7 @@ class StdoutCleanlinessTest {
                             try (SpectraStream s = SpectraFile.open(mzml)) {
                                 while (s.hasNext()) {
                                     ScanView v = s.next();
-                                    v.materialize();
+                                    v.peaks();
                                 }
                             }
                         });
@@ -100,7 +100,7 @@ class StdoutCleanlinessTest {
                             try (SpectraStream s = SpectraFile.open(mgf)) {
                                 while (s.hasNext()) {
                                     ScanView v = s.next();
-                                    v.materialize();
+                                    v.peaks();
                                 }
                             }
                         });

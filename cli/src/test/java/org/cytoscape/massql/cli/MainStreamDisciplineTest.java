@@ -1,7 +1,9 @@
 package org.cytoscape.massql.cli;
 
 import static org.cytoscape.massql.cli.CliFixtures.invoke;
+import static org.cytoscape.massql.cli.CliFixtures.parse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
@@ -30,7 +32,7 @@ class MainStreamDisciplineTest {
     @TempDir Path dir;
 
     @Test
-    void stdoutIsExactlyTheJsonArrayAndATrailingNewline() {
+    void stdoutIsExactlyTheJsonPayloadAndATrailingNewline() {
         CliFixtures.Invocation r =
                 invoke(
                         CliFixtures.smallMzml().toString(),
@@ -43,15 +45,15 @@ class MainStreamDisciplineTest {
         assertTrue(out.endsWith(System.lineSeparator()), "a console payload ends with a newline");
 
         String body = out.strip();
-        assertTrue(body.startsWith("["), "stdout begins with the array: " + preview(body));
-        assertTrue(body.endsWith("]"), "and ends with it: " + preview(body));
+        assertFalse(parse(body).results().isEmpty(), "stdout carries the rows: " + preview(body));
+        assertTrue(body.endsWith("}"), "and ends with the object: " + preview(body));
 
         // Nothing before or after the array. A single stray progress line here would corrupt the
         // payload for every consumer piping to jq -- the exact failure the JavolutionQuiet fix
         // and
         // StdoutCleanlinessTest exist to prevent, now asserted at the CLI layer too.
-        assertEquals(0, body.indexOf('['), "no preamble before the JSON");
-        assertEquals(body.length() - 1, body.lastIndexOf(']'), "no epilogue after the JSON");
+        assertEquals(0, body.indexOf('{'), "no preamble before the JSON");
+        assertEquals(body.length() - 1, body.lastIndexOf('}'), "no epilogue after the JSON");
 
         // And the whole thing is one document: exactly one newline, at the very end.
         assertEquals(
@@ -70,7 +72,9 @@ class MainStreamDisciplineTest {
                         CliFixtures.emptyResultQuery().toString());
 
         assertEquals(0, r.exitCode(), r.stderr());
-        assertEquals("[]", r.stdout().strip(), "stdout is still valid JSON, with or without notes");
+        assertTrue(
+                parse(r.stdout()).results().isEmpty(),
+                "stdout is still valid JSON, with or without notes");
     }
 
     @Test
@@ -122,8 +126,8 @@ class MainStreamDisciplineTest {
 
         // The file holds the JSON document and nothing else -- no diagnostics leaked into it.
         String written = readString(target).strip();
-        assertEquals(0, written.indexOf('['), "the output file starts with the array");
-        assertEquals(written.length() - 1, written.lastIndexOf(']'), "and ends with it");
+        assertEquals(0, written.indexOf('{'), "the output file starts with the object");
+        assertEquals(written.length() - 1, written.lastIndexOf('}'), "and ends with it");
     }
 
     private static String readString(Path p) {

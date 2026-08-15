@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -116,44 +116,31 @@ class SpectraStreamContractTest {
         }
     }
 
-    // ---------------------------------------------------------------- the returned view is ONE
-    // object
+    // ---------------------------------------------------------------- each view is a value
 
     @ParameterizedTest
     @ValueSource(strings = {MGF, MZML, MZXML})
-    void nextReturnsTheSameInstanceEveryTime(String f) {
-        // Not an accident to be fixed -- it is the design, and it is why retained memory is bounded
-        // by
-        // the largest single scan. Asserting it here means anyone who "improves" the readers into
-        // allocating per scan has to change a test that says why not to.
+    void eachNextReturnsAnIndependentValue(String f) {
         try (SpectraStream s = SpectraFile.open(fixture(f))) {
             assertTrue(s.hasNext());
             ScanView first = s.next();
             if (!s.hasNext()) return; // single-scan fixture: nothing to compare
             ScanView second = s.next();
-            assertSame(
-                    first,
-                    second,
-                    "the view is a reused cursor; a fresh instance per scan would silently multiply "
-                            + "retained memory by the scan count");
+            assertNotSame(first, second);
+            assertNotEquals(first.scanId(), second.scanId());
         }
     }
 
     @Test
-    void theViewIsRewoundNotCopiedSoStaleReferencesSeeTheNewScan() {
-        // The consequence of the above, stated so it cannot surprise anyone: a reference held
-        // across
-        // an advance reports the NEW scan's data. materialize() is the supported way to retain.
+    void aRetainedViewKeepsItsOwnScanAcrossAdvances() {
         try (SpectraStream s = SpectraFile.open(fixture(MZML))) {
             ScanView v = s.next();
             int firstId = v.scanId();
+            int firstPeaks = v.peaks().rowCount();
             assertTrue(s.hasNext());
             s.next();
-            assertNotEquals(
-                    firstId,
-                    v.scanId(),
-                    "the same object must now report the second scan -- this is the aliasing the "
-                            + "javadoc warns about, and materialize() is the way around it");
+            assertEquals(firstId, v.scanId(), "a retained view is a value, not a cursor");
+            assertEquals(firstPeaks, v.peaks().rowCount());
         }
     }
 

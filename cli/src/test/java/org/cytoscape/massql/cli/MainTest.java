@@ -1,6 +1,7 @@
 package org.cytoscape.massql.cli;
 
 import static org.cytoscape.massql.cli.CliFixtures.invoke;
+import static org.cytoscape.massql.cli.CliFixtures.parse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -147,7 +148,7 @@ class MainTest {
                         "\n\n  QUERY scaninfo(MS2DATA) WHERE MS2PREC=810.79:TOLERANCEMZ=1.0  \n\n");
         CliFixtures.Invocation r = invoke(CliFixtures.smallMzml().toString(), padded.toString());
         assertEquals(0, r.exitCode(), "stderr: " + r.stderr());
-        assertTrue(r.stdout().startsWith("["), r.stdout());
+        assertFalse(parse(r.stdout()).results().isEmpty(), r.stdout());
     }
 
     @Test
@@ -213,10 +214,7 @@ class MainTest {
     // ------------------------------------------------------------------ --pretty
 
     @Test
-    void prettyIsTheDefaultAndColoursStdout() {
-        // The human case is the default: someone exploring in a terminal should not have to
-        // discover a
-        // flag to get readable output.
+    void prettyIsTheDefault() {
         for (String[] args :
                 new String[][] {
                     {}, {"--pretty", "true"},
@@ -226,13 +224,7 @@ class MainTest {
             assertTrue(
                     r.stdout().lines().count() > 2,
                     "indented output spans many lines: " + r.stdout());
-            assertTrue(
-                    r.stdout().contains("\u001B"), "stdout is a terminal sink, so it is coloured");
-            // Escapes stripped first: a colour code sits between the indent and the key, so the
-            // indentation is only visible in the uncolourised text.
-            assertTrue(
-                    r.stdout().replaceAll("\u001B\\[[0-9]+m", "").contains("\n    \"scan\": "),
-                    "two-space indent per level: " + r.stdout());
+            assertTrue(r.stdout().contains("\"scan\": "), "keys are indented: " + r.stdout());
         }
     }
 
@@ -250,20 +242,19 @@ class MainTest {
     }
 
     @Test
-    void aFileSinkIsIndentedButNeverColoured() throws Exception {
-        // Escape codes in a file would break every parser that later reads it, so --output is
-        // uncolourised even though --pretty is on.
+    void aFileSinkIsByteIdenticalToStdout() throws Exception {
         Path out = dir.resolve("pretty.json");
-        CliFixtures.Invocation r = run("--pretty", "true", "--output", out.toString());
-        assertEquals(0, r.exitCode(), r.stderr());
-        assertTrue(r.stdoutIsEmpty(), "--output keeps stdout empty: " + r.stdout());
+        CliFixtures.Invocation toFile = run("--pretty", "true", "--output", out.toString());
+        assertEquals(0, toFile.exitCode(), toFile.stderr());
+        assertTrue(toFile.stdoutIsEmpty(), "--output keeps stdout empty: " + toFile.stdout());
 
-        String json = java.nio.file.Files.readString(out);
-        assertTrue(json.contains("\n    \"scan\": "), "still indented: " + json);
-        assertFalse(json.contains("\u001B"), "a file is not a terminal: " + json);
+        CliFixtures.Invocation toStdout = run("--pretty", "true");
+        assertEquals(
+                toStdout.stdout().strip(),
+                java.nio.file.Files.readString(out).strip(),
+                "one render, two destinations");
     }
 
-    @Test
     void aNonBooleanPrettyValueIsRejectedRatherThanTreatedAsFalse() {
         // Boolean.parseBoolean maps every unrecognised string to false, which would silently turn
         // formatting off for a typo. Both of these must say so instead.

@@ -20,6 +20,7 @@ import org.cytoscape.massql.MassqlOptions;
 import org.cytoscape.massql.io.ScanView;
 import org.cytoscape.massql.io.SpectraFile;
 import org.cytoscape.massql.io.SpectraStream;
+import org.cytoscape.massql.lang.ast.Polarity;
 import org.cytoscape.massql.result.ScanInfoResult;
 import org.cytoscape.massql.spectra.SpectrumTable;
 import org.cytoscape.massql.spectra.SpectrumTableBuilder;
@@ -68,58 +69,27 @@ class ScaninfoCollationTest {
         return b.build();
     }
 
-    /** A minimal ScanView over a hand-built single-scan table, for the unit-level cases. */
-    private record View(SpectrumTable t) implements ScanView {
-        @Override
-        public int scanId() {
-            return t.index().scanIdAt(0);
-        }
-
-        @Override
-        public int msLevel() {
-            return t.msLevel();
-        }
-
-        @Override
-        public double rt() {
-            return t.index().rtOf(0);
-        }
-
-        @Override
-        public int polarity() {
-            return t.index().polarityOf(0);
-        }
-
-        @Override
-        public double precmz() {
-            return t.index().precmzOf(0);
-        }
-
-        @Override
-        public int ms1scan() {
-            return t.index().ms1scanOf(0);
-        }
-
-        @Override
-        public int charge() {
-            return t.index().chargeOf(0);
-        }
-
-        @Override
-        public int peakCount() {
-            return t.rowCount();
-        }
-
-        @Override
-        public SpectrumTable materialize() {
-            return t;
-        }
+    /** A ScanView over a hand-built single-scan table, for the unit-level cases. */
+    private static ScanView view(SpectrumTable t) {
+        int polarity = t.index().polarityOf(0);
+        double precmz = t.index().precmzOf(0);
+        int ms1scan = t.index().ms1scanOf(0);
+        int charge = t.index().chargeOf(0);
+        return new ScanView(
+                t.index().scanIdAt(0),
+                t.msLevel(),
+                t.index().rtOf(0),
+                polarity == 1 ? Polarity.POSITIVE : polarity == 2 ? Polarity.NEGATIVE : null,
+                precmz == 0.0 ? null : precmz,
+                ms1scan == 0 ? null : ms1scan,
+                charge == 0 ? null : charge,
+                t);
     }
 
     private static ScanInfoResult collateOne(
             SpectrumTable scan, SpectrumTable ms1, MassqlOptions opts) {
         ScaninfoCollation c = new ScaninfoCollation(opts);
-        c.accept(new View(scan), scan, ms1);
+        c.accept(view(scan), scan, ms1);
         return c.rows().get(0);
     }
 
@@ -324,7 +294,12 @@ class ScaninfoCollationTest {
         assertEquals(100.0, r.basePeakMz(), "but its m/z is finite and survives");
 
         // And the row serializes to valid JSON rather than throwing.
-        assertDoesNotThrow(() -> org.cytoscape.massql.result.ResultJson.write(List.of(r)));
+        assertDoesNotThrow(
+                () ->
+                        new com.google.gson.GsonBuilder()
+                                .serializeNulls()
+                                .create()
+                                .toJson(new org.cytoscape.massql.result.ResultJson(List.of(r))));
     }
 
     @Test
@@ -350,9 +325,8 @@ class ScaninfoCollationTest {
                 oneScan(10, 2, 1.0, 1, 500.0, 0, 0, new double[] {1.0}, new double[] {1.0});
         SpectrumTable lo =
                 oneScan(2, 2, 1.0, 1, 500.0, 0, 0, new double[] {1.0}, new double[] {1.0});
-        c.accept(new View(hi), hi, null);
-        MassqlException e =
-                assertThrows(MassqlException.class, () -> c.accept(new View(lo), lo, null));
+        c.accept(view(hi), hi, null);
+        MassqlException e = assertThrows(MassqlException.class, () -> c.accept(view(lo), lo, null));
         assertTrue(e.getMessage().contains("out of order"), e.getMessage());
     }
 

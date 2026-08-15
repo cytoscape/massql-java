@@ -1,7 +1,9 @@
 package org.cytoscape.massql.cli;
 
 import static org.cytoscape.massql.cli.CliFixtures.invoke;
+import static org.cytoscape.massql.cli.CliFixtures.parse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
@@ -29,7 +31,7 @@ class MainExitCodeTest {
         CliFixtures.Invocation r =
                 invoke(CliFixtures.smallMzml().toString(), CliFixtures.standardQuery().toString());
         assertEquals(0, r.exitCode(), "stderr: " + r.stderr());
-        assertTrue(r.stdout().startsWith("["), "stdout carries the JSON array");
+        assertFalse(parse(r.stdout()).results().isEmpty(), "stdout carries the rows");
     }
 
     @Test
@@ -42,7 +44,7 @@ class MainExitCodeTest {
                         CliFixtures.microMzml().toString(),
                         CliFixtures.emptyResultQuery().toString());
         assertEquals(0, r.exitCode(), "an empty result is a valid answer, not a failure");
-        assertEquals("[]", r.stdout().strip(), "and the answer is an empty JSON array");
+        assertTrue(parse(r.stdout()).results().isEmpty(), "and the answer is an empty result");
     }
 
     @Test

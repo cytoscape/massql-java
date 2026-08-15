@@ -4,70 +4,68 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.RecordComponent;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
+import org.cytoscape.massql.result.ResultJson;
 import org.cytoscape.massql.result.ScanInfoResult;
 
-import com.google.gson.JsonArray;
+import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
+import com.google.gson.annotations.SerializedName;
 
 /**
  * Reads a reference-generated golden from {@code goldens/query-results/} into {@link ScanInfoResult}
  * rows.
  *
- * <h2>Why a JSON library, when the rest of this repository parses JSON with regex</h2>
- *
- * <p>Three other places ({@code ParityDump}, {@code MzmlReaderTest}, {@code MzxmlReaderTest}) hand-roll
- * their parsing to avoid a JSON dependency, since Jackson discovers modules via {@code ServiceLoader}.
- * That concern does not apply here: its failure mechanism is a thread-context classloader that cannot
- * see the caller's classes, and a test running under Gradle on a flat classpath has no such split.
- * {@code gson} is {@code testImplementation} only, and {@code checkBannedDependencies} inspects
- * {@code runtimeClasspath}, so it provably cannot reach the runtime closure.
- *
- * <p>⛔ <b>The decisive argument is silent truncation.</b> A hand-rolled regex stops at the field its
- * pattern happens to reach — dropping {@code charge}, {@code ms1scan} and {@code precmz} without a
- * word — which lets a reader bug survive a <b>green</b> parity gate. This file feeds the differential
- * against the reference, so a parser whose failure mode is silent truncation is the wrong tool.
- *
- * <h2>Strictness is the point</h2>
- *
- * <p>Every read is validated: the document must be an array, each element an object carrying
- * <b>exactly</b> the 12 frozen keys, and every value a number or {@code null}. A golden that has been
- * truncated, reordered or had a row dropped <b>fails loudly here</b> rather than quietly comparing
- * fewer rows and reporting green. {@code GoldenResultsTest} proves each of those rejections.
- *
- * <p><b>Public because it is shared across test packages</b> — the differential lives in
- * {@code …massql.exec} and the cross-format test in {@code …massql.io}. It is in the test source
- * set, so it appears in no shipped artifact and on no public API surface.
- *
- * <p>The key list is duplicated from {@code ScanInfoResult.KEYS}, which is package-private to
- * {@code …massql.result}. This copy is checked against the goldens themselves on every read, so a
- * divergence surfaces immediately.
+ * <p>Gson maps the values; the structural checks here are what gson does not do. A golden that lost a
+ * key would otherwise deserialize as a row of nulls and compare "successfully" against a genuinely
+ * null column, so the key set and the value types are asserted before mapping.
  */
 public final class GoldenResults {
 
-    /** The frozen 12-key contract, in order — {@code docs/RESULT_SCHEMA.md}. */
+    /** The frozen key order, read from the record itself rather than restated. */
     public static final List<String> KEYS =
-            List.of(
-                    "scan",
-                    "precmz",
-                    "ms1scan",
-                    "rt",
-                    "charge",
-                    "tic",
-                    "mslevel",
-                    "base_peak_i",
-                    "base_peak_mz",
-                    "ms1_i",
-                    "ms1_precmz",
-                    "ms1_base_peak_i");
+            Arrays.stream(ScanInfoResult.class.getRecordComponents())
+                    .map(GoldenResults::keyOf)
+                    .toList();
+
+    private static String keyOf(RecordComponent c) {
+        try {
+            // @SerializedName targets FIELD, so it propagates to the record's field rather than
+            // staying readable on the component -- which is also where gson reads it.
+            return c.getDeclaringRecord()
+                    .getDeclaredField(c.getName())
+                    .getAnnotation(SerializedName.class)
+                    .value();
+        } catch (NoSuchFieldException e) {
+            throw new AssertionError(c.getName(), e);
+        }
+    }
+
+    /** Key -> component type, so the integral check below follows the record rather than a list. */
+    private static final Map<String, Class<?>> TYPES =
+            Arrays.stream(ScanInfoResult.class.getRecordComponents())
+                    .collect(
+                            Collectors.toMap(
+                                    GoldenResults::keyOf,
+                                    RecordComponent::getType,
+                                    (a, b) -> a,
+                                    LinkedHashMap::new));
+
+    private static final Gson GSON = new Gson();
 
     private GoldenResults() {}
 
@@ -96,29 +94,31 @@ public final class GoldenResults {
             throw new AssertionError(
                     "golden is not valid JSON: " + path + " -- " + e.getMessage(), e);
         }
-        if (!root.isJsonArray()) {
-            throw new AssertionError("golden must be a JSON array, got " + root + ": " + path);
+        if (!root.isJsonObject() || !root.getAsJsonObject().has("results")) {
+            throw new AssertionError("golden must be an object with a 'results' array: " + path);
+        }
+        JsonElement results = root.getAsJsonObject().get("results");
+        if (!results.isJsonArray()) {
+            throw new AssertionError("'results' must be an array, got " + results + ": " + path);
         }
 
-        JsonArray rows = root.getAsJsonArray();
-        List<ScanInfoResult> out = new ArrayList<>(rows.size());
+        List<JsonElement> rows = new ArrayList<>();
+        results.getAsJsonArray().forEach(rows::add);
         for (int i = 0; i < rows.size(); i++) {
-            out.add(row(path, i, rows.get(i)));
+            validate(path, i, rows.get(i));
         }
-        return List.copyOf(out);
+        ResultJson parsed = GSON.fromJson(root, ResultJson.class);
+        return parsed.results();
     }
 
-    private static ScanInfoResult row(Path path, int index, JsonElement element) {
+    private static void validate(Path path, int index, JsonElement element) {
         String at = path.getFileName() + " row " + index;
         if (!element.isJsonObject()) {
             throw new AssertionError(at + " is not an object: " + element);
         }
         JsonObject o = element.getAsJsonObject();
 
-        // Exactly the 12 keys -- no more, no fewer. A golden that lost a key would otherwise read
-        // as
-        // a row full of nulls and compare "successfully" against a genuinely null column.
-        if (!o.keySet().equals(new java.util.LinkedHashSet<>(KEYS))) {
+        if (!o.keySet().equals(new LinkedHashSet<>(KEYS))) {
             throw new AssertionError(
                     at
                             + " does not carry exactly the 12 frozen keys.\n  expected: "
@@ -128,43 +128,18 @@ public final class GoldenResults {
                             + "\nSee docs/RESULT_SCHEMA.md -- the contract is one union schema with no key"
                             + " ever absent.");
         }
-
-        return new ScanInfoResult(
-                integer(at, o, "scan"),
-                number(at, o, "precmz"),
-                integer(at, o, "ms1scan"),
-                number(at, o, "rt"),
-                integer(at, o, "charge"),
-                number(at, o, "tic"),
-                integer(at, o, "mslevel"),
-                number(at, o, "base_peak_i"),
-                number(at, o, "base_peak_mz"),
-                number(at, o, "ms1_i"),
-                number(at, o, "ms1_precmz"),
-                number(at, o, "ms1_base_peak_i"));
-    }
-
-    /** A JSON number or null. Anything else — a string, a bool, an object — is a malformed golden. */
-    private static Double number(String at, JsonObject o, String key) {
-        JsonElement v = o.get(key);
-        if (v.isJsonNull()) return null;
-        if (!v.isJsonPrimitive() || !v.getAsJsonPrimitive().isNumber()) {
-            throw new AssertionError(at + ": '" + key + "' must be a number or null, got " + v);
+        for (String key : KEYS) {
+            JsonElement v = o.get(key);
+            if (v.isJsonNull()) continue;
+            if (!v.isJsonPrimitive() || !v.getAsJsonPrimitive().isNumber()) {
+                throw new AssertionError(at + ": '" + key + "' must be a number or null, got " + v);
+            }
+            // Gson would truncate 3.5 to 3 for an Integer column, making an exact comparison
+            // silently approximate.
+            if (TYPES.get(key) == Integer.class && v.getAsDouble() % 1 != 0) {
+                throw new AssertionError(at + ": '" + key + "' must be integral, got " + v);
+            }
         }
-        return v.getAsDouble();
-    }
-
-    private static Integer integer(String at, JsonObject o, String key) {
-        JsonElement v = o.get(key);
-        if (v.isJsonNull()) return null;
-        if (!v.isJsonPrimitive() || !v.getAsJsonPrimitive().isNumber()) {
-            throw new AssertionError(at + ": '" + key + "' must be a number or null, got " + v);
-        }
-        double d = v.getAsDouble();
-        if (d != Math.rint(d)) {
-            throw new AssertionError(at + ": '" + key + "' must be integral, got " + d);
-        }
-        return (int) d;
     }
 
     /** Asserts the golden exists, so a missing file fails here rather than as an empty comparison. */

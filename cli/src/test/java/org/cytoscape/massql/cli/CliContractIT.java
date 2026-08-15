@@ -138,8 +138,11 @@ class CliContractIT {
         } catch (RuntimeException e) {
             throw new AssertionError(what + " is not valid JSON: " + abbreviate(json), e);
         }
-        assertTrue(root.isJsonArray(), what + " must be a JSON array, got: " + abbreviate(json));
-        return root.getAsJsonArray();
+        assertTrue(root.isJsonObject(), what + " must be a JSON object, got: " + abbreviate(json));
+        JsonElement rows = root.getAsJsonObject().get("results");
+        assertNotNull(rows, what + " has no 'results': " + abbreviate(json));
+        assertTrue(rows.isJsonArray(), what + " 'results' must be an array: " + abbreviate(json));
+        return rows.getAsJsonArray();
     }
 
     private static String abbreviate(String s) {
@@ -435,7 +438,6 @@ class CliContractIT {
      */
     @Test
     void thePipedAndFileModesAgreeByteForByte(@TempDir Path dir) {
-        // Both sinks uncolourised, so "one rendering, two destinations" is a byte claim again.
         Path file = dir.resolve("results.json");
         fork(
                 CliFixtures.smallMzml(),
@@ -517,10 +519,7 @@ class CliContractIT {
     // ------------------------------------------------------------------ --pretty
 
     @Test
-    void prettyStdoutIsIndentedAndColourisedThroughTheRealJar() {
-        // The default path a human hits: no flags, output to the terminal. Exercised through the
-        // assembled jar because the escapes and the indentation both have to survive a real process
-        // boundary, not just an in-process StringWriter.
+    void prettyStdoutIsIndentedThroughTheRealJar() {
         Run r = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery());
         assertEquals(0, r.exit(), () -> r.err());
 
@@ -528,70 +527,40 @@ class CliContractIT {
         assertTrue(
                 out.lines().count() >= 2,
                 () -> "indented output is multi-line: " + abbreviate(out));
-        assertTrue(out.contains("\u001B[36m"), () -> "keys are cyan: " + visible(out));
-        assertTrue(out.contains("\u001B[2mnull\u001B[0m"), () -> "nulls are dim: " + visible(out));
-
-        String plain = strip(out);
-        assertTrue(
-                plain.startsWith("[\n  {\n"),
-                () -> "two-space indent per level: " + abbreviate(plain));
-        assertTrue(
-                plain.contains("\n    \"scan\": "), () -> "keys sit at four: " + abbreviate(plain));
-        JsonArray prettyRows = parseArray(plain, "the de-colourised pretty payload");
-        assertEquals(6, prettyRows.size());
-        assertRowsMatchStandardQuery(prettyRows);
+        assertTrue(out.startsWith("{\n"), () -> abbreviate(out));
+        assertTrue(out.contains("\"scan\": "), () -> "keys are indented: " + abbreviate(out));
+        assertRowsMatchStandardQuery(parseArray(out, "the pretty payload"));
     }
 
     @Test
-    void prettyToAFileIsIndentedWithNoEscapeCodes(@TempDir Path dir) {
-        // ⛔ Colour is decided by the SINK, not by --pretty: escape codes in a file would break
-        // every
-        // parser that later reads it, so the file stays valid JSON while still being readable.
+    void prettyToAFileMatchesStdoutByteForByte(@TempDir Path dir) {
         Path out = dir.resolve("pretty.json");
-        Run r = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery(), "--output", out);
-        assertEquals(0, r.exit(), () -> r.err());
-        assertEquals(0, r.stdout().length, () -> "--output keeps stdout empty: " + r.out());
+        Run toFile = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery(), "--output", out);
+        assertEquals(0, toFile.exit(), () -> toFile.err());
+        assertEquals(
+                0, toFile.stdout().length, () -> "--output keeps stdout empty: " + toFile.out());
 
-        String json = readString(out);
-        assertFalse(json.contains("\u001B"), () -> "a file is not a terminal: " + visible(json));
-        assertTrue(json.startsWith("[\n  {\n"), () -> "still indented: " + abbreviate(json));
-        assertTrue(json.contains("\n    \"scan\": "), () -> abbreviate(json));
-        JsonArray prettyFileRows = parseArray(json, "the pretty --output payload");
-        assertEquals(6, prettyFileRows.size());
-        assertRowsMatchStandardQuery(prettyFileRows);
+        Run toStdout = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery());
+        assertEquals(
+                toStdout.out().strip(), readString(out).strip(), "one render, two destinations");
+        assertRowsMatchStandardQuery(parseArray(readString(out), "the --output payload"));
     }
 
     @Test
-    void prettyFalseIsASingleUncolouredLineWithTheSameRows() {
-        // The machine form, and the flag a caller piping into jq needs.
+    void prettyFalseIsASingleLineWithTheSameRows() {
         Run compact =
                 fork(CliFixtures.smallMzml(), CliFixtures.standardQuery(), "--pretty", "false");
         assertEquals(0, compact.exit(), () -> compact.err());
-
-        String out = compact.out();
-        assertFalse(out.contains("\u001B"), () -> "no colour in machine output: " + visible(out));
         assertEquals(
                 1,
-                out.stripTrailing().lines().count(),
-                () -> "compact is one line: " + abbreviate(out));
+                compact.out().stripTrailing().lines().count(),
+                () -> "compact is one line: " + abbreviate(compact.out()));
 
-        // Only whitespace and escapes ever differ between the two renderings, so once those are
-        // removed the payloads must carry the same VALUES -- not merely the same row count.
         Run pretty = fork(CliFixtures.smallMzml(), CliFixtures.standardQuery());
         assertEquals(
-                parseArray(strip(pretty.out()), "the pretty payload"),
-                parseArray(out, "the compact payload"),
+                parseArray(pretty.out(), "the pretty payload"),
+                parseArray(compact.out(), "the compact payload"),
                 "the two renderings must parse to identical values");
-    }
-
-    /** ANSI SGR codes removed, leaving the JSON a parser would accept. */
-    private static String strip(String s) {
-        return s.replaceAll("\u001B\\[[0-9]+m", "");
-    }
-
-    /** Escapes rendered visibly, so a failure message stays readable in a terminal or a CI log. */
-    private static String visible(String s) {
-        return abbreviate(s.replace("\u001B", "<ESC>"));
     }
 
     // ------------------------------------------------------------------ file helpers

@@ -30,7 +30,7 @@ java -jar cli/build/libs/massql-java-cli.jar src/test/resources/data/small.mzML 
   -q 'QUERY scaninfo(MS2DATA) WHERE MS2PREC=810.79:TOLERANCEMZ=1.0'
 ```
 
-That prints a JSON array — one object per matching scan, six of them here.
+That prints a JSON object whose `results` array holds one entry per matching scan, six here.
 
 ---
 
