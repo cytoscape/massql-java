@@ -60,7 +60,7 @@ and upstream silently gave them nothing.
 | Added | Why |
 |---|---|
 | `owned` field, populated only by `map` | `byteBuffer(int)` swaps entries for `duplicate()`s, and a duplicate has no cleaner — only the originals can be unmapped. Streams built through the public constructors borrow their buffers and own nothing. |
-| `close()` that unmaps each owned buffer via `sun.misc.Unsafe.invokeCleaner` | The only way to release a mapping before GC. `jdk.unsupported` opens `sun.misc`, so no `--add-opens` is needed; if a future JDK withdraws it, the catch leaves the mapping to the collector and behaviour falls back to upstream's. |
+| `close()` that unmaps each owned buffer via `sun.misc.Unsafe.invokeCleaner` | The only way to release a mapping before GC. `jdk.unsupported` declares both `exports sun.misc` and **`opens sun.misc`** — check with `java --describe-module jdk.unsupported` — so the reflective lookup of `theUnsafe` needs no `--add-opens` on a supported JDK. The lookup is nonetheless wrapped: if any JDK withdraws `invokeCleaner` or denies the reflective access, the handle stays null, every unmap becomes a no-op, and behaviour falls back to upstream's collector-timed release. |
 | `closed` flag, checked in `byteBuffer(int)` | **Load-bearing.** Reading an unmapped buffer aborts the JVM with SIGSEGV rather than throwing. Every access routes through `byteBuffer(int)`, so one guard covers the class. |
 
 Covered by `ByteBufferInputStreamCloseTest` and by `ResourceLeakIT.mappedFileIsUnlockedOnceClosed`,

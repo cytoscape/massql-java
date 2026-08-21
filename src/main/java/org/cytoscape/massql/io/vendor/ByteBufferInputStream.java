@@ -342,10 +342,13 @@ public class ByteBufferInputStream extends InputStream {
     }
   }
 
-  /** {@code sun.misc.Unsafe}, reached reflectively; jdk.unsupported opens the package. */
+  /** {@code sun.misc.Unsafe}, reached reflectively; {@code jdk.unsupported} opens {@code sun.misc}. */
   private static final Object UNSAFE;
 
-  /** {@code Unsafe.invokeCleaner(ByteBuffer)}, or null where it is unavailable. */
+  /**
+   * {@code Unsafe.invokeCleaner(ByteBuffer)}, or null if it is withdrawn or the reflective access is
+   * denied -- in which case unmapping is skipped and the collector frees the mapping, as upstream.
+   */
   private static final MethodHandle INVOKE_CLEANER;
 
   static {
