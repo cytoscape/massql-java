@@ -54,7 +54,7 @@ final class MzxmlReader extends AbstractSpectraStream {
         try {
             xml.setInput(mapped, "UTF-8");
         } catch (XMLStreamException e) {
-            closeQuietly();
+            mapped.close();
             throw new MassqlException("cannot parse " + path + ": " + e.getMessage(), e);
         }
     }
@@ -295,20 +295,13 @@ final class MzxmlReader extends AbstractSpectraStream {
         }
     }
 
-    private void closeQuietly() {
-        try {
-            mapped.close();
-        } catch (IOException ignored) {
-        }
-    }
-
     @Override
     protected void releaseResources() {
         try {
             xml.close();
         } catch (XMLStreamException ignored) {
         }
-        closeQuietly();
+        mapped.close();
     }
 
     private final class Scan {

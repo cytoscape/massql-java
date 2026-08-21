@@ -4,13 +4,16 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
 import org.cytoscape.massql.testsupport.Fixtures;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -105,6 +108,26 @@ class ResourceLeakIT {
 
         assertNoDescriptorGrowth(name + " (never read)", before, CYCLES);
         assertTrue(drain(p) > 0, name + ": readable afterwards");
+    }
+
+    /**
+     * The mapping, not the descriptor. Java frees a {@code MappedByteBuffer} only when the
+     * collector reaches it, and Windows keeps the mapped file locked for that whole time -- so a
+     * user could not delete or re-export the spectra file they had just queried. Deleting is
+     * always permitted on POSIX, so this only bites on the Windows leg of the CI matrix; it is
+     * cheap enough to run everywhere.
+     */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"micro.mgf", "micro.mzML", "micro.mzXML"})
+    void mappedFileIsUnlockedOnceClosed(String name, @TempDir Path tmp) throws IOException {
+        Path copy = tmp.resolve(name);
+        Files.copy(Fixtures.require("fixtures/micro/" + name), copy);
+
+        assertTrue(drain(copy) > 0, name + ": the copy must yield spectra, or nothing was mapped");
+
+        assertDoesNotThrow(
+                () -> Files.delete(copy),
+                name + ": the spectra file is still locked after the stream was closed");
     }
 
     private static void assertNoDescriptorGrowth(String what, long before, int opens) {

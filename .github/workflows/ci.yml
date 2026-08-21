@@ -1,4 +1,8 @@
 # Runs the build's test targets on every push to master and every PR.
+#
+# The Windows leg is not redundant: mzML/mzXML reading memory-maps the input, and only Windows
+# refuses to delete a file whose mapping is still live. ResourceLeakIT.mappedFileIsUnlockedOnceClosed
+# is the assertion that catches a regression there, and it can only fail on this leg.
 name: Continuous Integration
 
 on:
@@ -9,7 +13,16 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout code
@@ -22,6 +35,11 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
+      # The runner image does not ship GNU make, and the Makefile is the only supported entry point.
+      - name: Install make
+        if: runner.os == 'Windows'
+        run: choco install make --no-progress -y
+
       - name: Unit tests
         run: make test
 
@@ -32,7 +50,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports
+          name: test-reports-${{ matrix.os }}
           path: |
             build/test-results/
             build/reports/

@@ -30,13 +30,13 @@ Original copyright is retained verbatim in each header: *(C) Copyright 2015-2016
 
 ## The vendored files
 
-11 files, ~2,670 lines, all from `msdk-io-mzml` at the commit above.
+11 files, ~2,850 lines, all from `msdk-io-mzml` at the commit above.
 
 | File | Lines | Upstream path (under `msdk-io-mzml/src/main/java/io/github/msdk/io/mzml/`) | Modifications |
 |---|---|---|---|
 | `MSNumpress.java` | 1131 | `util/MSNumpress.java` | package declaration only |
 | `MzMLPeaksDecoder.java` | 328 | `data/MzMLPeaksDecoder.java` | **three, all dependency removals** — see below |
-| `ByteBufferInputStream.java` | 288 | `util/ByteBufferInputStream.java` | package declaration only |
+| `ByteBufferInputStream.java` | 369 | `util/ByteBufferInputStream.java` | **package declaration, plus an eager `close()`** — see below |
 | `MzMLBinaryDataInfo.java` | 278 | `data/MzMLBinaryDataInfo.java` | **dropped `javax.annotation.Nonnull`** (jsr305 is banned by policy) |
 | `MzMLCV.java` | 158 | `data/MzMLCV.java` | package declaration only |
 | `MzMLTags.java` | 150 | `data/MzMLTags.java` | package declaration only |
@@ -46,8 +46,26 @@ Original copyright is retained verbatim in each header: *(C) Copyright 2015-2016
 | `MzMLBitLength.java` | 52 | `data/MzMLBitLength.java` | package declaration only |
 | `MzMLArrayType.java` | 49 | `data/MzMLArrayType.java` | package declaration only |
 
-Nine of the eleven are **byte-identical to upstream apart from the package line**, which is the property
+Eight of the eleven are **byte-identical to upstream apart from the package line**, which is the property
 that makes a future re-sync a mechanical diff rather than a merge.
+
+### `ByteBufferInputStream` — releasing the mappings
+
+Upstream declares no `close()`, so it inherits `InputStream`'s no-op and the `MappedByteBuffer`s handed
+out by `map` are released only when the garbage collector eventually reaches them. On Windows the
+mapped file stays **locked** for that entire window, so a user cannot delete or overwrite the spectra
+file they just queried. `MzmlReader` and `MzxmlReader` both call `mapped.close()` expecting a release,
+and upstream silently gave them nothing.
+
+| Added | Why |
+|---|---|
+| `owned` field, populated only by `map` | `byteBuffer(int)` swaps entries for `duplicate()`s, and a duplicate has no cleaner — only the originals can be unmapped. Streams built through the public constructors borrow their buffers and own nothing. |
+| `close()` that unmaps each owned buffer via `sun.misc.Unsafe.invokeCleaner` | The only way to release a mapping before GC. `jdk.unsupported` declares both `exports sun.misc` and **`opens sun.misc`** — check with `java --describe-module jdk.unsupported` — so the reflective lookup of `theUnsafe` needs no `--add-opens` on a supported JDK. The lookup is nonetheless wrapped: if any JDK withdraws `invokeCleaner` or denies the reflective access, the handle stays null, every unmap becomes a no-op, and behaviour falls back to upstream's collector-timed release. |
+| `closed` flag, checked in `byteBuffer(int)` | **Load-bearing.** Reading an unmapped buffer aborts the JVM with SIGSEGV rather than throwing. Every access routes through `byteBuffer(int)`, so one guard covers the class. |
+
+Covered by `ByteBufferInputStreamCloseTest` and by `ResourceLeakIT.mappedFileIsUnlockedOnceClosed`,
+which deletes the mapped file after closing — the assertion only has teeth on the Windows leg of the
+CI matrix.
 
 ### `MzMLPeaksDecoder` — the only substantive edits
 
