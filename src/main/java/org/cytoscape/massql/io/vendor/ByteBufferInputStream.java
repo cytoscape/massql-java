@@ -3,8 +3,8 @@
  *   path:   msdk-io-mzml/src/main/java/io/github/msdk/io/mzml/util/ByteBufferInputStream.java
  *   commit: da2927a15c178b8ba9492d1e62571018bc70eecc
  *
- * Modified: package declaration only; otherwise byte-identical to upstream
- * See docs/VENDORED.md for the rationale and the full modification list.
+ * Modified: package declaration, plus eager unmapping in close() -- upstream never releases the
+ *   mappings it creates. See docs/VENDORED.md for the rationale and the full modification list.
  *
  * MSDK is dual-licensed LGPL-2.1 OR EPL-1.0. This project elects **EPL-1.0**.
  */
@@ -30,6 +30,10 @@ package org.cytoscape.massql.io.vendor;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
@@ -86,6 +90,15 @@ public class ByteBufferInputStream extends InputStream {
   private long remainingBytes;
 
   /**
+   * The mappings this stream created and must release, or null when it borrows buffers owned by
+   * someone else.
+   */
+  private final MappedByteBuffer[] owned;
+
+  /** Set by {@link #close()}; gates every buffer access. */
+  private volatile boolean closed;
+
+  /**
    * Creates a new byte-buffer input stream from a single {@link java.nio.ByteBuffer}.
    *
    * @param byteBuffer the underlying byte buffer.
@@ -107,6 +120,12 @@ public class ByteBufferInputStream extends InputStream {
    */
   protected ByteBufferInputStream(final ByteBuffer[] byteBuffer, final long size, final int curr,
       final boolean[] readyToUse) {
+    this(byteBuffer, size, curr, readyToUse, null);
+  }
+
+  private ByteBufferInputStream(final ByteBuffer[] byteBuffer, final long size, final int curr,
+      final boolean[] readyToUse, final MappedByteBuffer[] owned) {
+    this.owned = owned;
     this.byteBuffer = byteBuffer;
     this.n = byteBuffer.length;
     this.curr = curr;
@@ -133,17 +152,22 @@ public class ByteBufferInputStream extends InputStream {
       throws IOException {
     final long size = fileChannel.size();
     final int chunks = (int) ((size + (CHUNK_SIZE - 1)) / CHUNK_SIZE);
+    final MappedByteBuffer[] owned = new MappedByteBuffer[chunks];
     final ByteBuffer[] byteBuffer = new ByteBuffer[chunks];
-    for (int i = 0; i < chunks; i++)
-      byteBuffer[i] =
+    for (int i = 0; i < chunks; i++) {
+      owned[i] =
           fileChannel.map(mapMode, i * CHUNK_SIZE, Math.min(CHUNK_SIZE, size - i * CHUNK_SIZE));
+      byteBuffer[i] = owned[i];
+    }
     byteBuffer[0].position(0);
     final boolean[] readyToUse = new boolean[chunks];
     Arrays.fill(readyToUse, true);
-    return new ByteBufferInputStream(byteBuffer, size, 0, readyToUse);
+    return new ByteBufferInputStream(byteBuffer, size, 0, readyToUse, owned);
   }
 
   private ByteBuffer byteBuffer(final int n) {
+    if (closed)
+      throw new IllegalStateException("stream is closed");
     if (readyToUse[n])
       return byteBuffer[n];
     readyToUse[n] = true;
@@ -283,6 +307,63 @@ public class ByteBufferInputStream extends InputStream {
   public void constrain(long position, long remainingBytes) {
     this.position(position);
     this.remainingBytes = remainingBytes;
+  }
+
+
+  /**
+   * Releases the mappings created by {@link #map(FileChannel, MapMode)}.
+   *
+   * <p>
+   * Upstream inherits {@link InputStream}'s no-op close, so a mapping survives until the collector
+   * reaches it -- and on Windows the mapped file stays locked for that whole time. Reading a buffer
+   * after it is unmapped aborts the JVM rather than throwing, which is why {@link #byteBuffer(int)}
+   * refuses to hand one out once {@link #closed} is set.
+   */
+  @Override
+  public void close() {
+    if (closed)
+      return;
+    closed = true;
+    if (owned == null)
+      return;
+    for (int i = 0; i < owned.length; i++) {
+      unmap(owned[i]);
+      owned[i] = null;
+    }
+  }
+
+  private static void unmap(final MappedByteBuffer buffer) {
+    if (buffer == null || INVOKE_CLEANER == null)
+      return;
+    try {
+      INVOKE_CLEANER.invoke(UNSAFE, buffer);
+    } catch (Throwable ignored) {
+      // A JDK that withdraws invokeCleaner leaves the mapping to the collector, as upstream does.
+    }
+  }
+
+  /** {@code sun.misc.Unsafe}, reached reflectively; jdk.unsupported opens the package. */
+  private static final Object UNSAFE;
+
+  /** {@code Unsafe.invokeCleaner(ByteBuffer)}, or null where it is unavailable. */
+  private static final MethodHandle INVOKE_CLEANER;
+
+  static {
+    Object unsafe = null;
+    MethodHandle invokeCleaner = null;
+    try {
+      final Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
+      final Field theUnsafe = unsafeClass.getDeclaredField("theUnsafe");
+      theUnsafe.setAccessible(true);
+      unsafe = theUnsafe.get(null);
+      invokeCleaner = MethodHandles.lookup().findVirtual(unsafeClass, "invokeCleaner",
+          MethodType.methodType(void.class, ByteBuffer.class));
+    } catch (Throwable t) {
+      unsafe = null;
+      invokeCleaner = null;
+    }
+    UNSAFE = unsafe;
+    INVOKE_CLEANER = invokeCleaner;
   }
 
 }
