@@ -12,12 +12,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.cytoscape.massql.Massql;
 import org.cytoscape.massql.MassqlException;
 import org.cytoscape.massql.spectra.SpectrumTable;
 import org.cytoscape.massql.testsupport.Fixtures;
 import org.cytoscape.massql.testsupport.Raw;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class MgfReaderTest {
     private static Path write(Path dir, String name, String content) throws IOException {
@@ -218,6 +221,98 @@ class MgfReaderTest {
         List<Row> r = readAll(p);
         assertEquals(1.5, r.get(0).rt(), "90 s = 1.5 min");
         assertEquals(0.0, r.get(1).rt(), "absent RTINSECONDS is 0.0");
+    }
+
+    /**
+     * Ordinal numbering is a first-class mode, not a degraded one: GNPS and mzmine both emit MGFs
+     * without {@code SCANS=}, and the position-derived ids are what a downstream network's scan
+     * column is expected to carry. So the sequence has to be exactly 1..N with no gaps.
+     */
+    @Test
+    void blockIndexNumberingIsDenseAndOneBased(@TempDir Path dir) throws IOException {
+        StringBuilder mgf = new StringBuilder();
+        for (int i = 1; i <= 5; i++) {
+            mgf.append("BEGIN IONS\nPEPMASS=").append(i).append(".0\n100.0 10.0\nEND IONS\n");
+        }
+
+        List<Row> rows = readAll(write(dir, "ordinal.mgf", mgf.toString()));
+
+        assertEquals(5, rows.size());
+        for (int i = 0; i < rows.size(); i++) {
+            assertEquals(i + 1, rows.get(i).scan(), "block " + (i + 1) + " is scan " + (i + 1));
+        }
+    }
+
+    /**
+     * {@code SCANS=} is only honoured when it is a positive number, so a file that writes 0 or a
+     * negative falls back to the block index rather than emitting a scan id no network could join
+     * against.
+     */
+    @ParameterizedTest(name = "SCANS={0}")
+    @ValueSource(strings = {"0", "-5"})
+    void aNonPositiveScansHeaderFallsBackToTheBlockIndex(String scans, @TempDir Path dir)
+            throws IOException {
+        String mgf =
+                """
+                BEGIN IONS
+                PEPMASS=1.0
+                SCANS=%s
+                100.0 10.0
+                END IONS
+                BEGIN IONS
+                PEPMASS=2.0
+                SCANS=%s
+                100.0 10.0
+                END IONS
+                """
+                        .formatted(scans, scans);
+
+        List<Row> rows = readAll(write(dir, "nonpositive.mgf", mgf));
+
+        assertEquals(1, rows.get(0).scan());
+        assertEquals(2, rows.get(1).scan());
+    }
+
+    private static final String MIXED_NUMBERING =
+            """
+            BEGIN IONS
+            PEPMASS=1.0
+            SCANS=100
+            100.0 10.0
+            END IONS
+            BEGIN IONS
+            PEPMASS=2.0
+            100.0 10.0
+            END IONS
+            """;
+
+    /**
+     * The numbering rule is per block, and the reader applies it without looking at its neighbours:
+     * an explicit id on one block does not renumber the blocks around it.
+     */
+    @Test
+    void theNumberingRuleIsAppliedPerBlock(@TempDir Path dir) throws IOException {
+        List<Row> rows = readAll(write(dir, "mixed.mgf", MIXED_NUMBERING));
+
+        assertEquals(100, rows.get(0).scan(), "the explicit id stands");
+        assertEquals(2, rows.get(1).scan(), "and the next block is still numbered by position");
+    }
+
+    /**
+     * Which means a file mixing the two schemes can descend, and a query over it fails rather than
+     * returning rows a caller would join against the wrong nodes. The reader is not the layer that
+     * notices -- collation is -- so this only shows up once a query runs.
+     */
+    @Test
+    void aFileMixingBothSchemesFailsTheQueryRatherThanMisalignIt(@TempDir Path dir)
+            throws IOException {
+        Path p = write(dir, "mixed.mgf", MIXED_NUMBERING);
+
+        MassqlException e =
+                assertThrows(
+                        MassqlException.class,
+                        () -> Massql.run("QUERY scaninfo(MS2DATA)", p, null));
+        assertTrue(e.getMessage().contains("out of order"), e.getMessage());
     }
 
     @Test
