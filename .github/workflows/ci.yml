@@ -1,4 +1,4 @@
-# Runs the build's test targets on every push to master and every PR.
+# Runs the build's test targets on every push to main and every PR.
 #
 # The Windows leg is not redundant: mzML/mzXML reading memory-maps the input, and only Windows
 # refuses to delete a file whose mapping is still live. ResourceLeakIT.mappedFileIsUnlockedOnceClosed
@@ -7,9 +7,9 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
 
 jobs:
   test:

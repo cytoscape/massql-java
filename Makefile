@@ -5,7 +5,14 @@
 #   massql-java       the SDK, the thin jar consumers embed  -> make publish-sdk
 #   massql-java-cli   the standalone CLI uber-jar            -> make publish-cli
 
+# On Windows, make runs its recipes through cmd.exe, which cannot parse "./gradlew" -- the
+# workflow's `shell: bash` only chooses the shell that launches make, not the one make uses. So the
+# wrapper is selected per platform. $(OS) is set to Windows_NT there and unset everywhere else.
+ifeq ($(OS),Windows_NT)
+GRADLE := gradlew.bat --console=plain
+else
 GRADLE := ./gradlew --console=plain
+endif
 
 .DEFAULT_GOAL := help
 .PHONY: help all build test integration-test lint lint-fix coverage \
